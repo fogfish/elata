@@ -1,0 +1,87 @@
+/*
+%%
+%%   Copyright (c) 2011, Nokia Corporation
+%%   All Rights Reserved.
+%%
+%%   The contents of this file are subject to the 3-clause BSD License,
+%%   (the "License"); you may not use this file except in compliance 
+%%   with the License. You should have received a copy of the 3-clause
+%%   BSD Licensee along with this software. If not, it can be
+%%   retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+%%
+%%   Software distributed under the License is distributed on an "AS IS"
+%%   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%   the License for the specific language governing rights and limitations
+%%   under the License.
+%%
+*/
+.view form
+{
+	text-align: center;
+}
+
+.view form > div
+{
+   position: relative;
+   text-align: left;
+   margin: 0;
+   padding: 8px 0px 8px 10px;
+   list-style: none;
+   line-height: 32px;
+   font-size: 18px;
+   font-weight: bold;
+   border-bottom: 1px solid #ccc;
+}
+
+.view form > div label 
+{
+   display: inline-block;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px 10px 0px 0px;
+   overflow: hidden;
+   padding: 0.3em 0 0 0;
+   text-align: right;
+   width: 15%;
+   font-size: 13px;
+   color: #4C566C;
+}
+
+.view form > div.required label
+{
+   color: #ff0099;	
+}
+
+.view form > div input 
+{
+   display: inline-block;
+   padding: 0.3em;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px;
+   overflow: visible;
+   white-space: normal;
+   width: 83%;
+   font-size: 13px;
+   font-weight: bold;
+   border: 1px solid #ccc;
+}
+
+.view form > div p
+{
+	display: inline-block;
+   padding: 0px;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px;
+   overflow: visible;
+   white-space: normal;
+   width: 83%;
+   font-size: 13px;
+   font-weight: normal;
+}
+
+.view form .button
+{
+	margin: 1em 0 0 0 !important;
+}

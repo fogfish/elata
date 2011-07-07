@@ -1,0 +1,143 @@
+/*
+%%
+%%   Copyright (c) 2011, Nokia Corporation
+%%   All Rights Reserved.
+%%
+%%   The contents of this file are subject to the 3-clause BSD License,
+%%   (the "License"); you may not use this file except in compliance 
+%%   with the License. You should have received a copy of the 3-clause
+%%   BSD Licensee along with this software. If not, it can be
+%%   retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+%%
+%%   Software distributed under the License is distributed on an "AS IS"
+%%   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%   the License for the specific language governing rights and limitations
+%%   under the License.
+%%
+*/
+
+/* reset styles */
+html, body, div, span, h1, h2, h3, h4, h5, h6, 
+p, blockquote,  a, abbr, acronym, address, 
+big, cite, code, del, dfn, em, font, img, ins, 
+kbd, q, s, samp, small, strike, strong,   sub,
+sup, tt, var, dl, dt, dd, ol, ul, li, fieldset,
+form,  label,  legend,  table,  caption, tbody,
+tfoot, thead, tr, th, td, input
+{
+   margin: 0;
+   padding: 0;
+   border: 0;
+   outline: 0;
+   font-weight: inherit;
+   font-style: inherit;
+   font-size: 100%;
+   font-family: inherit;
+   vertical-align: baseline;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   text-decoration: none;
+}
+
+/* hide ui elements */
+.popup
+{
+	display: none;
+}
+
+/* container laf */
+body
+{
+	background-color: #ccc;
+}
+
+#container
+{
+   width: 54em;
+   margin: 2em auto;
+   padding: 0;
+   /*
+   border: 1px solid #4A3;
+   border-radius: 0.5em;
+   box-shadow: 0.2em 0.2em 1em #003000;
+   */
+}
+
+#content
+{
+	background-color: #fff;
+	padding: 0.5em;
+	position: relative;
+}
+
+
+#header, #footer
+{
+    padding: 0.5em;
+    border-top-left-radius: 0.5em;
+    border-top-right-radius: 0.5em;
+    border-bottom: 3px solid #4A3;
+    color: #fff;
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#11c611), to(#2F2727));
+    background: -moz-linear-gradient(100% 100% 90deg, #2F2727, #11c611);
+}
+
+#footer
+{
+    border-radius: 0.5em;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-bottom: 0;
+    border-top: 3px solid #4a3;
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#2F2727), to(#11c611));
+    background: -moz-linear-gradient(100% 100% 90deg, #11c611, #2F2727);
+}
+
+#footer .copyright
+{
+	font-size: 0.8em;
+	float: right;
+}
+
+
+.view
+{
+	display: none;
+}
+
+.view h1
+{
+	position: relative;
+	font-size: 1.2em;
+	font-weight: bold;
+	line-height: 1.5em;
+	margin-bottom: 2em;
+	text-align: center; 
+	letter-spacing: 2px;
+	border-bottom: 1px solid #060; 
+	color: #050;
+}
+
+.view h1 div
+{
+	font-size: 0.6em;
+	font-weight: normal;
+	color: #333;
+	letter-spacing: normal;
+}
+
+a.button
+{
+	position: absolute;
+	top:0;
+	right: 0;
+	padding: 5px;
+	font-size: 13px;
+	font-weight: bold;
+	color: #333;
+	background: #aaa;
+	border: 1px solid #333;
+	border-radius: 4px 4px;
+	line-height: 1em;
+}

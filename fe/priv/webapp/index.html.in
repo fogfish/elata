@@ -1,0 +1,147 @@
+<!DOCTYPE html5>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="COPYRIGHT" content="
+     Copyright (c) 2011, Nokia Corporation
+     All Rights Reserved.
+
+     The contents of this file are subject to the 3-clause BSD License,
+     (the "License"); you may not use this file except in compliance 
+     with the License. You should have received a copy of the 3-clause
+     BSD Licensee along with this software. If not, it can be
+     retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+ 
+     Software distributed under the License is distributed on an "AS IS"
+     basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+     the License for the specific language governing rights and limitations
+     under the License.
+    ">
+    <title>Latency In-Focus</title>
+    <link type="text/css" href="elata-@VSN@.css" rel="stylesheet" media="screen">
+    <script type="text/javascript" src="mootools-core-1.3.2-full-compat-yc.js"></script>
+    <script type="text/javascript" src="bert.js"></script>
+    <script type="text/javascript" src="js/base64.js"></script>
+    <script type="text/javascript" src="elata-@VSN@.js"></script>
+    <script type="text/javascript">
+        window.addEvent('domready', function() {
+        	window.location.hash = "";
+           	new elata.App();
+        });
+    </script>
+</head>
+<body>
+<div id="container">
+    <div id="header">
+        <div id="navi">
+            <div><span>Latency In-Focus</span></div>
+            <div id="navi0"></div>
+            <div id="navi1"></div>
+            <div id="navi2"></div>
+            <input type="button" id="naviBack" class="button absRight" value="Previous View" onclick="window.location.hash = '#main';" />
+        </div>
+    </div>
+
+    <div id="content">
+       <!-- list of user services -->
+       <div class="view" id="user">
+          <h1>Service <a id="add-usecase" href="#addusecase" class="button absRight">Add New</a></h1>
+          <div class="list"></div>
+       </div>
+       
+       <!-- use-case details -->
+       <div class="view" id="usecase">
+          <h1></h1>
+          <div id="navi-vbar"><div></div></div>
+          <div id="image-grid"></div>
+          <div id="navi-hbar"></div>
+       </div>
+       
+       <!-- signin -->
+       <div class="view" id="signin">
+          <h1>Signin/Register</h1>
+          <form>
+             <!-- service title -->
+             <div>
+                <label>Username</label>
+                <input id="username" name="username" type="text" value="" placeholder="(e.g. kolesnik)">
+             </div>
+             <!-- usecase title -->
+             <div>
+                <label>Email</label>
+                <input id="usermail" name="usermail" type="text" value="" placeholder="(e.g. dmitry.kolesnikov@nokia.com)">
+             </div>
+             <!-- disclaimer -->
+             <div>
+                <label>Note</label>
+                <p>
+                The Intent of "Latency In-Focus" is the behavior analysis of cloud-base software components using
+                live telemetry gathered as the cloud sustain production load. The objectives are control of grade of 
+                service is fulfilling the requirements; quality assessment of distributed software architecture; 
+                resolution short term capacity decisions include for example the determination of optimal configuration, 
+                the number of lives servers; resolution of long term capacity decisions such as decisions concerning 
+                the development and extension of data- and service architecture, choice of technology, etc; 
+                to provide granular latency control for diverse data and computational load in hybrid Cloud architectures.
+                <br/><br/>
+                "With great power comes great responsibility". Users of the service are empowered with ability to define 
+                latency tracking use-cases that are executed agains live systems in 24/7 manner. Please consider carefully each
+                use-case defined by you. Please pay speciall attention when use-case covers 3rd party services.
+                <br/><br/>
+                User credential and e-mail is required for audit purposes only. User profiles are public but access to the service
+                is restricted within company.
+                <br/><br/>
+                The beta version of service do not support Internet Explorer. Please use Firefox, Safari, Chrome or other HTML5 compatible.
+                </p>
+             </div>
+             <input class="submit button" type="submit" value="Signin">
+          </form>   
+       </div>
+       
+       
+       <!-- editor -->
+       <div class="view" id="editor">
+          <form>
+             <!-- service title -->
+             <div>
+                <label>Service</label>
+                <input id="fservice" name="service" type="text" value="" placeholder="title of your service (e.g. My Service)">
+             </div>
+             <!-- usecase title -->
+             <div>
+                <label>Usecase</label>
+                <input id="fusecase" name="usecase" type="text" value="" placeholder="title of your usecase (e.g. My Use-Case)">
+             </div>
+             <!-- uri -->
+             <div>
+                <label>Uri</label>
+                <input id="furi" name="uri" type="text" value="" placeholder="uri of your usecase (e.g. http://localhost:80/path_to_resource)">
+             </div>
+             <!-- UA -->
+             <div>
+                <label>User-Agent</label>
+                <input id="fua" name="ua" type="text" value="Mozilla/5.0 (Symbian/3; U; NokiaN8-00; Profile/MIDP-2.1 Configuration/CLDC-1.1 ) AppleWebKit/532.4 (KHTML, like Gecko) QtWRT/1.0 Mobile Safari/532.4" placeholder="value of User-Agent HTTP header">
+             </div>
+             <!-- Note -->
+             <div>
+                <label>Note</label>
+                <p>
+                The defined use-case will be executed agains live systems in 24/7 manner. 
+                <br/><br/>
+                <strong>Note all fields are mandatory. Uri MUST contains schema, host, port and path, e.g. http://localhost:80/path</strong>
+                </p>
+             </div>   
+             <input class="button" type="submit" value="Create">
+          </form>
+       </div>
+       
+    </div>
+
+    <div id="footer">
+        <span class="copyright">&copy; Nokia 2011</span>
+    </div>
+    
+    <div class="popup" id="loader"></div>
+    
+</div>
+</body>
+</html>
