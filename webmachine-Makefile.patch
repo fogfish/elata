@@ -1,0 +1,29 @@
+--- webmachine/Makefile	2011-07-06 16:22:39.000000000 +0300
++++ /Users/kolesnik/devel/erlang/webmachine/Makefile	2011-07-06 16:21:06.000000000 +0300
+@@ -21,3 +21,26 @@
+ test: all
+ 	@(./rebar skip_deps=true eunit)
+ 
++#
++# Installs WebMachine and its dependencies into OTP
++# make install DESTDIR=/usr/local/otp
++otplibdir=$(DESTDIR)/lib/erlang/lib
++
++install-deps:
++	@for d in `ls ./deps/ 2> /dev/null`; do \
++	v=`cat ./deps/$$d/ebin/$$d.app | sed -n 's|.*{vsn,.*"\(.*\)"}.*|\1|p'`; \
++	for f in ebin include src ; do \
++	mkdir -p $(otplibdir)/$$d-$$v ; \
++	cp -R ./deps/$$d/$$f $(otplibdir)/$$d-$$v/; \
++	done; \
++	done
++
++install: install-deps
++	@v=`cat ./ebin/$(APP).app | sed -n 's|.*{vsn,.*"\(.*\)"}.*|\1|p'`; \
++	for f in ebin include src ; do \
++	mkdir -p $(otplibdir)/$(APP)-$$v ; \
++	cp -R ./$$f $(otplibdir)/$(APP)-$$v/; \
++	done 
++
++
++
