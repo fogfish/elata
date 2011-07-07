@@ -1,0 +1,112 @@
+%%
+%%   Copyright (c) 2011, Nokia Corporation
+%%   All Rights Reserved.
+%%
+%%   The contents of this file are subject to the 3-clause BSD License,
+%%   (the "License"); you may not use this file except in compliance 
+%%   with the License. You should have received a copy of the 3-clause
+%%   BSD Licensee along with this software. If not, it can be
+%%   retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+%%
+%%   Software distributed under the License is distributed on an "AS IS"
+%%   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%   the License for the specific language governing rights and limitations
+%%   under the License.
+%%
+
+{view,
+   v01latency,       %% view uid
+   [http, https], %% supproted uri schemas
+   {720, 240},
+   %% data streams
+   [
+      {a,  tcp,  mean},
+      {b,  ssl,  mean},
+      {c,  ttfb, mean},
+      {d,  ttmr, mean},
+      {e,  uri,  mean}
+   ],
+   %% themes 
+   [
+      {e,  "latency", "#65a800"},
+      {ad, "ttmr   ", "#65a800", "#99ff00"},
+      {ac, "ttfb   ", "#a84387", "#ff66cc"},
+      {ab, "ssl    ", "#6543a8", "#9966ff"},
+      {a,  "tcp    ", "#4285a6", "#66ccff"}
+   ]
+}.
+
+
+{view,
+   v02tcp,           %% view uid
+   [http, https],
+   {720,  240},
+   %% data streams
+   [
+      {a, tcp, mean},
+      {b, tcp, std},
+      {d, tcp, max}
+   ],
+   %% theme
+   [
+      {d,  "max", "#009900", "#66ff00"},
+      {ab, "std", "#339900", "#99ff00"},
+      {a,  "avg", "#669900", "#ccff00"}
+   ]   
+}.
+
+
+{view,
+   v03ssl,           %% view uid
+   [https],
+   {720,  220},
+   %% data streams
+   [
+      {a, ssl, mean},
+      {b, ssl, std},
+      {d, ssl, max}
+   ],
+   %% theme
+   [
+      {d,  "max", "#009900", "#66ff00"},
+      {ab, "std", "#339900", "#99ff00"},
+      {a,  "avg", "#669900", "#ccff00"}
+   ]   
+}.
+
+
+{view,
+   v04ttfb,           %% view uid
+   [http, https],
+   {720,  220},
+   %% data streams
+   [
+      {a, ttfb, mean},
+      {b, ttfb, std},
+      {d, ttfb, max}
+   ],
+   %% theme
+   [
+      {d,  "max", "#009900", "#66ff00"},
+      {ab, "std", "#339900", "#99ff00"},
+      {a,  "avg", "#669900", "#ccff00"}
+   ]   
+}.
+
+{view,
+   v05ttmr,           %% view uid
+   [http, https],
+   {720,  220},
+   %% data streams
+   [
+      {a, ttmr, mean},
+      {b, ttmr, std},
+      {d, ttmr, max}
+   ],
+   %% theme
+   [
+      {d,  "max", "#009900", "#66ff00"},
+      {ab, "std", "#339900", "#99ff00"},
+      {a,  "avg", "#669900", "#ccff00"}
+   ]   
+}.
