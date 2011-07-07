@@ -1,0 +1,170 @@
+%%
+%%   Copyright (c) 2011, Nokia Corporation
+%%   All Rights Reserved.
+%%
+%%   The contents of this file are subject to the 3-clause BSD License,
+%%   (the "License"); you may not use this file except in compliance 
+%%   with the License. You should have received a copy of the 3-clause
+%%   BSD Licensee along with this software. If not, it can be
+%%   retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+%%
+%%   Software distributed under the License is distributed on an "AS IS"
+%%   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%   the License for the specific language governing rights and limitations
+%%   under the License.
+%%
+%% @author Dmitry Kolesnikov <dmitry.kolesnikov@nokia.com>
+%%
+\section{Getting started with ELATA}
+
+Project delivery is available at http://github.com/fogfish/elata; and is composed from:
+\begin{itemize}
+\item agent (agt) -- gathers telemetry information about software components, performs latency measurements, etc;
+\item back-end (be) -- persist and analyze telemetry data received from agent;
+\item front-end (fe) -- hosts web application and implements REST interface to access telemetry.
+\item common components such as Key-Value Store Interface (kvs), WebMachine API wrapper (rest) and Time Series Analysis (tsa).   
+\end{itemize}
+
+
+\subsection{How to install ELATA agent}
+
+\subsubsection{ELATA agent dependencies}
+
+Erlang/OTP run-time, recommended version R14B02
+\begin{verbatim}
+   curl -O http://www.erlang.org/download/otp_src_R14B02.tar.gz
+   tar -zxvf otp_src_R14B02.tar.gz
+   cd otp_src_R14B02
+   ./configure --prefix=/usr/local/otp \
+               --enable-smp-support    \
+               --enable-kernel-poll    \
+               --enable-hipe           \
+               --disable-java
+   make && make install            
+\end{verbatim}
+
+WebMachine, recommended version 1.8.1 \\
+Note: WebMachine Makefile needs to be patched, patch is delivered as part of ELATA project
+\begin{verbatim}
+   git clone https://github.com/basho/webmachine
+   cd webmachine
+   patch Makefile < webmachine-Makefile.path
+   make && make install DESTDIR=/usr/local/otp
+\end{verbatim}
+
+
+\subsubsection{Build ELATA agent}
+
+Current release of ELATA contains only source code. Therefore, ELATA agent needs to be build once before it is massively deployed across world.    
+
+\begin{verbatim}
+   git clone https://github.com/fogfish/elata
+   cd elata
+   ./configure --with-erlang=/usr/local/otp
+   make
+\end{verbatim}  
+
+As the result ./elata/agt/elata\_agt-x.y.z.tgz is build. The file contains standalone binary (including Erlang/OTP) ready to be distributed and installed to network components (architecture and OS should be same).
+
+
+To install and run the agent:
+\begin{verbatim}
+   tar -zxvf elata_agt-x.y.z.tgz
+   ./bin/elata_agt
+\end{verbatim}
+
+
+\subsubsection{ELATA agent configuration}
+The agent behavior is configured
+\begin{itemize}
+\item at build-time via ./elata/agt/priv/sys.config.in
+\item at run-time via  /lib/elata\_agt-x.y.z/priv/sys.config.
+\end{itemize}
+Please refer to Erlang documentation (http://erlang.org) for details of configuration file format.
+
+
+The following options could be changed to modify agent behavior: 
+\begin{itemize}
+\item elata\_agt/port (default 8080), TCP/IP port used for communication with back-end.
+\item elata\_agt/worker, defines behavior of measurement agent
+\subitem idletime (default 300000 / 5 min), time in microseconds to wait between measurement trials. 
+\subitem thinktime (default 1000 / 1 sec), time in microsecond to wait between consequent measurement.
+\subitem cycle (default 10), number of consequent measurement cycles perform during a trial. Agent reports aggregated statistic based this measurements. 
+\end{itemize}
+
+
+\subsection{How to install ELATA back-end/front-end}
+
+
+\subsubsection{ELATA back-end/front-end dependencies}
+
+Please refer to Chapter -- ELATA agent dependencies for installation instruction of Erlang/OTP runtime and WebMachine.
+
+
+RRD Tool version 1.4.5 is used as storage and graph rendering back-end. Please refer to http://www.mrtg.org/rrdtool/ for details. 
+
+
+Optionally yuicompressor is used at build procedure to minimize output of JavaScript and Style sheet. Please refer to http://yuilibrary.com/downloads for details.
+
+
+\subsubsection{Build ELATA front-end/back-end}
+
+Current release of ELATA contains only source code. Therefore, build procedure is required before it is deployed to target hardware.    
+
+\begin{verbatim}
+   git clone https://github.com/fogfish/elata
+   cd elata
+   ./configure \
+      --with-erlang=/usr/local/otp \
+      --with-yuicompressor=/path/to/yuicompressor-x.y.z.jar
+   make
+\end{verbatim}  
+
+As the result ./elata/fe/elata\_fe-x.y.z.tgz is build. The file contains standalone binary (including Erlang/OTP) ready to be distributed and installed to network components (architecture and OS should be same).
+
+
+To install and run the agent:
+\begin{verbatim}
+   tar -zxvf elata_fe-x.y.z.tgz
+   ./bin/elata_fe
+\end{verbatim}
+
+
+\subsection{ELATA back-end configuration}
+
+List of connected agents needs to be explicitly defined
+\begin{itemize}
+\item at build-time via ./elata/be/priv/agent.config.in
+\item at run-time via  /lib/elata\_be-x.y.z/priv/agent.config.
+\end{itemize}
+
+Each agent node available in the system needs to be defined by the record in following format: 
+\begin{verbatim}
+{kvset, <<"rd-local">>,             %% unique agent identity
+    [
+       {title,      <<"RD/Local">>}, %% human readable name
+       {host,  {"127.0.0.1", 8080}}, %% host, port to communicate with
+       {sync,                60000}  %% telemetry synchronizations timeout
+      %{proxy, {"127.0.0.1", 8080}}  %% proxy host, port 
+    ]
+}.
+\end{verbatim}
+
+
+The application behavior is configured
+\begin{itemize}
+\item at build-time via ./elata/fe/priv/sys.config.in
+\item at run-time via  /lib/elata\_fe-x.y.z/priv/sys.config.
+\end{itemize}
+
+
+The following options could be changed to modify agent behavior: 
+\begin{itemize}
+\item elata\_be/codepath (default /usr/local/macports), path prefix to external tools.
+\item elata\_be/datapath (default /private/tmp/elata), folder to persist telemetry data
+\item elata\_fe/port (default 8000), TCP/IP port used for communication with client application (web browser)
+\item elata\_fe/datapath (default /private/tmp/elata), folder to persist user profiles and telemetry data. Note: in current release elata\_fe/datapath and elata\_be/datapath MUST point to same location.
+\end{itemize}
+
+
+

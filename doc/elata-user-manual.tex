@@ -1,0 +1,98 @@
+%%
+%%   Copyright (c) 2011, Nokia Corporation
+%%   All Rights Reserved.
+%%
+%%   The contents of this file are subject to the 3-clause BSD License,
+%%   (the "License"); you may not use this file except in compliance 
+%%   with the License. You should have received a copy of the 3-clause
+%%   BSD Licensee along with this software. If not, it can be
+%%   retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+%%
+%%   Software distributed under the License is distributed on an "AS IS"
+%%   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%   the License for the specific language governing rights and limitations
+%%   under the License.
+%%
+\documentclass[10pt]{article}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{textcomp}
+\usepackage{vmargin}
+\setpapersize{A4}
+\setmarginsrb{1.1in}{1in}{0.9in}{1in}{0pt}{0mm}{0pt}{8mm}
+\renewcommand{\familydefault}{phv}
+\renewcommand{\baselinestretch}{1.21}
+\usepackage[parfill]{parskip}
+
+\usepackage{booktabs}
+\usepackage{ctable}
+\usepackage{graphicx}
+\usepackage{bigstrut}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{float}
+ 
+\floatstyle{ruled}
+\newfloat{program}{thp}{lop}
+\floatname{program}{Program}
+
+
+\begin{document}
+
+\title{Erlang Latency Agent (ELATA) -- User Manual}
+\date{Published: \today}
+
+\maketitle
+
+\input{copyright.tex}
+\input{manual/objectives.tex}
+\input{manual/install.tex}
+
+\section{How to report bug}
+
+Report bugs to https://github.com/fogfish/elata/issues
+
+\section{How to contribute}
+
+The software sources are available on https://github.com/fogfish/elata
+\begin{verbatim}
+   git clone https://github.com/fogfish/elata
+   cd elata
+\end{verbatim}
+
+Send a patch to dmitry.kolesnikov@nokia.com or push the changes info a fork of the repository and send a pull request.
+
+\section{Authors}
+
+\subsection{Maintainers}
+\begin{itemize} 
+\item Dmitry Kolesnikov (dmitry.kolesnikov@nokia.com)
+\end{itemize}
+
+\subsection{Contributors}
+\begin{itemize}
+\item Tomi Kulmala (tomi.p.kulmala@nokia.com)
+\end{itemize}
+
+
+%\subsection{Acknowledgements}
+%If you'd like to thank anyone, place your comments here
+%and remove the percent signs.
+
+% Non-BibTeX users please use
+\begin{thebibliography}{}
+%
+% and use \bibitem to create references. Consult the Instructions
+% for authors for reference list style.
+%
+\bibitem{RefCisco}
+% Format for Journal Reference
+Cisco System Inc, White Paper, Design Best Practices for Latency Optimization
+% Format for books
+\bibitem{RefSouder}
+Souder S., High Performance Web Sites, O'Relly, 2007, ISBN 0-596-52930-9
+\end{thebibliography}
+
+\end{document}
+% end of file template.tex
+

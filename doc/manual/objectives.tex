@@ -1,0 +1,38 @@
+%%
+%%   Copyright (c) 2011, Nokia Corporation
+%%   All Rights Reserved.
+%%
+%%   The contents of this file are subject to the 3-clause BSD License,
+%%   (the "License"); you may not use this file except in compliance 
+%%   with the License. You should have received a copy of the 3-clause
+%%   BSD Licensee along with this software. If not, it can be
+%%   retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+%%
+%%   Software distributed under the License is distributed on an "AS IS"
+%%   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%   the License for the specific language governing rights and limitations
+%%   under the License.
+%%
+%% @author Dmitry Kolesnikov <dmitry.kolesnikov@nokia.com>
+
+\section{Objectives}
+
+A new recently developed paradigms of distributed systems [...] requires an explicit  orchestration of computation across Clients, Cloud and Core depending on components states and resource demand, through the proper exploit of granular and therefore accountable mechanisms. The behavior analysis of the software components using live telemetry gathered as the Cloud sustain production load is mandatory.
+
+End-to-end latency is seen by us as a major metric for quality assessment of software architecture and underlying infrastructure. It yields both user-oriented SLA and the objectives for each Cloud component. The ultimate goal is the ability to quantitatively evaluate and trade-off software quality attributes to ensure competitive end-to-end latency of Internet Services.
+
+On another hand, our task is to design systems as cost effectively as possible with a predefined grade of service when we know the future traffic demand and the capacity of system elements. Furthermore, it is the task to specify methods for controlling that the actual grade of service is fulfilling the requirements, and also to specify emergency actions when systems are overloaded or technical faults occur.
+
+We proposes an software solution to gather telemetry while the Cloud sustain production load. The application helps to resolve series of decision problem concerning both short-term and long-term arrangements appears:
+
+\begin{itemize}
+\item provide granular latency control for diverse data and computational load in hybrid Cloud architectures;
+\item resolution short term capacity decisions include for example the determination of optimal configuration, the number of lives servers or migration of computation;
+\item resolution of long term capacity decisions such as decisions concerning the development and extension of data- and service architecture, choice of technology, etc;
+\item control of SLA at different levels, e.g. consumer services, platform components, etc;
+\item quality assessment of distributed software architecture.
+\end{itemize}
+
+If performance metrics of a solution is inadequate then business is impacted. It has been reported in multiple sources [...] that latency affects on sales, user activity and various business metrics. The role of software behavioral analysis therefore is crucial in order to achieve proper level of accountability of the whole system.
+
+
