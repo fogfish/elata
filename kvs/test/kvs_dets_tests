@@ -1,0 +1,1 @@
+erl -pa ../ebin -eval 'R = case eunit:test(kvs_dets_tests, [verbose]) of ok -> 0; _ -> 1 end, timer:apply_after(100, erlang, halt, [R]).'
