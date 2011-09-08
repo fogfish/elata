@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,39 +29,65 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_bucket_sup).
--behaviour(supervisor).
+-module(kvs_dets_sup).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% ELATA: Bucket factory
-%%
+-behaviour(supervisor).
+-behaviour(gen_kvs_domain).
 
 -export([
+   % supervisor
    start_link/0,
-   create_bucket/2,
-   init/1
+   init/1,
+   % gen_kvs_domain
+   factory/1,
+   create/2,
+   insert/2,
+   lookup/2,
+   delete/2
 ]).
 
+%%%------------------------------------------------------------------
+%%%
+%%% Supervisor
+%%%
+%%%------------------------------------------------------------------
 start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-
-create_bucket(Bucket, Opts) ->
-   supervisor:start_child(?MODULE, [Bucket, Opts]).
    
 init([]) ->
-   Bucket = {
-      kvs_bucket,
+   Process = {
+      kvs_ets,       % child id
       {
-         kvs_bucket,
-         start_link,
-         []
+         kvs_dets,    % Mod
+         start_link, % Fun
+         []          % Args
       },
-      transient, 2000, worker, dynamic
+      permanent, 2000, worker, dynamic
    },
    {ok,
       {
-         {simple_one_for_one, 50, 10},
-         [Bucket]
+         {simple_one_for_one, 2, 1},   % 2 faults per second
+         [Process]
       }
    }.
+
+%%%------------------------------------------------------------------
+%%%
+%%% gen_kvs_domain
+%%%
+%%%------------------------------------------------------------------
+factory(Args) ->
+   supervisor:start_child(?MODULE, Args).
+   
+create(Pid, Entity) ->
+   gen_server:call(Pid, {create, Entity}).
+   
+insert(Pid, Entity) ->
+   gen_server:call(Pid, {insert, Entity}).
+   
+lookup(Pid, Key) ->
+   gen_server:call(Pid, {lookup, Key}).
+   
+delete(Pid, Key) ->
+   gen_server:call(Pid, {delete, Key}).

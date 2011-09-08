@@ -33,70 +33,94 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% ELATA: Key/Value Store interface/wrapper to storage implementations
+%% Key/Value Store provides CRUD interface to manage key/val entities   
+%% Interface operates with 'entities' (E) that is set of key-values.
+%%
+%% E {(k,v): k - term(), v - any()}
+%%
+%% Run-time entity representation implies either list of 
+%% attribute-value pairs or erlang tuples/record. The storage domain cannot 
+%% mix lists or tuples, one of them should be chosen.
 %%
 
-%%
-%% Public API
 -export([
-   define/2,
    create/2,
    insert/2,
    lookup/2,
    lookup/3,
-   delete/2,
-   to_list/1,
-   import/2
+   delete/2
 ]).
 
 %%
-%% define new bucket
-define(Bucket, Opts) ->
-   kvs_reg:define(Bucket, Opts),
-   kvs_reg:start_bucket(Bucket).
+%% TODO guarg condition
+%% is_tuple
+%% is_list on CRUD operations
+
 
 %%
-%% create new unique value
-create(Bucket, Value) ->
-   Result = case kvs_reg:resolve(Bucket) of
-      {error, _} ->
-         {ok, Pid} = kvs_reg:start_bucket(Bucket),
-         kvs_bucket:create(Pid, Value);
-      {ok,  Pid} ->
-         kvs_bucket:create(Pid, Value)
-   end,
-   do_notify(create, Result, Bucket, Value),
-   Result.
+%% create new entity
+create(Ns, Entity) ->
+   case keyval_domain:lookup(Ns) of
+      {error, _}  ->
+         % domain is not declared
+         {error, undefined_domain};
+      {ok, Domain} ->
+         % domain is found, its config is returned
+         Result = case proplists:is_defined(singleton, Domain) of
+            % domain is managed by single process
+            true  -> gen_kvs_domain:do_create(Domain, Entity);
+            % process per entity mode
+            false -> gen_kvs_entity:do_create(Domain, Entity)
+         end,
+         notify(create, Result, Ns, Entity, Domain),
+         Result
+   end.   
+
    
-
 %%
-%% insert/update value
-insert(Bucket, Value) ->
-   Result = case kvs_reg:resolve(Bucket) of
-      {error, _} ->
-         {ok, Pid} = kvs_reg:start_bucket(Bucket),
-         kvs_bucket:insert(Pid, Value);
-      {ok, Pid} ->
-         kvs_bucket:insert(Pid, Value)
-   end,
-   do_notify(insert, Result, Bucket, Value),
-   Result.
+%% insert/update entity
+insert(Ns, Entity) ->
+   case keyval_domain:lookup(Ns) of
+      {error, _}  ->
+         % domain is not declared
+         {error, undefined_domain};
+      {ok, Domain} ->
+         % domain is found, its config is returned
+         Result = case proplists:is_defined(singleton, Domain) of
+            % domain is managed by single process
+            true  -> gen_kvs_domain:do_insert(Domain, Entity);
+            % process per entity mode
+            false -> gen_kvs_entity:do_insert(Domain, Entity)
+         end,
+         notify(insert, Result, Ns, Entity, Domain),
+         Result
+   end.
+
 
 %%
 %% read value
-lookup(Bucket, Key) ->
-   Result = case kvs_reg:resolve(Bucket) of
-      {error, _} ->
-         {error, not_found};
-      {ok, Pid} ->
-         kvs_bucket:lookup(Pid, Key)
-   end,
-   do_notify(lookup, Result, Bucket, Key),
-   Result.
- 
+lookup(Ns, Key) ->
+   case keyval_domain:lookup(Ns) of
+      {error, _}  ->
+         % domain is not declared
+         {error, undefined_domain};
+      {ok, Domain} ->
+         % domain is found, its config is returned
+         Result = case proplists:is_defined(singleton, Domain) of
+            % domain is managed by single process
+            true  -> gen_kvs_domain:do_lookup(Domain, Key);
+            % process per entity mode
+            false -> gen_kvs_entity:do_lookup(Domain, Key)
+         end,
+         notify(lookup, Result, Ns, Key, Domain),
+         Result
+   end.
+
+   
+%% 
 %% read value with default value
-lookup(Bucket, Key, Default) ->
-   case keyval_store:lookup(Bucket, Key) of
+lookup(Ns, Key, Default) ->
+   case keyval_store:lookup(Ns, Key) of
       {error, _} ->
          {ok, Default};
       Result ->
@@ -104,32 +128,40 @@ lookup(Bucket, Key, Default) ->
    end.
    
 %%
-%% delete key from bucket                                          
-delete(Bucket, Key) ->
-   Result = case kvs_reg:resolve(Bucket) of
-      {error, _} ->
-         ok;
-      {ok, Pid} ->
-         kvs_bucket:delete(Pid, Key)
-   end,
-   do_notify(delete, Result, Bucket, Key),
-   Result.
-
-%%
-%% export to list
-to_list(Bucket) ->
-   case kvs_reg:resolve(Bucket) of
-      {error, _} ->
-         {error, undefined};
-      {ok,  Pid} ->
-         kvs_bucket:to_list(Pid)
+%% delete key from bucket       
+delete(Ns, Key) ->
+   case keyval_domain:lookup(Ns) of
+      {error, _}  ->
+         % domain is not declared
+         {error, undefined_domain};
+      {ok, Domain} ->
+         % domain is found, its config is returned
+         Result = case proplists:is_defined(singleton, Domain) of
+            % domain is managed by single process
+            true  -> gen_kvs_domain:do_delete(Domain, Key);
+            % process per entity mode
+            false -> gen_kvs_entity:do_delete(Domain, Key)
+         end,
+         notify(delete, Result, Ns, Key, Domain),
+         Result
    end.
+
    
 %%
+%% export to list
+%to_list(Bucket) ->
+%   case kvs_reg:resolve(Bucket) of
+%      {error, _} ->
+%         {error, undefined};
+%      {ok,  Pid} ->
+%         kvs_bucket:to_list(Pid)
+%   end.
+%   
+%%
 %% Import form file
-import(Bucket, Filename) ->
-   {ok, List} = file:consult(Filename),
-   keyval_store:create(Bucket, List).
+%import(Bucket, Filename) ->
+%   {ok, List} = file:consult(Filename),
+%   keyval_store:create(Bucket, List).
    
    
 %%%------------------------------------------------------------------
@@ -137,29 +169,30 @@ import(Bucket, Filename) ->
 %%% Private Functions
 %%%
 %%%------------------------------------------------------------------
-do_notify(create, ok, Bucket, Value) -> 
-   case kvs_reg:is_notify(Bucket) of
-      true  -> kvs_evt:create(Bucket, Value);
+notify(create, ok, Ns, Entity, Domain) ->
+   case proplists:is_defined(event, Domain) of
+      true  -> kvs_evt:create(Ns, Entity);
       false -> ok
    end;
 
-do_notify(insert, ok, Bucket, Value) ->
-   case kvs_reg:is_notify(Bucket) of
-      true  -> kvs_evt:insert(Bucket, Value);
+notify(insert, ok, Ns, Entity, Domain) ->
+   case proplists:is_defined(event, Domain) of
+      true  -> kvs_evt:insert(Ns, Entity);
       false -> ok
    end;
 
-do_notify(lookup, {ok, _}, Bucket, Key) ->
-   case kvs_reg:is_notify(Bucket) of
-      true  -> kvs_evt:lookup(Bucket, Key);
+%%% disabled due to performance implication  
+%%%notify(lookup, {ok, _}, Ns, Key, Domain) ->
+%%%   case proplists:is_defined(event, Domain) of
+%%%      true  -> kvs_evt:lookup(Ns, Key);
+%%%      false -> ok
+%%%   end;   
+
+notify(delete, ok, Ns, Key, Domain) ->
+   case proplists:is_defined(event, Domain) of
+      true  -> kvs_evt:delete(Ns, Key);
       false -> ok
    end;
-
-do_notify(delete, ok, Bucket, Key) ->
-   case kvs_reg:is_notify(Bucket) of
-      true  -> kvs_evt:delete(Bucket, Key);
-      false -> ok
-   end;
-
-do_notify(_,_,_,_) ->
+   
+notify(_, _, _, _, _) -> 
    ok.

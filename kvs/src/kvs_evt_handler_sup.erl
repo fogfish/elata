@@ -29,50 +29,49 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_reg).
--author(dmitry.kolesnikov@nokia.com).
+-module(kvs_evt_handler_sup).
+-behaviour(gen_server).
 
 %%
-%% Key/Value Registry maps key to pid of responsible processes
+%% Any gen_event handler failure causes silent removal of the handler 
+%% from event manager pool. Thus supervision of event handlers is mandatory
+%% to achive fault tolerance
 %%
-
-%% TODO: implement mnesia-based registry for clustered solutions
-
 -export([
-   % public API
-   start/0,
-   register/2,
-   unregister/1,   
-   resolve/1
+   start_link/1, 
+   %% gen_server
+   init/1, 
+   handle_call/3,
+   handle_cast/2, 
+   handle_info/2, 
+   terminate/2, 
+   code_change/3
 ]).
+   
+start_link(Handler) ->
+   gen_server:start_link({local, ?MODULE}, ?MODULE, [Handler], []).
 
--define(REGISTRY, ?MODULE).
+init([Handler]) ->
+   kvs_evt:subscribe(Handler),
+   {ok, Handler}.
+   
+handle_call(_Req, _From, State) ->
+   {reply, undefined, State}.
+handle_cast(_Req, State) ->
+   {noreply, State}.
 
-%%
-%% Initializes registry
-start() ->
-   ets:new(?REGISTRY, [public, named_table]),
+handle_info({gen_event_EXIT, _Handler, normal}, State) ->
+   {stop, normal, State};
+handle_info({gen_event_EXIT, _Handler, shutdown}, State) ->
+   {stop, normal, State};
+handle_info({gen_event_EXIT, _Handler, _Reason}, State) ->
+   {stop, {error, event_handler}, State};
+handle_info(_Msg, State) ->
+   {noreply, State}.
+   
+terminate(_Reason, _State) ->
    ok.
    
-%%
-%% Register Key-to-Pid mapping into registry
-register(Key, Item) ->
-   case ets:insert(?REGISTRY, {Key, Item}) of
-      true -> ok;
-      _    -> error
-   end.
-
-%%
-%% Removed Key-to-Pid mapping from registry
-unregister(Key) ->
-   ets:delete(?REGISTRY, Key),
-   ok.
+code_change(_OldVsn, State, _Extra) ->
+   {ok, State}.        
    
-%%
-%% Resolves Key-to-Pid mapping
-resolve(Key) ->
-   case ets:lookup(?REGISTRY, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
-   end.
-

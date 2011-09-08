@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,50 +29,48 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_reg).
+-module(kvs_evt_sup).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% Key/Value Registry maps key to pid of responsible processes
-%%
-
-%% TODO: implement mnesia-based registry for clustered solutions
+-behaviour(supervisor).
 
 -export([
-   % public API
-   start/0,
-   register/2,
-   unregister/1,   
-   resolve/1
+   % supervisor
+   start_link/0,
+   init/1,
+   factory/1
 ]).
 
--define(REGISTRY, ?MODULE).
-
-%%
-%% Initializes registry
-start() ->
-   ets:new(?REGISTRY, [public, named_table]),
-   ok.
+%%%------------------------------------------------------------------
+%%%
+%%% Supervisor
+%%%
+%%%------------------------------------------------------------------
+start_link() ->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
-%%
-%% Register Key-to-Pid mapping into registry
-register(Key, Item) ->
-   case ets:insert(?REGISTRY, {Key, Item}) of
-      true -> ok;
-      _    -> error
-   end.
+init([]) ->
+   Process = {
+      kvs_ets,       % child id
+      {
+         kvs_evt_handler_sup, % Mod
+         start_link,          % Fun
+         []                   % Args
+      },
+      permanent, 2000, worker, dynamic
+   },
+   {ok,
+      {
+         {simple_one_for_one, 2, 1},   % 2 faults per second
+         [Process]
+      }
+   }.
 
-%%
-%% Removed Key-to-Pid mapping from registry
-unregister(Key) ->
-   ets:delete(?REGISTRY, Key),
-   ok.
+%%%------------------------------------------------------------------
+%%%
+%%% 
+%%%
+%%%------------------------------------------------------------------
+factory(Handler) ->
+   supervisor:start_child(?MODULE, [Handler]).   
    
-%%
-%% Resolves Key-to-Pid mapping
-resolve(Key) ->
-   case ets:lookup(?REGISTRY, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
-   end.
-

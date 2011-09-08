@@ -42,7 +42,7 @@ start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->   
-   ok = kvs_reg:start(), 
+   ok = kvs_reg:start(),
    EvtManager = {
       kvs_evt,
       {
@@ -52,28 +52,18 @@ init([]) ->
       },
       permanent, 2000, worker, dynamic
    },
-   BucketSup = {
-      kvs_bucket_sup,
+   EvtFactory = {
+      kvs_evt_sup,
       {
-         kvs_bucket_sup,
+         kvs_evt_sup,
          start_link,
          []
-      },
-      permanent, 2000, supervisor, dynamic
+      }
    },
-   %RestSup = {
-   %   la_kvs_rest_sup,
-   %   {
-   %      la_kvs_rest_sup,
-   %      start_link,
-   %      [8080, [{["kvs", '*'], la_kvs_rest, []}]]
-   %   },
-   %   permanent, 2000, supervisor, dynamic
-   %},
    {ok,
       {
          {one_for_one, 4, 1800},
-         [BucketSup, EvtManager]
+         [EvtManager, EvtFactory]
       }
    }.
    

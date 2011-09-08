@@ -39,8 +39,8 @@
 %% Public API
 -export([
    start_link/0,
-   subscribe/2,
-   unsubscribe/2,
+   subscribe/1,
+   unsubscribe/1,
    create/2,
    insert/2,
    lookup/2,
@@ -49,22 +49,29 @@
 
 start_link() ->
    gen_event:start_link({local, ?MODULE}).
-   
-subscribe(Mod, Args) ->
-   gen_event:add_handler(?MODULE, Mod, Args).
-   
-unsubscribe(Mod, Args) ->
-   gen_event:delete_handler(?MODULE, Mod, Args).
-   
-create(Bucket, Value) ->
-   gen_event:notify(?MODULE, {create, Bucket, Value}).
-   
-insert(Bucket, Value) ->
-   gen_event:notify(?MODULE, {insert, Bucket, Value}).
-   
-lookup(Bucket, Key) ->
-   gen_event:notify(?MODULE, {lookup, Bucket, Key}).
 
-delete(Bucket, Key) ->
-   gen_event:notify(?MODULE, {delete, Bucket, Key}).
+subscribe({Handler, Args}) ->
+   gen_event:add_sup_handler(?MODULE, Handler, Args);
+subscribe(Handler) ->
+   io:format('subscribe ~p~n', [Handler]),
+   gen_event:add_sup_handler(?MODULE, Handler, []).
+   
+unsubscribe({Handler, Args}) ->
+   gen_event:delete_handler(?MODULE, Handler, Args);
+unsubscribe(Handler) ->
+   gen_event:delete_handler(?MODULE, Handler, []).   
+   
+   
+create(Ns, Entity) ->
+   io:format('do notify ~p~n', [Entity]),
+   gen_event:notify(?MODULE, {create, Ns, Entity}).
+   
+insert(Ns, Entity) ->
+   gen_event:notify(?MODULE, {insert, Ns, Entity}).
+   
+lookup(Ns, Key) ->
+   gen_event:notify(?MODULE, {lookup, Ns, Key}).
+
+delete(Ns, Key) ->
+   gen_event:notify(?MODULE, {delete, Ns, Key}).
    

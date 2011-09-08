@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,50 +29,45 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_reg).
+-module(keyval_domain).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Key/Value Registry maps key to pid of responsible processes
+%% Key/Value Domain provides management interface to storage domains 
+%% The interface impacts domain metadata registered within node
+%% Domains entityes are not impacted
 %%
-
-%% TODO: implement mnesia-based registry for clustered solutions
 
 -export([
-   % public API
-   start/0,
-   register/2,
-   unregister/1,   
-   resolve/1
+   create/2,                    
+   lookup/1,
+   delete/1
 ]).
 
--define(REGISTRY, ?MODULE).
+%%
+%% Create definition of storage domain (domain entities are not impacted)
+%%
+%% Name   = string() unique domain name
+%% Domain = [opt]
+%%    opt = singleton | event | {name, Name} | 
+%%          {plugin, Module} | {plugin, {Module, Args}} | 
+%%          {key, Id}
+%%    singleton = single process manages all domain entities (e.g. proxy to storage)
+%%    event = storage domain generates events on CRUD operations
+%%    Module = KVS plugin implementation of gen_kvs_domain / gen_kvs_entity
+%%    Args = list(), list of arguments supplied to factory method
+%%    Id = name of key attribute or key position
+create(Name, Domain) ->
+   % TODO: assert: plugin + key
+   kvs_reg:register({domain, Name}, [{name, Name} | Domain]).
 
 %%
-%% Initializes registry
-start() ->
-   ets:new(?REGISTRY, [public, named_table]),
-   ok.
-   
 %%
-%% Register Key-to-Pid mapping into registry
-register(Key, Item) ->
-   case ets:insert(?REGISTRY, {Key, Item}) of
-      true -> ok;
-      _    -> error
-   end.
+lookup(Name) ->
+   kvs_reg:resolve({domain, Name}).
 
 %%
-%% Removed Key-to-Pid mapping from registry
-unregister(Key) ->
-   ets:delete(?REGISTRY, Key),
-   ok.
-   
-%%
-%% Resolves Key-to-Pid mapping
-resolve(Key) ->
-   case ets:lookup(?REGISTRY, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
-   end.
+%% Delete definition of storage domain (domain entities are not impacted)
+delete(Name) ->
+   kvs_reg:unregister({domain, Name}).
 

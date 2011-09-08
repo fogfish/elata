@@ -29,50 +29,59 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_reg).
+-module(kvs_cache).
+-behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Key/Value Registry maps key to pid of responsible processes
+%%  
 %%
-
-%% TODO: implement mnesia-based registry for clustered solutions
 
 -export([
-   % public API
-   start/0,
-   register/2,
-   unregister/1,   
-   resolve/1
+   start_link/2,
+   %% gen_server
+   init/1, 
+   handle_call/3,
+   handle_cast/2, 
+   handle_info/2, 
+   terminate/2, 
+   code_change/3 
 ]).
 
--define(REGISTRY, ?MODULE).
-
 %%
-%% Initializes registry
-start() ->
-   ets:new(?REGISTRY, [public, named_table]),
+%%
+start_link(Key, Entity) ->
+  gen_server:start_link(?MODULE, [Key, Entity], []).
+  
+init([Key, Entity]) ->
+   kvs_reg:register(Key, self()),
+   {ok, {Key, Entity}}.
+
+   
+handle_call({set, Entity}, _From, {Key, _OldEntity}) ->
+   {reply, ok, {Key, Entity}};
+handle_call(get, _From, {Key, Entity}) ->
+   {reply, {ok, Entity}, {Key, Entity}};
+handle_call(_Req, _From, State) ->
+   {reply, undefined, State}.
+handle_cast(kill, State) ->
+   {stop, normal, State};
+handle_cast(_Req, State) ->
+   {noreply, State}.
+
+handle_info(_Msg, State) ->
+   {noreply, State}.
+   
+terminate(_Reason, {Key, _Entity}) ->
+   kvs_reg:unregister(Key),
    ok.
    
-%%
-%% Register Key-to-Pid mapping into registry
-register(Key, Item) ->
-   case ets:insert(?REGISTRY, {Key, Item}) of
-      true -> ok;
-      _    -> error
-   end.
+code_change(_OldVsn, State, _Extra) ->
+   {ok, State}.     
 
-%%
-%% Removed Key-to-Pid mapping from registry
-unregister(Key) ->
-   ets:delete(?REGISTRY, Key),
-   ok.
-   
-%%
-%% Resolves Key-to-Pid mapping
-resolve(Key) ->
-   case ets:lookup(?REGISTRY, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
-   end.
+%%%------------------------------------------------------------------   
+%%%
+%%% Private functions
+%%%
+%%%------------------------------------------------------------------
 

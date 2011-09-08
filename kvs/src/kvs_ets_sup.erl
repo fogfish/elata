@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,50 +29,65 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_reg).
+-module(kvs_ets_sup).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% Key/Value Registry maps key to pid of responsible processes
-%%
-
-%% TODO: implement mnesia-based registry for clustered solutions
+-behaviour(supervisor).
+-behaviour(gen_kvs_domain).
 
 -export([
-   % public API
-   start/0,
-   register/2,
-   unregister/1,   
-   resolve/1
+   % supervisor
+   start_link/0,
+   init/1,
+   % gen_kvs_domain
+   factory/1,
+   create/2,
+   insert/2,
+   lookup/2,
+   delete/2
 ]).
 
--define(REGISTRY, ?MODULE).
-
-%%
-%% Initializes registry
-start() ->
-   ets:new(?REGISTRY, [public, named_table]),
-   ok.
+%%%------------------------------------------------------------------
+%%%
+%%% Supervisor
+%%%
+%%%------------------------------------------------------------------
+start_link() ->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
-%%
-%% Register Key-to-Pid mapping into registry
-register(Key, Item) ->
-   case ets:insert(?REGISTRY, {Key, Item}) of
-      true -> ok;
-      _    -> error
-   end.
+init([]) ->
+   Process = {
+      kvs_ets,       % child id
+      {
+         kvs_ets,    % Mod
+         start_link, % Fun
+         []          % Args
+      },
+      permanent, 2000, worker, dynamic
+   },
+   {ok,
+      {
+         {simple_one_for_one, 2, 1},   % 2 faults per second
+         [Process]
+      }
+   }.
 
-%%
-%% Removed Key-to-Pid mapping from registry
-unregister(Key) ->
-   ets:delete(?REGISTRY, Key),
-   ok.
+%%%------------------------------------------------------------------
+%%%
+%%% gen_kvs_domain
+%%%
+%%%------------------------------------------------------------------
+factory(Args) ->
+   supervisor:start_child(?MODULE, Args).
    
-%%
-%% Resolves Key-to-Pid mapping
-resolve(Key) ->
-   case ets:lookup(?REGISTRY, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
-   end.
-
+create(Pid, Entity) ->
+   gen_server:call(Pid, {create, Entity}).
+   
+insert(Pid, Entity) ->
+   gen_server:call(Pid, {insert, Entity}).
+   
+lookup(Pid, Key) ->
+   gen_server:call(Pid, {lookup, Key}).
+   
+delete(Pid, Key) ->
+   gen_server:call(Pid, {delete, Key}).

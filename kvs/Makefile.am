@@ -13,14 +13,24 @@
 #   the License for the specific language governing rights and limitations
 #   under the License.
 #
+SUBDIRS = test
 
 ESRC = \
    src/keyval_store.erl \
+   src/keyval_domain.erl \
+   src/gen_kvs_domain.erl \
+   src/gen_kvs_entity.erl \
+   src/kvs_ets_sup.erl \
+   src/kvs_ets.erl \
+   src/kvs_dets_sup.erl \
+   src/kvs_dets.erl \
+   src/kvs_cache_sup.erl \
+   src/kvs_cache.erl \
+   src/kvs_evt.erl \
+   src/kvs_evt_sup.erl \
+   src/kvs_evt_handler_sup.erl \
    src/kvs_app.erl \
    src/kvs_sup.erl \
-   src/kvs_bucket_sup.erl \
-   src/kvs_bucket.erl \
-   src/kvs_evt.erl \
    src/kvs_reg.erl \
    src/kvset.erl
 
