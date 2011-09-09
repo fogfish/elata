@@ -51,10 +51,10 @@
 %%%------------------------------------------------------------------
 behaviour_info(callbacks) ->
    [
-      {factory, 1}, %% factory method create instance
-      {set,  2},    %% set(Pid, Entity)
-      {get,  1},    %% get(Pid)
-      {kill, 1}     %% kill(Pid)
+      {construct, 1}, %% constructs([...])
+      {destroy,   1}, %% destroy(Pid)  
+      {set,  2},      %% set(Pid, Item)
+      {get,  1}       %% get(Pid)
    ];
 
 behaviour_info(_) -> 
@@ -69,31 +69,31 @@ behaviour_info(_) ->
 
 %%
 %%
-do_create(Domain, Entity) ->
-   Key = key(Domain, Entity),
+do_create(Bucket, Item) ->
+   Key = key(Bucket, Item),
    case kvs_reg:resolve(Key) of
-      {error, _} -> spawn_entity(Domain, Entity), ok;
+      {error, _} -> spawn_entity(Bucket, Item), ok;
       {ok, _Pid} -> {error, already_exists}
    end.
 
 %%
 %%
-do_insert(Domain, Entity) ->
-   Key = key(Domain, Entity),
+do_insert(Bucket, Item) ->
+   Key = key(Bucket, Item),
    case kvs_reg:resolve(Key) of
       {error, _} -> 
-         spawn_entity(Domain, Entity);
+         spawn_entity(Bucket, Item);
       {ok,  Pid} ->
-         Mod = get_plugin(Domain),
-         Mod:set(Pid, Entity)
+         Mod = get_plugin(Bucket),
+         Mod:set(Pid, Item)
    end.
 
 %%
 %%
-do_lookup(Domain, Key) ->
+do_lookup(Bucket, Key) ->
    case kvs_reg:resolve(Key) of
       {ok, Pid}  ->
-         Mod = get_plugin(Domain),
+         Mod = get_plugin(Bucket),
          Mod:get(Pid);
       {error, _} ->
          {error, not_found}
@@ -101,11 +101,11 @@ do_lookup(Domain, Key) ->
 
 %%
 %%
-do_delete(Domain, Key) ->
+do_delete(Bucket, Key) ->
    case kvs_reg:resolve(Key) of
       {ok, Pid} ->
-         Mod = get_plugin(Domain),
-         Mod:kill(Pid),
+         Mod = get_plugin(Bucket),
+         Mod:destroy(Pid),
          kvs_reg:unregister(Key),
          ok;
       {error, _} ->
@@ -117,24 +117,24 @@ do_delete(Domain, Key) ->
 %%% Private Functions
 %%%
 %%%------------------------------------------------------------------
-get_plugin(Domain) ->
-   case proplists:get_value(plugin, Domain) of
+get_plugin(Bucket) ->
+   case proplists:get_value(plugin, Bucket) of
       {Mod, _}  -> Mod;
       Mod       -> Mod
    end.
 
-key(Domain, Entity) when is_list(Entity) ->
-   Key = proplists:get_value(key, Domain),
-   proplists:get_value(Key, Entity);
-key(Domain, Entity) when is_tuple(Entity) ->
-   Key = proplists:get_value(key, Domain),
-   erlang:element(Key, Entity).
+key(Bucket, Item) when is_list(Item) ->
+   Key = proplists:get_value(key, Bucket),
+   proplists:get_value(Key, Item);
+key(Bucket, Item) when is_tuple(Item) ->
+   Key = proplists:get_value(key, Bucket),
+   erlang:element(Key, Item).
    
-spawn_entity(Domain, Entity) ->
-   Key = key(Domain, Entity),
-   {ok, Pid} = case proplists:get_value(plugin, Domain) of
-      {Mod, Args} -> Mod:factory(Args ++ [Key, Entity]);   
-      Mod         -> Mod:factory([Key, Entity])
+spawn_entity(Bucket, Item) ->
+   Key = key(Bucket, Item),
+   {ok, Pid} = case proplists:get_value(plugin, Bucket) of
+      {Mod, Args} -> Mod:construct(Args ++ [Key, Item]);   
+      Mod         -> Mod:construct([Key, Item])
    end,
    % Process should register itself at init routine (fault recovery)
    kvs_reg:register(Key, Pid), 

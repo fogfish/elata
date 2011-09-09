@@ -218,8 +218,8 @@ top_srcdir = @top_srcdir@
 SUBDIRS = test
 ESRC = \
    src/keyval_store.erl \
-   src/keyval_domain.erl \
-   src/gen_kvs_domain.erl \
+   src/keyval_bucket.erl \
+   src/gen_kvs_singleton.erl \
    src/gen_kvs_entity.erl \
    src/kvs_ets_sup.erl \
    src/kvs_ets.erl \

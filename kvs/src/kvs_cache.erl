@@ -50,21 +50,21 @@
 
 %%
 %%
-start_link(Key, Entity) ->
-  gen_server:start_link(?MODULE, [Key, Entity], []).
+start_link(Key, Item) ->
+  gen_server:start_link(?MODULE, [Key, Item], []).
   
-init([Key, Entity]) ->
+init([Key, Item]) ->
    kvs_reg:register(Key, self()),
-   {ok, {Key, Entity}}.
+   {ok, {Key, Item}}.
 
    
-handle_call({set, Entity}, _From, {Key, _OldEntity}) ->
-   {reply, ok, {Key, Entity}};
-handle_call(get, _From, {Key, Entity}) ->
-   {reply, {ok, Entity}, {Key, Entity}};
+handle_call({kvs_set, Item}, _From, {Key, _}) ->
+   {reply, ok, {Key, Item}};
+handle_call(kvs_get, _From, {Key, Item}) ->
+   {reply, {ok, Item}, {Key, Item}};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
-handle_cast(kill, State) ->
+handle_cast(kvs_destroy, State) ->
    {stop, normal, State};
 handle_cast(_Req, State) ->
    {noreply, State}.
@@ -72,7 +72,7 @@ handle_cast(_Req, State) ->
 handle_info(_Msg, State) ->
    {noreply, State}.
    
-terminate(_Reason, {Key, _Entity}) ->
+terminate(_Reason, {Key, _}) ->
    kvs_reg:unregister(Key),
    ok.
    

@@ -34,96 +34,58 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %%
-%% Unit test of KVS proxy to ETS via keyval_store interface 
+%%
 %%
 
-list_kvs_cache_test_() ->
+kvs_cache_test_() ->
    {
       setup,
-      fun setup_list_domain/0,
+      fun() -> 
+         kvs_reg:start(),             
+         kvs_cache_sup:start_link()
+      end,
       [
-      { "Create entity as list", fun create_as_list/0},
-      { "Lookup entity as list", fun lookup_as_list/0},
-      { "Insert entity as list", fun insert_as_list/0},
-      { "Delete entity as list", fun delete_as_list/0},
-      
-      { "Create entity as tuple", fun create_as_tuple/0},
-      { "Lookup entity as tuple", fun lookup_as_tuple/0},
-      { "Insert entity as tuple", fun insert_as_tuple/0},
-      { "Delete entity as tuple", fun delete_as_tuple/0}
+      {
+         "Construct item process", 
+         fun() ->
+            {ok, _} = kvs_cache_sup:construct([a, {a, b, c}])
+         end
+      },
+      {
+         "Get item", 
+         fun() ->
+            {ok, Pid} = kvs_reg:resolve(a),
+            ?assert(
+               {ok, {a, b, c}} =:= kvs_cache_sup:get(Pid)
+            )
+         end
+      },
+      {
+         "Set item", 
+         fun() ->
+            {ok, Pid} = kvs_reg:resolve(a),
+            ?assert(
+               ok =:= kvs_cache_sup:set(Pid, {c, b, a})
+            ),
+            ?assert(
+               {ok, {c, b, a}} =:= kvs_cache_sup:get(Pid)
+            )
+         end
+      },
+      {
+         "Destroy item process", 
+         fun() ->
+            {ok, Pid} = kvs_reg:resolve(a),
+            ?assert(
+               ok =:= kvs_cache_sup:destroy(Pid)
+            ),
+            timer:sleep(100),
+            ?assert(
+               {error, not_found} =:= kvs_reg:resolve(a)
+            )
+         end
+      }
       ]
    }.
-
--define(LST_DOMAIN,   [{plugin, kvs_cache_sup}, {key, id}]).
--define(REC_DOMAIN,   [{plugin, kvs_cache_sup}, {key, 2}]).
-
--define(LST_ENTITY_1, [{id, entity_1}, {name, "Test Entity 1"}]).
--define(LST_ENTITY_2, [{id, entity_1}, {name, "Test Entity 2"}]).
--define(REC_ENTITY_1, {rec, entity_1, "Test Entity 1"}).
--define(REC_ENTITY_2, {rec, entity_1, "Test Entity 2"}).
-
-
-setup_list_domain() ->
-   kvs_reg:start(),
-   kvs_cache_sup:start_link(),
-   keyval_domain:create(test_lst, ?LST_DOMAIN),
-   keyval_domain:create(test_rec, ?REC_DOMAIN).
    
-%%%
-%%% Entity is List of key-value pairs
-%%%
-create_as_list() ->
-   ?assert(
-      ok =:= keyval_store:create(test_lst, ?LST_ENTITY_1)
-   ).
-   
-lookup_as_list() ->
-   ?assert(
-      {ok, ?LST_ENTITY_1} =:= keyval_store:lookup(test_lst, entity_1)
-   ).
-
-insert_as_list() ->
-   ?assert(
-      ok =:= keyval_store:insert(test_lst, ?LST_ENTITY_2)
-   ),
-   ?assert(
-      {ok, ?LST_ENTITY_2} =:= keyval_store:lookup(test_lst, entity_1)
-   ).
-   
-delete_as_list() ->
-   ?assert(
-      ok =:= keyval_store:delete(test_lst, entity_1)
-   ),
-   ?assert(
-      {error, not_found} =:= keyval_store:lookup(test_lst, entity_1)
-   ).
-
-%%%
-%%% Entity is tuple
-%%%
-create_as_tuple() ->
-   ?assert(
-      ok =:= keyval_store:create(test_rec, ?REC_ENTITY_1)
-   ).
-   
-lookup_as_tuple() ->
-   ?assert(
-      {ok, ?REC_ENTITY_1} =:= keyval_store:lookup(test_rec, entity_1)
-   ).   
-   
-insert_as_tuple() ->
-   ?assert(
-      ok =:= keyval_store:insert(test_rec, ?REC_ENTITY_2)
-   ),
-   ?assert(
-      {ok, ?REC_ENTITY_2} =:= keyval_store:lookup(test_rec, entity_1)
-   ).
-   
-delete_as_tuple() ->
-   ?assert(
-      ok =:= keyval_store:delete(test_rec, entity_1)
-   ),
-   ?assert(
-      {error, not_found} =:= keyval_store:lookup(test_rec, entity_1)
-   ).   
    

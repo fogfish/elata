@@ -29,7 +29,7 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_ets_tests).
+-module(keyval_store_ets_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -37,10 +37,10 @@
 %% Unit test of KVS proxy to ETS via keyval_store interface 
 %%
 
-list_kvs_ets_test_() ->
+keyval_store_ets_test_() ->
    {
       setup,
-      fun setup_list_domain/0,
+      fun setup/0,
       [
       { "Create entity as list", fun create_as_list/0},
       { "Lookup entity as list", fun lookup_as_list/0},
@@ -63,11 +63,12 @@ list_kvs_ets_test_() ->
 -define(REC_ENTITY_2, {rec, entity_1, "Test Entity 2"}).
 
 
-setup_list_domain() ->
+setup() ->
    kvs_reg:start(),
+   kvs_cache_sup:start_link(),
    kvs_ets_sup:start_link(),
-   keyval_domain:create(test_lst, ?LST_DOMAIN),
-   keyval_domain:create(test_rec, ?REC_DOMAIN).
+   keyval_bucket:create(test_lst, ?LST_DOMAIN),
+   keyval_bucket:create(test_rec, ?REC_DOMAIN).
    
 %%%
 %%% Entity is List of key-value pairs

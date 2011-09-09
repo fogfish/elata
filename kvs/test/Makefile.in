@@ -122,8 +122,9 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-TESTS = kvs_reg_tests keyval_domain_tests kvs_ets_tests \
-	kvs_cache_tests kvs_dets_tests kvs_evt_tests
+TESTS = kvs_reg_tests kvs_cache_tests keyval_bucket_tests \
+	keyval_store_cache_tests keyval_store_ets_tests \
+	keyval_store_dets_tests kvs_evt_tests
 CLEANFILES = $(TESTS) $(TESTS:=.beam)
 all: all-am
 

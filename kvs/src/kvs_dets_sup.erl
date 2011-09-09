@@ -33,7 +33,7 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -behaviour(supervisor).
--behaviour(gen_kvs_domain).
+-behaviour(gen_kvs_singleton).
 
 -export([
    % supervisor

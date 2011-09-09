@@ -40,10 +40,10 @@
    start_link/0,
    init/1,
    % gen_kvs_domain
-   factory/1,
+   construct/1,
+   destroy/1,
    set/2,
-   get/1,
-   kill/1
+   get/1
 ]).
 
 %%%------------------------------------------------------------------
@@ -76,14 +76,14 @@ init([]) ->
 %%% gen_kvs_entity
 %%%
 %%%------------------------------------------------------------------
-factory(Args) ->
+construct(Args) ->
    supervisor:start_child(?MODULE, Args).
+
+destroy(Pid) ->
+   gen_server:cast(Pid, kvs_destroy).
    
-set(Pid, Entity) ->
-   gen_server:call(Pid, {set, Entity}).
+set(Pid, Item) ->
+   gen_server:call(Pid, {kvs_set, Item}).
    
 get(Pid) ->
-   gen_server:call(Pid, get).
-   
-kill(Pid) ->
-   gen_server:cast(Pid, kill).
+   gen_server:call(Pid, kvs_get).

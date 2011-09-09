@@ -1,8 +1,9 @@
 TESTS  = kvs_reg_tests
-TESTS += keyval_domain_tests
-TESTS += kvs_ets_tests
 TESTS += kvs_cache_tests
-TESTS += kvs_dets_tests
+TESTS += keyval_bucket_tests
+TESTS += keyval_store_cache_tests
+TESTS += keyval_store_ets_tests
+TESTS += keyval_store_dets_tests
 TESTS += kvs_evt_tests
 
 .SECONDARY:

@@ -29,7 +29,7 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(gen_kvs_domain).
+-module(gen_kvs_singleton).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
@@ -53,8 +53,8 @@
 behaviour_info(callbacks) ->
    [
       {factory, 1}, %% factory method create instance factory(Args)
-      {create,  2}, %% create(Pid, Entity)
-      {insert,  2}, %% insert(Pid, Entity)
+      {create,  2}, %% create(Pid, Item)
+      {insert,  2}, %% insert(Pid, Item)
       {lookup,  2}, %% lookup(Pid, Key)
       {delete,  2}  %% delete(Pid, Key)
    ];
@@ -71,33 +71,33 @@ behaviour_info(_) ->
 
 %%
 %%
-do_create(Domain, Entity) ->
-   Name = proplists:get_value(name, Domain),
+do_create(Bucket, Item) ->
+   Name = proplists:get_value(name, Bucket),
    {ok, Pid} = case kvs_reg:resolve(Name) of
-      {error, _} -> spawn_domain(Name, Domain);
+      {error, _} -> spawn_domain(Name, Bucket);
       R          -> R
    end,
-   Mod = get_plugin(Domain),
-   Mod:create(Pid, Entity).
+   Mod = get_plugin(Bucket),
+   Mod:create(Pid, Item).
 
 %%
 %%
-do_insert(Domain, Entity) ->
-   Name = proplists:get_value(name, Domain),
+do_insert(Bucket, Item) ->
+   Name = proplists:get_value(name, Bucket),
    {ok, Pid} = case kvs_reg:resolve(Name) of
-      {error, _} -> spawn_domain(Name, Domain);
+      {error, _} -> spawn_domain(Name, Bucket);
       R          -> R
    end,
-   Mod = get_plugin(Domain),
-   Mod:insert(Pid, Entity).
+   Mod = get_plugin(Bucket),
+   Mod:insert(Pid, Item).
    
 %%
 %%
-do_lookup(Domain, Key) ->
-   Name = proplists:get_value(name, Domain),
+do_lookup(Bucket, Key) ->
+   Name = proplists:get_value(name, Bucket),
    case kvs_reg:resolve(Name) of
       {ok, Pid}  -> 
-         Mod = get_plugin(Domain),
+         Mod = get_plugin(Bucket),
          Mod:lookup(Pid, Key);
       {error, _} ->
          {error, not_found}
@@ -105,11 +105,11 @@ do_lookup(Domain, Key) ->
 
 %%
 %%
-do_delete(Domain, Key) ->
-   Name = proplists:get_value(name, Domain),
+do_delete(Bucket, Key) ->
+   Name = proplists:get_value(name, Bucket),
    case kvs_reg:resolve(Name) of
       {ok, P}  -> 
-         Mod = get_plugin(Domain),
+         Mod = get_plugin(Bucket),
          Mod:delete(P, Key);
       {error, _} ->
          ok
@@ -120,16 +120,16 @@ do_delete(Domain, Key) ->
 %%% Private Functions
 %%%
 %%%------------------------------------------------------------------
-get_plugin(Domain) ->
-   case proplists:get_value(plugin, Domain) of
+get_plugin(Bucket) ->
+   case proplists:get_value(plugin, Bucket) of
       {Mod, _} -> Mod;
       Mod      -> Mod
    end.
 
-spawn_domain(Name, Domain) ->
-   {ok, Pid} = case proplists:get_value(plugin, Domain) of
-      {Mod, Args} -> Mod:factory([Name, Domain | Args]);   
-      Mod         -> Mod:factory([Name, Domain])
+spawn_domain(Name, Bucket) ->
+   {ok, Pid} = case proplists:get_value(plugin, Bucket) of
+      {Mod, Args} -> Mod:factory([Name, Bucket | Args]);   
+      Mod         -> Mod:factory([Name, Bucket])
    end,
    % Process should register itself at init routine (fault recovery)
    kvs_reg:register(Name, Pid), 

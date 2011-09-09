@@ -29,14 +29,17 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(keyval_domain_tests).
+-module(keyval_bucket_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
 basic_domain_test_() ->
    {
       setup,
-      fun() -> kvs_reg:start() end,
+      fun() -> 
+         kvs_reg:start(),
+         kvs_cache_sup:start_link()
+      end,
       [
       { "Create domain", fun create/0},
       { "Lookup domain", fun lookup/0},
@@ -51,23 +54,23 @@ basic_domain_test_() ->
 %%
 create() ->
    ?assert(
-      ok =:= keyval_domain:create(test, ?DOMAIN)
+      ok =:= keyval_bucket:create(test, ?DOMAIN)
    ).
  
 %%
 lookup() ->
    ?assert(
-      {ok, [{name, test} | ?DOMAIN]} =:= keyval_domain:lookup(test)
+      {ok, [{name, test} | ?DOMAIN]} =:= keyval_bucket:lookup(test)
    ).
 
 %%
 delete() ->
    ?assert(
-      ok =:= keyval_domain:delete(test)
+      ok =:= keyval_bucket:delete(test)
    ).
    
 undefined() ->
    ?assert(
-      {error, not_found} =:= keyval_domain:lookup(test)
+      {error, not_found} =:= keyval_bucket:lookup(test)
    ).
    

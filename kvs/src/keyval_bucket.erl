@@ -29,13 +29,13 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(keyval_domain).
+-module(keyval_bucket).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Key/Value Domain provides management interface to storage domains 
-%% The interface impacts domain metadata registered within node
-%% Domains entityes are not impacted
+%% Key/Value Bucket provides management interface to storage buckets 
+%% The interface impacts bucket metadata registered within node
+%% Bucket entityes are not impacted
 %%
 
 -export([
@@ -48,7 +48,7 @@
 %% Create definition of storage domain (domain entities are not impacted)
 %%
 %% Name   = string() unique domain name
-%% Domain = [opt]
+%% Bucket = [opt]
 %%    opt = singleton | event | {name, Name} | 
 %%          {plugin, Module} | {plugin, {Module, Args}} | 
 %%          {key, Id}
@@ -57,17 +57,32 @@
 %%    Module = KVS plugin implementation of gen_kvs_domain / gen_kvs_entity
 %%    Args = list(), list of arguments supplied to factory method
 %%    Id = name of key attribute or key position
-create(Name, Domain) ->
+create(Name, Bucket) ->
    % TODO: assert: plugin + key
-   kvs_reg:register({domain, Name}, [{name, Name} | Domain]).
+   % TODO: assert & inject dual-time vclock
+   Bkey = {kvs_sys_bucket, Name},
+   case kvs_reg:resolve(Bkey) of
+      {error, _} ->
+         {ok, _Pid} = kvs_cache_sup:construct([Bkey, [{name, Name} | Bucket]]),
+         ok;
+      {ok,  _Pid} -> 
+         {error, already_exists}
+   end.
 
 %%
 %%
 lookup(Name) ->
-   kvs_reg:resolve({domain, Name}).
+   Bkey = {kvs_sys_bucket, Name},
+   case kvs_reg:resolve(Bkey) of
+      {ok, Pid} -> kvs_cache_sup:get(Pid);
+      Error     -> Error
+   end.
 
 %%
 %% Delete definition of storage domain (domain entities are not impacted)
 delete(Name) ->
-   kvs_reg:unregister({domain, Name}).
-
+   Bkey = {kvs_sys_bucket, Name},
+   case kvs_reg:resolve(Bkey) of
+      {ok, Pid} -> kvs_cache_sup:destroy(Pid);
+      Error     -> Error
+   end.

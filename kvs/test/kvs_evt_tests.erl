@@ -64,6 +64,7 @@ kvs_evt_test_() ->
 setup() ->
    % start registry
    kvs_reg:start(),
+   kvs_cache_sup:start_link(),
    % start event
    kvs_evt:start_link(),
    kvs_evt_sup:start_link(),
@@ -71,8 +72,8 @@ setup() ->
    % start storage
    kvs_cache_sup:start_link(),
    kvs_ets_sup:start_link(),
-   keyval_domain:create(test_src, [event, {plugin, kvs_cache_sup}, {key, id}]),
-   keyval_domain:create(test_dst, [singleton, {plugin, kvs_ets_sup}, {key, id}]).
+   keyval_bucket:create(test_src, [event, {plugin, kvs_cache_sup}, {key, id}]),
+   keyval_bucket:create(test_dst, [singleton, {plugin, kvs_ets_sup}, {key, id}]).
    
 
 create() ->   
