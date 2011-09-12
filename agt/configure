@@ -2331,7 +2331,7 @@ pkgliberldir=$liberldir/$PACKAGE-$VERSION
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $pkgliberldir" >&5
 $as_echo "$pkgliberldir" >&6; }
 
-ac_config_files="$ac_config_files Makefile"
+ac_config_files="$ac_config_files Makefile test/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3055,6 +3055,7 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "test/Makefile") CONFIG_FILES="$CONFIG_FILES test/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

@@ -33,4 +33,5 @@ AC_MSG_RESULT([$pkgliberldir])
 
 AC_OUTPUT( \
    Makefile           \
+   test/Makefile      \
 )

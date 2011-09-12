@@ -12,14 +12,15 @@
 #   the License for the specific language governing rights and limitations
 #   under the License.
 #
+SUBDIRS = test
 
 ESRC = \
    src/elata_agt.erl \
    src/elata_agt_app.erl \
    src/elata_agt_sup.erl \
    src/agt_kvs_io.erl \
-   src/agt_wrk.erl \
-   src/agt_wrk_sup.erl \
+   src/agt_job.erl \
+   src/agt_job_sup.erl \
    src/agt_probe.erl \
    src/agt_rest_api.erl \
    src/uri_util.erl
