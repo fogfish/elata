@@ -64,9 +64,7 @@ keyval_store_dets_test_() ->
 
 
 setup() ->
-   kvs_reg:start(),
-   kvs_cache_sup:start_link(),
-   kvs_dets_sup:start_link(),
+   kvs_sup:start_link(),
    keyval_bucket:create(test_lst, ?LST_DOMAIN),
    keyval_bucket:create(test_rec, ?REC_DOMAIN).
    

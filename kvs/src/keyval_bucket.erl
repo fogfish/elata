@@ -63,7 +63,10 @@ create(Name, Bucket) ->
    Bkey = {kvs_sys_bucket, Name},
    case kvs_reg:resolve(Bkey) of
       {error, _} ->
+         % define a plugin factory as part of root supervior tree
+         ok = kvs_sup:attach(proplists:get_value(plugin, Bucket)),
          {ok, _Pid} = kvs_cache_sup:construct([Bkey, [{name, Name} | Bucket]]),
+         error_logger:info_report([{name, Name} | Bucket]),
          ok;
       {ok,  _Pid} -> 
          {error, already_exists}

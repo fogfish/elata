@@ -37,8 +37,7 @@ basic_domain_test_() ->
    {
       setup,
       fun() -> 
-         kvs_reg:start(),
-         kvs_cache_sup:start_link()
+         kvs_sup:start_link()
       end,
       [
       { "Create domain", fun create/0},
@@ -49,7 +48,7 @@ basic_domain_test_() ->
    }.
 
 %% test domain
--define(DOMAIN, [{plugin, undefined}]).
+-define(DOMAIN, [{plugin, kvs_cache_sup}]).
    
 %%
 create() ->

@@ -34,15 +34,41 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -export([
+   % supervisor
    start_link/0,
-   init/1
+   init/1,
+   % custom
+   attach/1
 ]).
+
+%%%
+%%% Root supervisor of Key/Value storage
+%%%
+%%% Statically handles
+%%%  - event manager
+%%%  - event handler factory/supervisor
+%%%  - kvs_cache (in-memory cache)
+%%% 
+%%% Dynamically handles
+%%%  - storage plug-in defined by application via keyval_bucket:create
+%%%
 
 start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->   
    ok = kvs_reg:start(),
+   % plugins
+   Cache = {
+      kvs_cache_sup,
+      {
+         kvs_cache_sup,
+         start_link,
+         []
+      },
+      permanent, 2000, supervisor, dynamic
+   },
+   % event management
    EvtManager = {
       kvs_evt,
       {
@@ -58,13 +84,39 @@ init([]) ->
          kvs_evt_sup,
          start_link,
          []
-      }
+      },
+      permanent, 2000, worker, dynamic
    },
    {ok,
       {
          {one_for_one, 4, 1800},
-         [EvtManager, EvtFactory]
+         [Cache, EvtManager, EvtFactory]
       }
    }.
    
    
+%%%   
+%%% Attaches a module into supervisor tree
+%%%
+attach(Mod) ->
+   case Mod of
+      kvs_cache_sup -> 
+         ok;
+      _             ->
+         Child = {  % child spec
+            Mod,
+            {
+               Mod,
+               start_link,
+               []
+            },
+            permanent, 2000, supervisor, dynamic
+         },
+         case supervisor:start_child(kvs_sup, Child) of 
+            {ok, _}    -> ok;
+            {ok, _, _} -> ok;
+            {error, already_present}     -> ok;
+            {error,{already_started, _}} -> ok;
+            Err -> Err
+         end     
+   end.

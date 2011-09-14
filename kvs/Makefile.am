@@ -31,8 +31,7 @@ ESRC = \
    src/kvs_evt_handler_sup.erl \
    src/kvs_app.erl \
    src/kvs_sup.erl \
-   src/kvs_reg.erl \
-   src/kvset.erl
+   src/kvs_reg.erl 
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 EBIN += ebin/elata_kvs.app

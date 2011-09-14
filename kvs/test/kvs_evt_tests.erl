@@ -62,16 +62,8 @@ kvs_evt_test_() ->
 -define(ENTITY_2, [{id, entity_1}, {name, "Test Entity 2"}]).   
    
 setup() ->
-   % start registry
-   kvs_reg:start(),
-   kvs_cache_sup:start_link(),
-   % start event
-   kvs_evt:start_link(),
-   kvs_evt_sup:start_link(),
+   kvs_sup:start_link(),
    kvs_evt_sup:factory(kvs_evt_tests),
-   % start storage
-   kvs_cache_sup:start_link(),
-   kvs_ets_sup:start_link(),
    keyval_bucket:create(test_src, [event, {plugin, kvs_cache_sup}, {key, id}]),
    keyval_bucket:create(test_dst, [singleton, {plugin, kvs_ets_sup}, {key, id}]).
    
