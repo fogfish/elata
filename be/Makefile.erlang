@@ -27,6 +27,7 @@ DOCONF += \
 #
 # compile
 ebin/%.beam : src/%.erl
+	test  -d ebin || mkdir ebin
 	$(ERLC) $(CCFLAGS) -I ./include -b beam -o ebin $<
 
 ebin/%.app  : src/%.app.in
