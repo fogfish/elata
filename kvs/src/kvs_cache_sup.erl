@@ -33,17 +33,19 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -behaviour(supervisor).
--behaviour(gen_kvs_entity).
+-behaviour(gen_kvs_bucket).
 
 -export([
    % supervisor
    start_link/0,
    init/1,
-   % gen_kvs_domain
+   % gen_kvs_bucket
    construct/1,
-   destroy/1,
-   set/2,
-   get/1
+   config/0,
+   set/3,
+   has/2,
+   get/2,
+   remove/2
 ]).
 
 %%%------------------------------------------------------------------
@@ -56,7 +58,7 @@ start_link() ->
    
 init([]) ->
    Process = {
-      kvs_ets,       % child id
+      kvs_cache,       % child id
       {
          kvs_cache,  % Mod
          start_link, % Fun
@@ -76,14 +78,24 @@ init([]) ->
 %%% gen_kvs_entity
 %%%
 %%%------------------------------------------------------------------
-construct(Args) ->
-   supervisor:start_child(?MODULE, Args).
+construct([Bucket]) ->
+   % nothing to do it is called from kvs_bucket
+   {ok, self()};
+construct([Bucket, Key, Item]) ->
+   supervisor:start_child(?MODULE, [Bucket, Key, Item]).
 
-destroy(Pid) ->
-   gen_server:cast(Pid, kvs_destroy).
+config() ->
+   [supervise, keyspace].
    
-set(Pid, Item) ->
-   gen_server:call(Pid, {kvs_set, Item}).
+set(Pid, Key, Item) ->
+   gen_server:call(Pid, {kvs_set, Key, Item}).
    
-get(Pid) ->
-   gen_server:call(Pid, kvs_get).
+has(Pid, Key) ->
+   gen_server:call(Pid, {kvs_has, Key}).
+   
+get(Pid, Key) ->
+   gen_server:call(Pid, {kvs_get, Key}).
+   
+remove(Pid, Key) ->
+   gen_server:cast(Pid, {kvs_remove, Key}).
+      

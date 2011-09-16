@@ -34,58 +34,55 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %%
-%%
+%% Unit test of KVS proxy to ETS via keyval_store interface 
 %%
 
 kvs_cache_test_() ->
    {
       setup,
-      fun() -> 
-         kvs_reg:start(),             
-         kvs_cache_sup:start_link()
-      end,
+      fun setup/0,
       [
-      {
-         "Construct item process", 
-         fun() ->
-            {ok, _} = kvs_cache_sup:construct([a, {a, b, c}])
-         end
-      },
-      {
-         "Get item", 
-         fun() ->
-            {ok, Pid} = kvs_reg:resolve(a),
-            ?assert(
-               {ok, {a, b, c}} =:= kvs_cache_sup:get(Pid)
-            )
-         end
-      },
-      {
-         "Set item", 
-         fun() ->
-            {ok, Pid} = kvs_reg:resolve(a),
-            ?assert(
-               ok =:= kvs_cache_sup:set(Pid, {c, b, a})
-            ),
-            ?assert(
-               {ok, {c, b, a}} =:= kvs_cache_sup:get(Pid)
-            )
-         end
-      },
-      {
-         "Destroy item process", 
-         fun() ->
-            {ok, Pid} = kvs_reg:resolve(a),
-            ?assert(
-               ok =:= kvs_cache_sup:destroy(Pid)
-            ),
-            timer:sleep(100),
-            ?assert(
-               {error, not_found} =:= kvs_reg:resolve(a)
-            )
-         end
-      }
+      { "Put item", fun put/0},
+      { "Has item", fun has/0},
+      { "Get item", fun get/0},
+      { "Has item", fun remove/0}
       ]
    }.
+
+setup() ->
+   kvs_sup:start_link(),
+   kvs_bucket:define(test, [{storage, kvs_cache_sup}, {id, {attr, 1}}]).
    
+%%%
+%%% 
+%%%
+put() ->
+   ?assert(
+      {ok, a} =:= kvs:put(test, {a, b, c})
+   ).
    
+has() ->
+   ?assert(
+      true  =:= kvs:has(test, a)
+   ),
+   ?assert(
+      false =:= kvs:has(test, b)
+   ).
+   
+get() ->
+   ?assert(
+      {ok, {a, b, c}} =:= kvs:get(test, a)
+   ),
+   ?assert(
+      {error, not_found} =:= kvs:get(test, b)
+   ).
+   
+remove() ->
+   ?assert(
+      ok =:= kvs:remove(test, a)
+   ),
+   timer:sleep(100),
+   ?assert(
+      {error, not_found} =:= kvs:get(test, a)
+   ).
+

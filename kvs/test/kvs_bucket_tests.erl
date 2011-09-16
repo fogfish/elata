@@ -29,50 +29,45 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_reg).
+-module(kvs_bucket_tests).
 -author(dmitry.kolesnikov@nokia.com).
+-include_lib("eunit/include/eunit.hrl").
 
-%%
-%% Key/Value Registry maps key to pid of responsible processes
-%%
-
-%% TODO: implement mnesia-based registry for clustered solutions
-
--export([
-   % public API
-   start/0,
-   register/2,
-   unregister/1,   
-   resolve/1
-]).
-
--define(REGISTRY, ?MODULE).
-
-%%
-%% Initializes registry
-start() ->
-   ets:new(?REGISTRY, [public, named_table]),
-   ok.
+basic_domain_test_() ->
+   {
+      setup,
+      fun() -> 
+         kvs_sys:construct([kvs_sys_ref]),
+         kvs_sys:construct([kvs_sys_bucket])
+      end,
+      [
+      { "Define domain", fun define/0},
+      { "Lookup domain", fun lookup/0},
+      { "Delete domain", fun delete/0},
+      { "Undefined domain", fun undefined/0} 
+      ]
+   }.
    
 %%
-%% Register Key-to-Pid mapping into registry
-register(Key, Item) ->
-   case ets:insert(?REGISTRY, {Key, Item}) of
-      true -> ok;
-      _    -> error
-   end.
+define() ->
+   ?assert(
+      ok =:= kvs_bucket:define(test, [{storage, kvs_sys}, {id, {attr, 1}}])
+   ).
+ 
+%%
+lookup() ->
+   ?assert(
+      {ok, [{name, test}, {storage, kvs_sys}, {id, {attr, 1}}]} =:= kvs_bucket:lookup(test)
+   ).
 
 %%
-%% Removed Key-to-Pid mapping from registry
-unregister(Key) ->
-   ets:delete(?REGISTRY, Key),
-   ok.
+delete() ->
+   ?assert(
+      ok =:= kvs_bucket:remove(test)
+   ).
    
-%%
-%% Resolves Key-to-Pid mapping
-resolve(Key) ->
-   case ets:lookup(?REGISTRY, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
-   end.
-
+undefined() ->
+   ?assert(
+      {error, not_found} =:= kvs_bucket:lookup(test)
+   ).
+   

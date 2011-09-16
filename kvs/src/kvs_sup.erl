@@ -57,17 +57,8 @@ start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->   
-   ok = kvs_reg:start(),
-   % plugins
-   Cache = {
-      kvs_cache_sup,
-      {
-         kvs_cache_sup,
-         start_link,
-         []
-      },
-      permanent, 2000, supervisor, dynamic
-   },
+   {ok, _} = kvs_sys:construct([kvs_sys_ref]),
+   {ok, _} = kvs_sys:construct([kvs_sys_bucket]),
    % event management
    EvtManager = {
       kvs_evt,
@@ -90,7 +81,7 @@ init([]) ->
    {ok,
       {
          {one_for_one, 4, 1800},
-         [Cache, EvtManager, EvtFactory]
+         [EvtManager, EvtFactory]
       }
    }.
    
@@ -98,25 +89,22 @@ init([]) ->
 %%%   
 %%% Attaches a module into supervisor tree
 %%%
-attach(Mod) ->
-   case Mod of
-      kvs_cache_sup -> 
-         ok;
-      _             ->
-         Child = {  % child spec
-            Mod,
-            {
-               Mod,
-               start_link,
-               []
-            },
-            permanent, 2000, supervisor, dynamic
-         },
-         case supervisor:start_child(kvs_sup, Child) of 
-            {ok, _}    -> ok;
-            {ok, _, _} -> ok;
-            {error, already_present}     -> ok;
-            {error,{already_started, _}} -> ok;
-            Err -> Err
-         end     
-   end.
+attach({Mod, Args}) ->
+   Child = {  % child spec
+      Mod,
+      {
+         Mod,
+         start_link,
+         Args
+      },
+      permanent, 2000, supervisor, dynamic
+   },
+   case supervisor:start_child(kvs_sup, Child) of 
+      {ok, _}    -> ok;
+      {ok, _, _} -> ok;
+      {error, already_present}     -> ok;
+      {error,{already_started, _}} -> ok;
+      Err -> Err
+   end;
+attach(Mod) -> 
+   attach({Mod, []}).

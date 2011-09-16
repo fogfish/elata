@@ -38,7 +38,7 @@
    % supervisor
    start_link/0,
    init/1,
-   factory/1
+   subscribe/1
 ]).
 
 %%%------------------------------------------------------------------
@@ -71,6 +71,6 @@ init([]) ->
 %%% 
 %%%
 %%%------------------------------------------------------------------
-factory(Handler) ->
+subscribe(Handler) ->
    supervisor:start_child(?MODULE, [Handler]).   
    

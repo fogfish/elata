@@ -52,47 +52,34 @@ kvs_evt_test_() ->
       setup,
       fun setup/0,
       [
-      { "Create event", fun create/0},
-      { "Insert event", fun insert/0},
-      { "Delete event", fun delete/0}
+      { "Put    event", fun put/0},
+      { "Remove event", fun remove/0}
       ]
    }.
-
--define(ENTITY_1, [{id, entity_1}, {name, "Test Entity 1"}]).
--define(ENTITY_2, [{id, entity_1}, {name, "Test Entity 2"}]).   
    
 setup() ->
    kvs_sup:start_link(),
-   kvs_evt_sup:factory(kvs_evt_tests),
-   keyval_bucket:create(test_src, [event, {plugin, kvs_cache_sup}, {key, id}]),
-   keyval_bucket:create(test_dst, [singleton, {plugin, kvs_ets_sup}, {key, id}]).
+   kvs_evt_sup:subscribe(kvs_evt_tests),
+   kvs_bucket:define(test_src, [event, {storage, kvs_cache_sup}, {id, {attr, 1}}]),
+   kvs_bucket:define(test_dst, [{storage, kvs_sys}, {id, {attr, 1}}]).
    
 
-create() ->   
+put() ->   
    ?assert(
-      ok =:= keyval_store:create(test_src, ?ENTITY_1)
+      {ok, a} =:= kvs:put(test_src, {a, b, c})
    ),
    timer:sleep(100),
    ?assert(
-      {ok, ?ENTITY_1} =:= keyval_store:lookup(test_dst, entity_1)
+      {ok, {a, b, c}} =:= kvs:get(test_dst, a)
    ).   
-
-insert() ->   
-   ?assert(
-      ok =:= keyval_store:insert(test_src, ?ENTITY_1)
-   ),
-   timer:sleep(100),
-   ?assert(
-      {ok, ?ENTITY_1} =:= keyval_store:lookup(test_dst, entity_1)
-   ).
    
-delete() ->
+remove() ->
    ?assert(
-      ok =:= keyval_store:delete(test_src, entity_1)
+      ok =:= kvs:remove(test_src, a)
    ),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= keyval_store:lookup(test_dst, entity_1)
+      {error, not_found} =:= kvs:get(test_dst, a)
    ).
 
    
@@ -104,14 +91,11 @@ delete() ->
 init([]) -> 
    {ok, []}.
    
-handle_event({create, Ns, Entity}, State) ->
-   keyval_store:create(test_dst, Entity),
+handle_event({put, Bucket, Key, Item}, State) ->
+   kvs:put(test_dst, Item),
    {ok, State};
-handle_event({insert, Ns, Entity}, State) ->
-   keyval_store:insert(test_dst, Entity),
-   {ok, State};
-handle_event({delete, Ns, Key}, State) ->
-   keyval_store:delete(test_dst, Key),
+handle_event({remove, Bucket, Key, Item}, State) ->
+   kvs:remove(test_dst, Key),
    {ok, State};
 handle_event(Evt, State) ->
    {ok, State}.

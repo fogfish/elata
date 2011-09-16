@@ -29,65 +29,72 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_dets_sup).
+-module(kvs).
 -author(dmitry.kolesnikov@nokia.com).
 
--behaviour(supervisor).
--behaviour(gen_kvs_singleton).
+%%%
+%%% Active Key/Value store provides unified interface for key-value storage.
+%%% Items are allocated to buckets. 
+%%%
 
 -export([
-   % supervisor
-   start_link/0,
-   init/1,
-   % gen_kvs_domain
-   factory/1,
-   create/2,
-   insert/2,
-   lookup/2,
-   delete/2
+   put/2,
+   get/2,
+   has/2,
+   remove/2
 ]).
 
-%%%------------------------------------------------------------------
+
 %%%
-%%% Supervisor
+%%% put(Bucket, Item) -> {ok, Key} | {error, ...}
+%%%    Bucket = bucket unique name, see kvs_bucket:define(...)
+%%%    Item   = item to store
+%%%    Key    = unique item identity (identity function over Item)
+%%% 
+%%% stores Item into Bucket
+put(Bucket, Item)  -> 
+   % retrive bucket metadata
+   case kvs_sys:get(kvs_sys_bucket, Bucket) of
+      {error,  _} -> {error, undefined_bucket};
+      {ok, Bmeta} -> gen_kvs_bucket:handle_put(Bmeta, Item)
+   end.
+
 %%%
-%%%------------------------------------------------------------------
-start_link() ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+%%% has(Bucket, Key) -> true | false
+%%%    Bucket = bucket unique name, see kvs_bucket:define(...)
+%%%    Key    = unique item identity
+%%% check key in the bucket
+has(Bucket, Key) ->
+   case kvs_sys:get(kvs_sys_bucket, Bucket) of
+      {error,  _} -> {error, undefined_bucket};
+      {ok, Bmeta} -> gen_kvs_bucket:handle_has(Bmeta, Key)
+   end.
+
+%%%
+%%% get(Bucket, Key) -> {ok, Item} | {error, ...}
+%%%    Bucket = bucket unique name, see kvs_bucket:define(...)
+%%%    Key    = unique item identity
+%%% retrives key from bucket
+get(Bucket, Key) ->
+   case kvs_sys:get(kvs_sys_bucket, Bucket) of
+      {error,  _} -> {error, undefined_bucket};
+      {ok, Bmeta} -> gen_kvs_bucket:handle_get(Bmeta, Key)
+   end.
    
-init([]) ->
-   Process = {
-      kvs_ets,       % child id
-      {
-         kvs_dets,    % Mod
-         start_link, % Fun
-         []          % Args
-      },
-      permanent, 2000, worker, dynamic
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.
+%%%
+%%% remove(Bucket, Key) -> ok | {error, ...}
+%%%    Bucket = bucket unique name, see kvs_bucket:define(...)
+%%%    Key    = unique item identity
+%%% removes keys from bucket
+remove(Bucket, Key) ->
+   case kvs_sys:get(kvs_sys_bucket, Bucket) of
+      {error,  _} -> {error, undefined_bucket};
+      {ok, Bmeta} -> gen_kvs_bucket:handle_remove(Bmeta, Key)
+   end.
 
 %%%------------------------------------------------------------------
 %%%
-%%% gen_kvs_domain
+%%% Private Functions
 %%%
 %%%------------------------------------------------------------------
-factory(Args) ->
-   supervisor:start_child(?MODULE, Args).
-   
-create(Pid, Entity) ->
-   gen_server:call(Pid, {create, Entity}).
-   
-insert(Pid, Entity) ->
-   gen_server:call(Pid, {insert, Entity}).
-   
-lookup(Pid, Key) ->
-   gen_server:call(Pid, {lookup, Key}).
-   
-delete(Pid, Key) ->
-   gen_server:call(Pid, {delete, Key}).
+

@@ -29,47 +29,94 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(keyval_bucket_tests).
+-module(kvs_sys_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
-basic_domain_test_() ->
+kvs_sys_test_() ->
    {
       setup,
-      fun() -> 
-         kvs_sup:start_link()
+      fun() ->
+         {ok, _} = kvs_sys:construct([kvs_sys_ref]),
+         {ok, _} = kvs_sys:construct([kvs_sys_bucket])
+      end,
+      fun(X) ->
+         ets:delete(kvs_sys_ref),
+         ets:delete(kvs_sys_bucket)
       end,
       [
-      { "Create domain", fun create/0},
-      { "Lookup domain", fun lookup/0},
-      { "Delete domain", fun delete/0},
-      { "Undefined domain", fun undefined/0} 
+         {"Put item into sys bucket", fun put/0},
+         {"Has item in sys bucket", fun has/0},
+         {"Get item in sys bucket", fun get/0},
+         {"Remove item in sys bucket", fun remove/0}
       ]
    }.
 
-%% test domain
--define(DOMAIN, [{plugin, kvs_cache_sup}]).
-   
-%%
-create() ->
+kvs_sys_api_test_() ->
+   {
+      setup,
+      fun() ->
+         {ok, _} = kvs_sys:construct([kvs_sys_ref]),
+         {ok, _} = kvs_sys:construct([kvs_sys_bucket])
+      end,
+      fun(X) ->
+         ets:delete(kvs_sys_ref),
+         ets:delete(kvs_sys_bucket)
+      end,
+      [
+         {"KVS Put", fun kvs_put/0},
+         {"KVS Has", fun kvs_has/0},
+         {"KVS Get", fun kvs_get/0},
+         {"KVS Remove", fun kvs_remove/0}
+      ]
+  }.
+  
+put() ->
    ?assert(
-      ok =:= keyval_bucket:create(test, ?DOMAIN)
-   ).
- 
-%%
-lookup() ->
-   ?assert(
-      {ok, [{name, test} | ?DOMAIN]} =:= keyval_bucket:lookup(test)
+      ok =:= kvs_sys:put(kvs_sys_bucket, test, {a, b, c})
    ).
 
-%%
-delete() ->
+has() ->
    ?assert(
-      ok =:= keyval_bucket:delete(test)
+      true =:= kvs_sys:has(kvs_sys_bucket, test)
    ).
    
-undefined() ->
+get() ->
    ?assert(
-      {error, not_found} =:= keyval_bucket:lookup(test)
+      {ok, {a, b, c}} =:= kvs_sys:get(kvs_sys_bucket, test)
+   ).
+   
+remove() ->
+   ?assert(
+      ok =:= kvs_sys:remove(kvs_sys_bucket, test)
+   ),
+   ?assert(
+      {error, not_found} =:= kvs_sys:get(kvs_sys_bucket, test)
+   ).
+
+kvs_put() ->
+   ?assert(
+      {ok, test} =:= kvs:put(kvs_sys_bucket, [{name, test}, {val, abc}])
+   ).
+   
+kvs_has() ->
+   ?assert(
+      true  =:= kvs:has(kvs_sys_bucket, test)
+   ),
+   ?assert(
+      false =:= kvs:has(kvs_sys_bucket, undef)
+   ).
+
+kvs_get() ->
+   ?assert(
+      {ok, [{name, test}, {val, abc}]} =:= kvs:get(kvs_sys_bucket, test)
+   ).
+   
+kvs_remove() ->
+   ?assert(
+      ok =:= kvs:remove(kvs_sys_bucket, test)
+   ),
+   ?assert(
+      {error, not_found} =:= kvs:get(kvs_sys_bucket, test)
    ).
    

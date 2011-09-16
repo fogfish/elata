@@ -41,10 +41,8 @@
    start_link/0,
    subscribe/1,
    unsubscribe/1,
-   create/2,
-   insert/2,
-   lookup/2,
-   delete/2
+   put/3,
+   remove/3
 ]).
 
 start_link() ->
@@ -53,7 +51,6 @@ start_link() ->
 subscribe({Handler, Args}) ->
    gen_event:add_sup_handler(?MODULE, Handler, Args);
 subscribe(Handler) ->
-   io:format('subscribe ~p~n', [Handler]),
    gen_event:add_sup_handler(?MODULE, Handler, []).
    
 unsubscribe({Handler, Args}) ->
@@ -62,16 +59,9 @@ unsubscribe(Handler) ->
    gen_event:delete_handler(?MODULE, Handler, []).   
    
    
-create(Ns, Entity) ->
-   io:format('do notify ~p~n', [Entity]),
-   gen_event:notify(?MODULE, {create, Ns, Entity}).
+put(Bucket, Key, Item) ->
+   gen_event:notify(?MODULE, {put, Bucket, Key, Item}).
    
-insert(Ns, Entity) ->
-   gen_event:notify(?MODULE, {insert, Ns, Entity}).
-   
-lookup(Ns, Key) ->
-   gen_event:notify(?MODULE, {lookup, Ns, Key}).
-
-delete(Ns, Key) ->
-   gen_event:notify(?MODULE, {delete, Ns, Key}).
-   
+remove(Bucket, Key, Item) ->
+   gen_event:notify(?MODULE, {remove, Bucket, Key, Item}).
+      

@@ -29,63 +29,76 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(keyval_bucket).
+-module(kvs_bucket).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Key/Value Bucket provides management interface to storage buckets 
-%% The interface impacts bucket metadata registered within node
-%% Bucket entityes are not impacted
+%% A bucket is a hashtable, it manages items keyspace and
+%% own assotiated metadata.
 %%
 
 -export([
-   create/2,                    
+   define/2,                    
    lookup/1,
-   delete/1
+   remove/1
 ]).
 
+
 %%
-%% Create definition of storage domain (domain entities are not impacted)
+%% Define a new Key/Value bucket
 %%
 %% Name   = string() unique domain name
 %% Bucket = [opt]
-%%    opt = singleton | event | {name, Name} | 
-%%          {plugin, Module} | {plugin, {Module, Args}} | 
-%%          {key, Id}
-%%    singleton = single process manages all domain entities (e.g. proxy to storage)
-%%    event = storage domain generates events on CRUD operations
-%%    Module = KVS plugin implementation of gen_kvs_domain / gen_kvs_entity
-%%    Args = list(), list of arguments supplied to factory method
-%%    Id = name of key attribute or key position
-create(Name, Bucket) ->
-   % TODO: assert: plugin + key
-   % TODO: assert & inject dual-time vclock
-   Bkey = {kvs_sys_bucket, Name},
-   case kvs_reg:resolve(Bkey) of
+%%    opt = event | {storage, Module} | {id, Func}
+%%    event  = bucket generates events when data is changed
+%%    Module = plugin implementation gen_kvs_bucket
+%%    Args   = list(), list of arguments supplied to factory method
+%%    Func   = Item identity function
+%%       sha1 - key is SHA1(Item)
+%%       {attr, Name} - key is value of attribute (Name) or position of tuple
+%%
+define(Name, Bucket) ->
+   % TODO: assert Bucket metadata
+   case kvs:get(kvs_sys_bucket, Name) of
+      {ok,  Pid} ->
+         {error, already_exists};
       {error, _} ->
-         % define a plugin factory as part of root supervior tree
-         ok = kvs_sup:attach(proplists:get_value(plugin, Bucket)),
-         {ok, _Pid} = kvs_cache_sup:construct([Bkey, [{name, Name} | Bucket]]),
-         error_logger:info_report([{name, Name} | Bucket]),
-         ok;
-      {ok,  _Pid} -> 
-         {error, already_exists}
+         Mod = proplists:get_value(storage, Bucket),
+         Cfg = Mod:config(),
+         % supervise storage plug-in if nessesary
+         case proplists:is_defined(supervise, Cfg) of
+            false -> ok;
+            true  -> kvs_sup:attach(Mod)
+         end,
+         % start-up keyspace management
+         case proplists:get_value(keyspace, Cfg) of
+            undefined ->
+               ok;
+            Keyspace  ->
+               ok = kvs_bucket:define({keyspace, Name}, [{storage, kvs_sys}, {id, {attr, 1}}])
+         end,
+         % create bucket instance
+         Bmeta = lists:append([[{name, Name}], Cfg, Bucket]),
+         {ok, _Pid} = Mod:construct([Bmeta]),
+         kvs:put(kvs_sys_bucket, Bmeta),
+         error_logger:info_report(Bmeta),
+         ok
    end.
 
 %%
 %%
 lookup(Name) ->
-   Bkey = {kvs_sys_bucket, Name},
-   case kvs_reg:resolve(Bkey) of
-      {ok, Pid} -> kvs_cache_sup:get(Pid);
-      Error     -> Error
-   end.
+   kvs:get(kvs_sys_bucket, Name).
 
 %%
 %% Delete definition of storage domain (domain entities are not impacted)
-delete(Name) ->
-   Bkey = {kvs_sys_bucket, Name},
-   case kvs_reg:resolve(Bkey) of
-      {ok, Pid} -> kvs_cache_sup:destroy(Pid);
-      Error     -> Error
-   end.
+remove(Name) ->
+   % TODO: destroy bucket processes
+   kvs:remove(kvs_sys_bucket, Name).
+   
+%%%------------------------------------------------------------------
+%%%
+%%% Private Functions
+%%%
+%%%------------------------------------------------------------------
+

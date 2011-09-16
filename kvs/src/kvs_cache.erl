@@ -38,7 +38,7 @@
 %%
 
 -export([
-   start_link/2,
+   start_link/3,
    %% gen_server
    init/1, 
    handle_call/3,
@@ -50,21 +50,24 @@
 
 %%
 %%
-start_link(Key, Item) ->
-  gen_server:start_link(?MODULE, [Key, Item], []).
+start_link(Bucket, Key, Item) ->
+  gen_server:start_link(?MODULE, [Bucket, Key, Item], []).
   
-init([Key, Item]) ->
-   kvs_reg:register(Key, self()),
-   {ok, {Key, Item}}.
-
+init([Bucket, Key, Item]) ->
+   % register itself to keyspace
+   Name      = proplists:get_value(name, Bucket),
+   {ok, Key} = kvs:put({keyspace, Name}, {Key, self()}),
+   {ok, {Name, Key, Item}}.
    
-handle_call({kvs_set, Item}, _From, {Key, _}) ->
-   {reply, ok, {Key, Item}};
-handle_call(kvs_get, _From, {Key, Item}) ->
-   {reply, {ok, Item}, {Key, Item}};
+handle_call({kvs_set, Key, Item}, _From, {Name, Key, _}) ->
+   {reply, ok, {Name, Key, Item}};
+handle_call({kvs_has, Key}, _From, State) ->
+   {reply, true, State};
+handle_call({kvs_get, Key}, _From, {Name, Key, Item}) ->
+   {reply, {ok, Item}, {Name, Key, Item}};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
-handle_cast(kvs_destroy, State) ->
+handle_cast({kvs_remove, Key}, State) ->
    {stop, normal, State};
 handle_cast(_Req, State) ->
    {noreply, State}.
@@ -72,8 +75,8 @@ handle_cast(_Req, State) ->
 handle_info(_Msg, State) ->
    {noreply, State}.
    
-terminate(_Reason, {Key, _}) ->
-   kvs_reg:unregister(Key),
+terminate(_Reason, {Name, Key, _}) ->
+   kvs:remove({keyspace, Name}, Key),
    ok.
    
 code_change(_OldVsn, State, _Extra) ->
