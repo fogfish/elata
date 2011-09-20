@@ -33,7 +33,7 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -behaviour(supervisor).
--behaviour(gen_kvs_entity).
+-behaviour(gen_kvs_bucket).
 
 %%%
 %%% ELATA Job Factory
@@ -46,9 +46,11 @@
    init/1,
    % gen_kvs_domain
    construct/1,
-   destroy/1,
-   set/2,
-   get/1
+   config/0,
+   put/3,
+   has/2,
+   get/2,
+   remove/2
 ]).
 
 %%%------------------------------------------------------------------
@@ -81,14 +83,24 @@ init([]) ->
 %%% gen_kvs_entity
 %%%
 %%%------------------------------------------------------------------
-construct(Args) ->
-   supervisor:start_child(?MODULE, Args).
+construct([Bucket]) ->
+   % nothing to do, it is called from kvs_bucket
+   {ok, self()};
+construct([Bucket, Key, Item]) ->
+   supervisor:start_child(?MODULE, [Bucket, Key, Item]).
 
-destroy(Pid) ->
-   gen_server:cast(Pid, kvs_destroy).
+config() ->
+   [supervise, keyspace].
+
+put(Pid, Key, Item) ->
+   gen_server:call(Pid, {kvs_put, Key, Item}).
    
-set(Pid, Item) ->
-   gen_server:call(Pid, {kvs_set, Item}).
+has(Pid, Key) ->
+   gen_server:call(Pid, {kvs_has, Key}).
    
-get(Pid) ->
-   gen_server:call(Pid, kvs_get).
+get(Pid, Key) ->
+   gen_server:call(Pid, {kvs_get, Key}).
+   
+remove(Pid, Key) ->
+   gen_server:cast(Pid, {kvs_remove, Key}).
+      

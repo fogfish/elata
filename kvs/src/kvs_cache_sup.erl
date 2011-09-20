@@ -42,7 +42,7 @@
    % gen_kvs_bucket
    construct/1,
    config/0,
-   set/3,
+   put/3,
    has/2,
    get/2,
    remove/2
@@ -87,8 +87,8 @@ construct([Bucket, Key, Item]) ->
 config() ->
    [supervise, keyspace].
    
-set(Pid, Key, Item) ->
-   gen_server:call(Pid, {kvs_set, Key, Item}).
+put(Pid, Key, Item) ->
+   gen_server:call(Pid, {kvs_put, Key, Item}).
    
 has(Pid, Key) ->
    gen_server:call(Pid, {kvs_has, Key}).

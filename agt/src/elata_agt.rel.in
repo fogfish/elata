@@ -25,7 +25,7 @@
       {inets,  "5.5.2"},
       {mochiweb, "1.5.1"},
       {webmachine, "1.8.1"},
-      {elata_kvs, "0.1.0"},
+      {elata_kvs, "0.2.0"},
       {elata_rest, "0.1.0"},
       {elata_tsa, "0.1.0"},
       {elata_agt, "@VSN@"}
