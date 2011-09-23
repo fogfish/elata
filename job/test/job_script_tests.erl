@@ -4,7 +4,7 @@
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
-%%    are met:             
+%%    are met:
 %% 
 %%     * Redistributions of source code must retain the above copyright
 %%     notice, this list of conditions and the following disclaimer.
@@ -29,53 +29,21 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(agt_kvs_io).
+-module(job_script_tests).
 -author(dmitry.kolesnikov@nokia.com).
--include("include/def.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
--export([
-   subscribe/0,
-   %% gen_event
-   init/1,
-   handle_event/2,
-   handle_call/2,
-   handle_info/2,
-   terminate/2,
-   code_change/3
-]).
+tcp_job_test() ->
+   {ok, _, _} = job_script:execute(<<"tcp://localhost:80/">>).
+   
+http_job_test() ->
+   {ok, _, _} = job_script:execute(<<"http://localhost:80/">>).
 
-subscribe() ->
-   kvs_evt:subscribe(?MODULE, []).
-   
-init([]) ->
-   {ok, []}.
-   
-handle_call(_Evt, State) ->
-   {ok, not_supported, State}.
-
-handle_event({create, kv_telemetry, {kvset, Uri, _} }, State) ->
-   spawn_worker(Uri),
-   {ok, State};
-handle_event(_Evt, State) ->
-   {ok, State}.
-
-handle_info(_Msg, State) ->
-   {noreply, State}.
-   
-terminate(_Reason, _State) ->
-   ok.
-   
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.
-   
-   
-%%%------------------------------------------------------------------
-%%%
-%%% Private funcions
-%%%
-%%%------------------------------------------------------------------
-spawn_worker(Uri) ->
-   agt_wrk_sup:create(Uri),
-   {ok, undefined}.
-
-
+http_simple_script_test() ->
+   {ok, _, _} = job_script:execute([
+      {uri, <<"http://localhost:80/">>},
+      {proxy,  {<<"127.0.0.1">>, 80}},
+      {header, [
+         {<<"User-Agent">>, <<"eunit">>}
+      ]}
+   ]).

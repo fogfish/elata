@@ -67,14 +67,14 @@ agt_job_test_() ->
 
 setup() ->
    ok = application:start(elata_kvs),
-   kvs_bucket:define(test_job, [{storage, agt_job_sup}, {id, {attr, id}}]).
+   kvs_bucket:define(test_job, [{storage, agt_job_sup}]).
    
 %%%
 %%% Job CRUD
 %%%
 pjob_put() ->
    ?assert(
-      {ok, test_job_1} =:= kvs:put(test_job, ?PJOB)
+      ok =:= kvs:put(test_job, test_job_1, ?PJOB)
    ).
    
 pjob_get() ->
@@ -93,7 +93,7 @@ pjob_remove() ->
    
 job_lc1() ->
    ?assert(
-      {ok, test_job_2} =:= kvs:put(test_job, ?TJOB)
+      ok  =:= kvs:put(test_job, test_job_2, ?TJOB)
    ),
    timer:sleep(1000),
    ?assert(
@@ -110,7 +110,7 @@ job_lc1() ->
 
 job_lc2() ->
    ?assert(
-      {ok, test_job_2} =:= kvs:put(test_job, ?TJOB)
+      ok =:= kvs:put(test_job, test_job_2, ?TJOB)
    ),
    timer:sleep(1000),
    ?assert(
@@ -118,7 +118,7 @@ job_lc2() ->
    ),
    timer:sleep(1000),
    ?assert(
-      {ok, test_job_2} =:= kvs:put(test_job, ?TJOB)
+      ok =:= kvs:put(test_job, test_job_2, ?TJOB)
    ),
    timer:sleep(1000),
    ?assert(

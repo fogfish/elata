@@ -29,7 +29,7 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(uri_util).
+-module(job_uri).
 -author(dmitry.kolesnikov@nokia.com).
 -include("include/def.hrl").
 
@@ -110,29 +110,6 @@ to_binary(#uri{schema = Schema, host = Host, port = Port,
      Path/binary, Bfrag/binary, Bq/binary>>.
    
    
-%%
-%% EUnit
-%%
--include_lib("eunit/include/eunit.hrl").
 
-uri1_test() ->
-   {uri,
-      http,
-      <<"localhost">>,
-      80,
-      <<"/path/to">>,
-      <<"blah">>,
-      <<"a=b">>
-   }  = uri_util:new(<<"http://localhost:80/path/to#blah?a=b">>).
-   
-uri2_test() ->  
-   {uri,
-      http,
-      <<"localhost">>,
-      80,
-      <<"/path/to">>,
-      undefined,
-      undefined
-   }  = uri_util:new(<<"http://localhost:80/path/to">>).
 
 

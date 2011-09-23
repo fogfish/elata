@@ -81,8 +81,8 @@ start_link(Bucket, Key, Job) ->
 %% Init
 init([Bucket, Key, Job]) ->
    % register itself to keyspace
-   Name      = proplists:get_value(name, Bucket),
-   {ok, Key} = kvs:put({keyspace, Name}, {Key, self()}),
+   Name  = proplists:get_value(name, Bucket),
+   ok    = kvs:put({keyspace, Name}, Key, self()),
    think_timer(Job),
    error_logger:info_report([{job, started} | Job]),
    % return a state
@@ -96,8 +96,7 @@ init([Bucket, Key, Job]) ->
          cycles=0
        }
     }.
-    
-    
+        
 %%% set
 handle_call({kvs_put, Key, Job}, _From, #srv{bucket=Bucket} = State) ->
    % reset a job
@@ -120,18 +119,18 @@ handle_cast({kvs_remove, Key}, State) ->
 handle_cast(_Req, State) ->
    {noreply, State}.
 
-handle_info(sample, #srv{job=Job, timestamp=Time, ttl=undefined, cycles=Cycles} = State) ->
+handle_info(sample, #srv{key=Key, job=Job, timestamp=Time, ttl=undefined, cycles=Cycles} = State) ->
    % handles permanent jobs
-   execute_job(Job),
+   execute_job(Key, Job),
    think_timer(Job),
    {noreply, State#srv{timestamp=timestamp(), cycles=Cycles + 1}};
-handle_info(sample, #srv{job=Job, timestamp=Time, ttl=TTL, cycles=Cycles} = State) ->
+handle_info(sample, #srv{key=Key, job=Job, timestamp=Time, ttl=TTL, cycles=Cycles} = State) ->
    % handles temporary jobs
    Tlag = timestamp() - Time,
    Nttl = TTL - Tlag,
    if
       Nttl > 0 ->
-         execute_job(Job),
+         execute_job(Key, Job),
          think_timer(Job),
          {noreply, State#srv{timestamp=timestamp(), cycles=Cycles + 1, ttl=Nttl}};
       true     ->
@@ -167,6 +166,11 @@ think_timer(Job) ->
    timer:send_after(Thinktime * 1000, sample).
    
 % executes a job   
-execute_job(Job) ->
+execute_job(Key, Job) ->
+   {ok, DS, Data} = job_script:execute(proplists:get_value(script, Job)),
+   Time = timestamp(),
+   %error_logger:info_report(lists:append(Job, DS)),
+   kvs:put(elata_telemetry, Key, lists:append([{timestamp, Time}], DS)),
+   kvs:put(elata_document,  Key, [{timestamp, Time}, {content, Data}]),
    ok.
    

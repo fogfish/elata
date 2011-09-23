@@ -48,14 +48,11 @@
 %% Define a new Key/Value bucket
 %%
 %% Name   = string() unique domain name
-%% Bucket = [opt]
-%%    opt = event | {storage, Module} | {id, Func}
+%% Bucket = [opt]                                       
+%%    opt = event | {storage, Module}
 %%    event  = bucket generates events when data is changed
 %%    Module = plugin implementation gen_kvs_bucket
 %%    Args   = list(), list of arguments supplied to factory method
-%%    Func   = Item identity function
-%%       sha1 - key is SHA1(Item)
-%%       {attr, Name} - key is value of attribute (Name) or position of tuple
 %%
 define(Name, Bucket) ->
    % TODO: assert Bucket metadata
@@ -80,7 +77,7 @@ define(Name, Bucket) ->
          % create bucket instance
          Bmeta = lists:append([[{name, Name}], Cfg, Bucket]),
          {ok, _Pid} = Mod:construct([Bmeta]),
-         kvs:put(kvs_sys_bucket, Bmeta),
+         kvs:put(kvs_sys_bucket, Name, Bmeta),
          error_logger:info_report(Bmeta),
          ok
    end.

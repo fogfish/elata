@@ -51,14 +51,14 @@ kvs_cache_test_() ->
 
 setup() ->
    kvs_sup:start_link(),
-   kvs_bucket:define(test, [{storage, kvs_cache_sup}, {id, {attr, 1}}]).
+   kvs_bucket:define(test, [{storage, kvs_cache_sup}]).
    
 %%%
 %%% 
 %%%
 put() ->
    ?assert(
-      {ok, a} =:= kvs:put(test, {a, b, c})
+      ok =:= kvs:put(test, a, {a, b, c})
    ).
    
 has() ->

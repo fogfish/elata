@@ -50,14 +50,12 @@
 %% (Used as a proxy to exised persistent/in-memory storage)
 %%
 -export([
-   handle_put/2,
+   handle_put/3,
    handle_has/2,
    handle_get/2,
    handle_remove/2,
    % custom behaviour
-   behaviour_info/1,
-   % helper method for buckets
-   identity/2
+   behaviour_info/1
 ]).
 
 
@@ -70,7 +68,7 @@ behaviour_info(callbacks) ->
    [
       {construct, 1}, %% construct([...])
       {config,    0}, %% bucket configuration
-      {put,  2},      %% set(Pid, Item)
+      {put,  3},      %% set(Pid, Key, Item)
       {has,  2},      %% has(Pid, Key)
       {get,  2},      %% get(Pid, Key)
       {remove, 2}     %% remove(Pid, Key)
@@ -84,12 +82,12 @@ behaviour_info(_) ->
 %%% Protected Functions (kvs interface)
 %%%
 %%%------------------------------------------------------------------
-handle_put(Bucket, Item) ->
+handle_put(Bucket, Key, Item) ->
    Bid = proplists:get_value(name,    Bucket),
    Mod = proplists:get_value(storage, Bucket),
    % calculate item identity
-   IdF = proplists:get_value(id, Bucket),
-   Key = identity(IdF, Item),
+   % IdF = proplists:get_value(id, Bucket),
+   % Key = identity(IdF, Item),
    case resolve(Bid, Key) of
       undefined -> 
          {ok, _Pid} = Mod:construct([Bucket, Key, Item]);
@@ -97,7 +95,7 @@ handle_put(Bucket, Item) ->
          ok = Mod:put(Pid, Key, Item)
    end,
    notify(put, Bucket, Key, Item),
-   {ok, Key}.
+   ok.
 
 handle_has(Bucket, Key) ->
    Bid = proplists:get_value(name,    Bucket),
@@ -106,13 +104,13 @@ handle_has(Bucket, Key) ->
       {error, not_found} ->
          case kvs_sys:get(kvs_sys_ref, Bid) of
             {error, not_found} -> false;
-            {ok, {_, Pid}}     -> Mod:has(Pid, Key)
+            {ok, Pid}          -> Mod:has(Pid, Key)
          end;
-      {ok, {_, Keyspace}}  ->
+      {ok, Keyspace}     ->
          % (keyspace partitioned) entity storage is resolved via bucket specific keyspace
          case kvs_sys:get(Keyspace, Key) of
             {error, not_found} -> false;
-            {ok,   {_Key, Pid}} -> Mod:has(Pid, Key)
+            {ok, Pid}          -> Mod:has(Pid, Key)
          end
    end.
    
@@ -142,15 +140,17 @@ handle_remove(Bucket, Key) ->
 %%%
 %%% Items identity function
 %%%
-identity(sha1, Item) ->
-   crypto:sha(erlang:term_to_binary(Item));
- 
-identity({attr, Key}, Item) when is_tuple(Item) ->
-   erlang:element(Key, Item);
 
-identity({attr, Key}, Item) when is_list(Item) ->
-   proplists:get_value(Key, Item). 
-   
+%
+%identity(sha1, Item) ->
+%   crypto:sha(erlang:term_to_binary(Item));
+% 
+%identity({attr, Key}, Item) when is_tuple(Item) ->
+%   erlang:element(Key, Item);
+%
+%identity({attr, Key}, Item) when is_list(Item) ->
+%   proplists:get_value(Key, Item). 
+%   
 
 %%%------------------------------------------------------------------
 %%%
@@ -166,14 +166,14 @@ resolve(Bucket, Key) ->
             {error, not_found} -> 
                error_logger:error_msg('KVS: access to undefined bucket ~p~n', [Bucket]),
                undefined;
-            {ok, {_, Pid}}     -> 
+            {ok, Pid}          -> 
                Pid
          end;
-      {ok, {_, Keyspace}}  ->
+      {ok, Keyspace}      ->
          % (keyspace partitioned) entity storage is resolved via bucket specific keyspace
          case kvs_sys:get(Keyspace, Key) of
             {error, not_found} -> undefined;
-            {ok,   {Key, Pid}} -> Pid
+            {ok,    Pid}       -> Pid
          end
    end.
    

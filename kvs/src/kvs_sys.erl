@@ -51,23 +51,21 @@
 construct([kvs_sys_ref]) ->
    % system bucket maps named instances to they physical reference
    Ref = ets:new(kvs_sys_ref, [public, named_table]),
-   ets:insert(kvs_sys_ref, {kvs_sys_ref, {kvs_sys_ref, kvs_sys_ref}}),
+   ets:insert(kvs_sys_ref, {kvs_sys_ref, kvs_sys_ref}),
    {ok, Ref};  
 
 construct([kvs_sys_bucket]) ->
    % system bucket contains metadata of other buckets
    Ref = ets:new(kvs_sys_bucket, [public, named_table]),
-   ets:insert(kvs_sys_ref, {kvs_sys_bucket, {kvs_sys_bucket, kvs_sys_bucket}}),
+   ets:insert(kvs_sys_ref, {kvs_sys_bucket, kvs_sys_bucket}),
    % register all system buckets (enables access via kvs interface)
    SysRef = [
       {name,    kvs_sys_ref},
-      {storage, ?MODULE},
-      {id,      {attr, 1}}
+      {storage, ?MODULE}
    ],
    SysBkt = [
       {name,    kvs_sys_bucket},
-      {storage, ?MODULE},
-      {id,      {attr, name}}
+      {storage, ?MODULE}
    ],
    ets:insert(kvs_sys_bucket, {kvs_sys_ref,    SysRef}),
    ets:insert(kvs_sys_bucket, {kvs_sys_bucket, SysBkt}),
@@ -78,7 +76,7 @@ construct([kvs_sys_bucket]) ->
 construct([Bucket | _]) ->
    Name = proplists:get_value(name, Bucket),
    Ref  = ets:new(anonymous, [public]),
-   {ok, Name} = kvs:put(kvs_sys_ref, {Name, Ref}),
+   ok   = kvs:put(kvs_sys_ref, Name, Ref),
    {ok, Ref}.   
 
 %%
@@ -89,7 +87,7 @@ config() ->
 %%
 %%
 put(Name, Key, Item) ->
-   case ets:insert_new(Name, {Key, Item}) of
+   case ets:insert(Name, {Key, Item}) of
       true -> ok;
       _    -> {error, fatal} 
    end.   

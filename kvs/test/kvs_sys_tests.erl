@@ -96,7 +96,7 @@ remove() ->
 
 kvs_put() ->
    ?assert(
-      {ok, test} =:= kvs:put(kvs_sys_bucket, [{name, test}, {val, abc}])
+      ok =:= kvs:put(kvs_sys_bucket, test, [{name, test}, {val, abc}])
    ).
    
 kvs_has() ->

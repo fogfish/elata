@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -25,66 +25,16 @@
 %%   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 %%   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 %%   HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-%%   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+%%   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR  
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_cache).
--behaviour(gen_server).
--author(dmitry.kolesnikov@nokia.com).
-
-%%
-%%  
-%%
-
--export([
-   start_link/3,
-   %% gen_server
-   init/1, 
-   handle_call/3,
-   handle_cast/2, 
-   handle_info/2, 
-   terminate/2, 
-   code_change/3 
-]).
-
-%%
-%%
-start_link(Bucket, Key, Item) ->
-  gen_server:start_link(?MODULE, [Bucket, Key, Item], []).
-  
-init([Bucket, Key, Item]) ->
-   % register itself to keyspace
-   Name = proplists:get_value(name, Bucket),
-   ok   = kvs:put({keyspace, Name}, Key, self()),
-   {ok, {Name, Key, Item}}.
-   
-handle_call({kvs_put, Key, Item}, _From, {Name, Key, _}) ->
-   {reply, ok, {Name, Key, Item}};
-handle_call({kvs_has, Key}, _From, State) ->
-   {reply, true, State};
-handle_call({kvs_get, Key}, _From, {Name, Key, Item}) ->
-   {reply, {ok, Item}, {Name, Key, Item}};
-handle_call(_Req, _From, State) ->
-   {reply, undefined, State}.
-handle_cast({kvs_remove, Key}, State) ->
-   {stop, normal, State};
-handle_cast(_Req, State) ->
-   {noreply, State}.
-
-handle_info(_Msg, State) ->
-   {noreply, State}.
-   
-terminate(_Reason, {Name, Key, _}) ->
-   kvs:remove({keyspace, Name}, Key),
-   ok.
-   
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.     
-
-%%%------------------------------------------------------------------   
-%%%
-%%% Private functions
-%%%
-%%%------------------------------------------------------------------
+-record(uri, {
+   schema   = undefined,
+   host     = <<>>,
+   port     = 0,
+   path     = <<>>,
+   q        = <<>>,
+   fragment = <<>>
+}).
 
