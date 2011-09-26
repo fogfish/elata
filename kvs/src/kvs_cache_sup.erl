@@ -37,7 +37,7 @@
 
 -export([
    % supervisor
-   start_link/0,
+   start_link/1,
    init/1,
    % gen_kvs_bucket
    construct/1,
@@ -53,7 +53,7 @@
 %%% Supervisor
 %%%
 %%%------------------------------------------------------------------
-start_link() ->
+start_link(Bucket) ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->
@@ -85,7 +85,7 @@ construct([Bucket, Key, Item]) ->
    supervisor:start_child(?MODULE, [Bucket, Key, Item]).
 
 config() ->
-   [supervise, keyspace].
+   [{supervise, supervisor}, keyspace].
    
 put(Pid, Key, Item) ->
    gen_server:call(Pid, {kvs_put, Key, Item}).

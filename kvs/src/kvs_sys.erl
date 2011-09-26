@@ -86,7 +86,7 @@ config() ->
 
 %%
 %%
-put(Name, Key, Item) ->
+put(Name, Key, Item) ->                                             
    case ets:insert(Name, {Key, Item}) of
       true -> ok;
       _    -> {error, fatal} 

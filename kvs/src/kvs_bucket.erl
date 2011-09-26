@@ -57,26 +57,26 @@
 define(Name, Bucket) ->
    % TODO: assert Bucket metadata
    case kvs:get(kvs_sys_bucket, Name) of
-      {ok,  Pid} ->
+      {ok,  _Pid} ->
          {error, already_exists};
       {error, _} ->
          Mod = proplists:get_value(storage, Bucket),
          Cfg = Mod:config(),
-         % supervise storage plug-in if nessesary
-         case proplists:is_defined(supervise, Cfg) of
-            false -> ok;
-            true  -> kvs_sup:attach(Mod)
-         end,
          % start-up keyspace management
          case proplists:get_value(keyspace, Cfg) of
             undefined ->
                ok;
-            Keyspace  ->
+            _Keyspace  ->
                ok = kvs_bucket:define({keyspace, Name}, [{storage, kvs_sys}, {id, {attr, 1}}])
          end,
          % create bucket instance
          Bmeta = lists:append([[{name, Name}], Cfg, Bucket]),
-         {ok, _Pid} = Mod:construct([Bmeta]),
+         {ok, Pid} = case proplists:get_value(supervise, Cfg) of
+            undefined  -> Mod:construct([Bmeta]);
+            supervisor -> kvs_sup:add(supervisor, Mod, Bmeta);
+            worker     -> kvs_sup:add(worker,     Mod, Bmeta)
+         end,
+         % {ok, _Pid} = Mod:construct([Bmeta]),
          kvs:put(kvs_sys_bucket, Name, Bmeta),
          error_logger:info_report(Bmeta),
          ok
