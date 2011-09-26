@@ -32,7 +32,55 @@ if [ ! -f $ROOT/lib/@PKG@-@VSN@/priv/webapp/mootools-core-1.3.2-full-compat-yc.j
    echo "cp mootools-core-1.3.2-full-compat-yc.js $ROOT/lib/@PKG@-@VSN@/priv/webapp/";
 fi   
 
-$ERL -sname @PKG@ -detached \
-   -boot   $ROOT/releases/@VSN@/start \
-   -config $ROOT/lib/@PKG@-@VSN@/priv/sys
+#$ERL -sname @PKG@ -detached \
+#   -boot   $ROOT/releases/@VSN@/start \
+#   -config $ROOT/lib/@PKG@-@VSN@/priv/sys
    
+LOGDIR=$ROOT/logs
+test -d $LOGDIR || mkdir -p $LOGDIR
+
+PIPEDIR=$ROOT/run
+test -d $PIPEDIR || mkdir -p $PIPEDIR
+
+SCRIPT=`basename $0`
+
+TOERL=$ROOT/$ERTS/bin/to_erl
+RUNERL=$ROOT/$ERTS/bin/run_erl
+
+case "$1" in
+    start)
+        if [ "$(ls -A $PIPEDIR)" ]; then
+            echo "Front-end is already running"
+	else
+            $RUNERL -daemon $PIPEDIR/ $LOGDIR/ \
+                "$ERL -sname @PKG@ \
+                -boot $ROOT/releases/@VSN@/start \
+                -config $ROOT/lib/@PKG@-@VSN@/priv/sys"
+            echo "OK"
+        fi
+        ;;
+
+    stop)
+        if [ "$(ls -A $PIPEDIR)" ]; then
+            echo 'q().' | $TOERL $PIPEDIR/ 2>/dev/null
+            echo "OK"
+        else
+            echo "Front-end is not running"
+        fi
+        ;;
+
+    attach)
+        if [ "$(ls -A $PIPEDIR)" ]; then
+	    exec $TOERL $PIPEDIR/
+        else
+            echo "Front-end is not running"
+        fi
+        ;;
+
+    *)
+        echo "Usage: $SCRIPT {start|stop|attach}"
+        exit 1
+        ;;
+esac
+
+exit 0
