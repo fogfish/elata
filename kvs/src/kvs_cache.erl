@@ -55,11 +55,11 @@ start_link(Bucket, Key, Item) ->
   
 init([Bucket, Key, Item]) ->
    % register itself to keyspace
-   Name      = proplists:get_value(name, Bucket),
-   {ok, Key} = kvs:put({keyspace, Name}, {Key, self()}),
+   Name = proplists:get_value(name, Bucket),
+   ok   = kvs:put({keyspace, Name}, Key, self()),
    {ok, {Name, Key, Item}}.
    
-handle_call({kvs_set, Key, Item}, _From, {Name, Key, _}) ->
+handle_call({kvs_put, Key, Item}, _From, {Name, Key, _}) ->
    {reply, ok, {Name, Key, Item}};
 handle_call({kvs_has, Key}, _From, State) ->
    {reply, true, State};

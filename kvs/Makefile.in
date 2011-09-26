@@ -224,16 +224,12 @@ ESRC = \
    src/kvs_sup.erl \
    src/kvs_cache_sup.erl \
    src/kvs_cache.erl \
+   src/kvs_dets.erl \
    src/kvs_evt.erl \
    src/kvs_evt_sup.erl \
    src/kvs_evt_handler_sup.erl \
    src/kvs_app.erl
 
-
-#   src/kvs_ets_sup.erl 
-#   src/kvs_ets.erl 
-#   src/kvs_dets_sup.erl 
-#   src/kvs_dets.erl 
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
 	ebin/elata_kvs.app
 nobase_pkgliberl_SCRIPTS = $(EBIN)

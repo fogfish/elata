@@ -51,13 +51,13 @@ basic_domain_test_() ->
 %%
 define() ->
    ?assert(
-      ok =:= kvs_bucket:define(test, [{storage, kvs_sys}, {id, {attr, 1}}])
+      ok =:= kvs_bucket:define(test, [{storage, kvs_sys}])
    ).
  
 %%
 lookup() ->
    ?assert(
-      {ok, [{name, test}, {storage, kvs_sys}, {id, {attr, 1}}]} =:= kvs_bucket:lookup(test)
+      {ok, [{name, test}, {storage, kvs_sys}]} =:= kvs_bucket:lookup(test)
    ).
 
 %%

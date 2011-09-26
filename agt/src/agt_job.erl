@@ -34,21 +34,24 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% ELATA Job is periodcally executed Sample and Hold process
+%% ELATA Job is periodcally executed sample and hold process
 %%
 %% id        - unique job identity SHA1( script )
-%% frequency - defines number of sample per unit of time 
+%% thinktime - defines number of seconds between job runs
 %% ttl       - time to live, number of seconds to keep sampling running
-%% script    - script to be executed by job 
-%% cycle     - number of executed samples
+%% script    - script to be executed by job
+%%
+%% Results of job execution are agregated into telemetry storage
+%%
+%% id        - unique job identity SHA1( script )
 %% timestamp - unix timestamp of last sample (local time of process)
+%% cycle     - number of executed samples
 %% output    - output of script execution
-%% sample    - sampled data streams in sample and hold manner (script output)
+%% ds        - raw data streams
 %%
 
-
 -export([
-   start_link/2,
+   start_link/3,
    %% gen_server
    init/1,
    handle_call/3,
@@ -58,48 +61,89 @@
    code_change/3
 ]).
 
+%% Job internall state
+-record(srv, {
+   bucket,      %% bucket descriptor
+   key,         %% unique job identifier
+   job,         %% job description                  
+   
+   timestamp,   %% unix timestamp of last job activity (in seconds)  
+   ttl,         %% time-to-live (effective time-to-live)
+   cycles       %% nbr of executed cycles
+}).
+
 %%
 %% 
-start_link(Key, Job) ->
-   gen_server:start_link(?MODULE, [Key, Job], []).
+start_link(Bucket, Key, Job) ->
+   gen_server:start_link(?MODULE, [Bucket, Key, Job], []).
    
 %%
 %% Init
-init([Key, Job]) ->
-   Freq = proplists:get_value(frequency, Job),
-   Idle = erlang:round( 1 / Freq * 1000 ),
-   kvs_reg:register(Key, self()),
-   timer:send_after(Idle, sample),
-   {ok, {Key, Job}}.
-
-handle_call({kvs_set, Item}, _From, {Key, _}) ->
-   {reply, ok, {Key, Item}};
-handle_call(kvs_get, _From, {Key, Item}) ->
-   {reply, {ok, Item}, {Key, Item}};
+init([Bucket, Key, Job]) ->
+   % register itself to keyspace
+   Name  = proplists:get_value(name, Bucket),
+   ok    = kvs:put({keyspace, Name}, Key, self()),
+   think_timer(Job),
+   error_logger:info_report([{job, started} | Job]),
+   % return a state
+   {ok,
+      #srv{
+         bucket=Bucket,
+         key=Key,
+         job=Job,
+         timestamp=timestamp(),
+         ttl=proplists:get_value(ttl, Job),
+         cycles=0
+       }
+    }.
+        
+%%% set
+handle_call({kvs_put, Key, Job}, _From, #srv{bucket=Bucket} = State) ->
+   % reset a job
+   NState = #srv{
+      bucket=Bucket,
+      key=Key,
+      job=Job,
+      timestamp=timestamp(),
+      ttl=proplists:get_value(ttl, Job),
+      cycles=0
+   },
+   {reply, ok, NState};
+   
+handle_call({kvs_get, Key}, _From, #srv{job = Job} = State) ->
+   {reply, {ok, Job}, State};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
-handle_cast(kvs_destroy, State) ->
+handle_cast({kvs_remove, Key}, State) ->
    {stop, normal, State};
 handle_cast(_Req, State) ->
    {noreply, State}.
 
-handle_info(sample, {Key, Job}) ->
-   NJob = sample_job(Job),
-   case proplists:get_value(ttl, NJob, 0) of
-      TTL when TTL > 0 ->
-         %% re-schedule job
-         Freq = proplists:get_value(frequency, NJob),
-         Idle = erlang:round( 1 / Freq * 1000 ),
-         timer:send_after(Idle, sample),
-         {noreply, {Key, NJob}};
-      TTL when TTL =< 0 ->
-         {stop, normal, {Key, NJob}}   
+handle_info(sample, #srv{key=Key, job=Job, timestamp=Time, ttl=undefined, cycles=Cycles} = State) ->
+   % handles permanent jobs
+   execute_job(Key, Job),
+   think_timer(Job),
+   {noreply, State#srv{timestamp=timestamp(), cycles=Cycles + 1}};
+handle_info(sample, #srv{key=Key, job=Job, timestamp=Time, ttl=TTL, cycles=Cycles} = State) ->
+   % handles temporary jobs
+   Tlag = timestamp() - Time,
+   Nttl = TTL - Tlag,
+   if
+      Nttl > 0 ->
+         execute_job(Key, Job),
+         think_timer(Job),
+         {noreply, State#srv{timestamp=timestamp(), cycles=Cycles + 1, ttl=Nttl}};
+      true     ->
+         {stop, normal, State}
    end;   
 handle_info(_Msg, State) ->
    {noreply, State}.
    
-terminate(_Reason, {Key, _}) ->
-   kvs_reg:unregister(Key),
+terminate(_Reason, #srv{bucket = Bucket, key = Key, job = Job} = State) ->
+   % unregister itself from keyspace
+   Name = proplists:get_value(name, Bucket),
+   ok   = kvs:remove({keyspace, Name}, Key),
+   error_logger:info_report([{job, terminated} | Job]),
    ok.
    
 code_change(_OldVsn, State, _Extra) ->
@@ -110,34 +154,23 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Private functions
 %%%
 %%%------------------------------------------------------------------
-sample_job(Job) ->
-   % refresh job timestamps
-   Job1 = job_timestamp(Job),
-   % increment number of cycles
-   job_cycles(Job1).
-   % run a job script
+
+% return unix timestamp
+timestamp() ->
+   {Mega, Sec, _Micro} = erlang:now(),
+   Mega * 1000000 + Sec.
+
+% starts think timer   
+think_timer(Job) ->   
+   Thinktime = proplists:get_value(thinktime, Job, 300),
+   timer:send_after(Thinktime * 1000, sample).
    
-% calculates a job timestamp   
-job_timestamp(Job) ->
-   {MegaSecs, Secs, _MicroSecs} = erlang:now(),
-   TS = MegaSecs * 1000000 + Secs,
-   case proplists:get_value(timestamp, Job) of
-      undefined -> 
-         [{timestamp, TS} | Job];
-      Timestamp ->
-         [{timestamp, TS} | job_ttl(proplists:delete(timestamp, Job), TS - Timestamp)]
-   end.
+% executes a job   
+execute_job(Key, Job) ->
+   {ok, DS, Data} = job_script:execute(proplists:get_value(script, Job)),
+   Time = timestamp(),
+   %error_logger:info_report(lists:append(Job, DS)),
+   kvs:put(elata_telemetry, Key, lists:append([{timestamp, Time}], DS)),
+   kvs:put(elata_document,  Key, [{timestamp, Time}, {content, Data}]),
+   ok.
    
-% updates job time-to-live
-job_ttl(Job, Delta) ->
-   case proplists:get_value(ttl, Job) of
-      undefined -> 
-         Job;
-      TTL       ->
-         [{ttl, TTL - Delta} | proplists:delete(ttl, Job)]
-   end.
-   
-% increment job cycles
-job_cycles(Job) ->
-   Cycle = proplists:get_value(cycle, Job, 0),
-   [{cycle, Cycle + 1} | proplists:delete(cycle, Job)].

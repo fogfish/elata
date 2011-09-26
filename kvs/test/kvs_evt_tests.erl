@@ -60,13 +60,13 @@ kvs_evt_test_() ->
 setup() ->
    kvs_sup:start_link(),
    kvs_evt_sup:subscribe(kvs_evt_tests),
-   kvs_bucket:define(test_src, [event, {storage, kvs_cache_sup}, {id, {attr, 1}}]),
-   kvs_bucket:define(test_dst, [{storage, kvs_sys}, {id, {attr, 1}}]).
+   kvs_bucket:define(test_src, [event, {storage, kvs_cache_sup}]),
+   kvs_bucket:define(test_dst, [{storage, kvs_sys}]).
    
 
 put() ->   
    ?assert(
-      {ok, a} =:= kvs:put(test_src, {a, b, c})
+      ok =:= kvs:put(test_src, a, {a, b, c})
    ),
    timer:sleep(100),
    ?assert(
@@ -92,7 +92,7 @@ init([]) ->
    {ok, []}.
    
 handle_event({put, Bucket, Key, Item}, State) ->
-   kvs:put(test_dst, Item),
+   ok = kvs:put(test_dst, Key, Item),
    {ok, State};
 handle_event({remove, Bucket, Key, Item}, State) ->
    kvs:remove(test_dst, Key),

@@ -29,45 +29,27 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(agt_wrk_sup).
--behaviour(supervisor).
+-module(job_uri_tests).
 -author(dmitry.kolesnikov@nokia.com).
+-include("../include/def.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
--export([
-   % factory
-   create/1,
-   % supervisor 
-   start_link/1,
-   init/1
-]).
 
-start_link(Opts) ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Opts]).
-
-create(Uri) ->
-   % each URI must have only one corresponding process
-   % named-processes is option but URI has to be converted into atom that
-   % cause OOM threat (URI delivered from remote peer). 
-   case keyval_store:lookup(kv_registry, Uri) of
-      {ok, {uid, Uri, Pid}} ->
-         {ok, Pid};
-      _ ->   
-         supervisor:start_child(?MODULE, [Uri])
-   end.
+uri1_test() ->
+   U = job_uri:new(<<"http://localhost:80/path/to#blah?a=b">>),
+   ?assert( U#uri.schema   =:= http ),
+   ?assert( U#uri.host     =:= <<"localhost">> ),
+   ?assert( U#uri.port     =:= 80 ),
+   ?assert( U#uri.path     =:= <<"/path/to">> ),
+   ?assert( U#uri.fragment =:= <<"blah">> ),
+   ?assert( U#uri.q        =:= <<"a=b">> ).
    
-init([Opts]) ->
-   Instance = {
-      agt_wrk_sup,
-      {
-         agt_wrk,
-         start_link,
-         [Opts]
-      },
-      transient, 2000, worker, dynamic
-   },
-   {ok,
-      {
-         {simple_one_for_one, 50, 10},
-         [Instance]
-      }
-   }.
+uri2_test() ->  
+   U = job_uri:new(<<"http://localhost:80/path/to">>),
+   ?assert( U#uri.schema   =:= http ),
+   ?assert( U#uri.host     =:= <<"localhost">> ),
+   ?assert( U#uri.port     =:= 80 ),
+   ?assert( U#uri.path     =:= <<"/path/to">> ),
+   ?assert( U#uri.fragment =:= <<>> ),
+   ?assert( U#uri.q        =:= <<>> ).
+   

@@ -43,13 +43,6 @@
 %%%------------------------------------------------------------------   
 -define(APPNAME,  elata_agt).
 -define(PORT,     8080).  
--define(WORKER,   [
-   {idletime,  300000},
-   %{idletime,   30000},
-   {thinktime,   1000},
-   {cycle,         10}
-]).
-
 
 %%
 %% start application
@@ -77,15 +70,12 @@ get_conf(Key, Default) ->
 %% return an application configuration
 config() ->
    {ok, [
-      {port,   get_conf(port,   ?PORT)},
-      {worker, get_conf(worker, ?WORKER)}
+      {port,   get_conf(port,   ?PORT)}
    ]}.
    
 %% boot application storage   
 boot_storage(_Config) ->
-   % maps uri to Pids of workers (internal use only)
-   keyval_store:define(kv_registry,  [{module, ets}]),
-   % temporary persists telemetry results
-   keyval_store:define(kv_telemetry, [{module, ets}, notify]),
-   agt_kvs_io:subscribe(),
+   kvs_bucket:define(elata_job,   [{storage, agt_job_sup}]),
+   kvs_bucket:define(elata_telemetry, [{storage, kvs_sys}]),
+   kvs_bucket:define(elata_document,  [{storage, kvs_sys}]),
    ok.

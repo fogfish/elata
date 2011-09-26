@@ -63,6 +63,6 @@ init([Config]) ->
    {ok,
       {
          {one_for_one, 4, 3600},
-         [AgtWrkSup, WebAppApi]
+         []
       }
    }.

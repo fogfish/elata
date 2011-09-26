@@ -42,80 +42,93 @@ agt_job_test_() ->
       setup,
       fun setup/0,
       [
-      { "Create job", fun create_job/0},
-      { "Lookup job", fun lookup_job/0},
-      { "Insert job", fun insert_job/0},
-      { "Delete job", fun delete_job/0},
-      { "Job life-cycle", fun job_life_cycle/0}
+      { "Put permanent job", fun pjob_put/0},
+      { "Get permanent job", fun pjob_get/0},
+      { "Remove permanent job", fun pjob_remove/0},
+      { "Job life-cycle 1", {timeout, 5, fun job_lc1/0}},
+      { "Job life-cycle 2", {timeout, 10, fun job_lc2/0}}
       ]
    }.
    
 %%% test job   
--define(JOB, [
+-define(PJOB, [
    {id,        test_job_1},
-   {frequency, 1},
-   {ttl,       3},
+   {thinktime, 1},
+   {ttl,       undefined},
    {script,    undefined}
 ]).   
    
+-define(TJOB, [
+   {id,        test_job_2},
+   {thinktime, 1},
+   {ttl,       3},
+   {script,    undefined}
+]).
+
 setup() ->
-   kvs_reg:start(),
-   kvs_cache_sup:start_link(),
-   agt_job_sup:start_link(),
-   keyval_bucket:create(test_job, [{plugin, agt_job_sup}, {key, id}]).
+   ok = application:start(elata_kvs),
+   kvs_bucket:define(test_job, [{storage, agt_job_sup}]).
    
 %%%
 %%% Job CRUD
 %%%
-create_job() ->
+pjob_put() ->
    ?assert(
-      ok =:= keyval_store:create(test_job, ?JOB)
+      ok =:= kvs:put(test_job, test_job_1, ?PJOB)
    ).
    
-lookup_job() ->
+pjob_get() ->
    ?assert(
-      {ok, ?JOB} =:= keyval_store:lookup(test_job, test_job_1)
+      {ok, ?PJOB} =:= kvs:get(test_job, test_job_1)
    ).
 
-insert_job() ->
-   NewJob = [{ttl, 60} | proplists:delete(ttl, ?JOB)],
+pjob_remove() ->
    ?assert(
-      ok =:= keyval_store:insert(test_job, NewJob)
+      ok =:= kvs:remove(test_job, test_job_1)
    ),
+   timer:sleep(100),
    ?assert(
-      {ok, NewJob} =:= keyval_store:lookup(test_job, test_job_1)
+      false =:= kvs:has(test_job, test_job_1)
    ).
    
-delete_job() ->
+job_lc1() ->
    ?assert(
-      ok =:= keyval_store:delete(test_job, test_job_1)
+      ok  =:= kvs:put(test_job, test_job_2, ?TJOB)
    ),
+   timer:sleep(1000),
    ?assert(
-      {error, not_found} =:= keyval_store:lookup(test_job, test_job_1)
+      {ok, ?TJOB} =:= kvs:get(test_job, test_job_2)
+   ),
+   timer:sleep(1000),
+   ?assert(
+      {ok, ?TJOB} =:= kvs:get(test_job, test_job_2)
+   ),
+   timer:sleep(1000),
+   ?assert(
+      {error, not_found} =:= kvs:get(test_job, test_job_2)
    ).
 
-%%%
-%%% Job Sample
-%%%
-job_life_cycle() ->
+job_lc2() ->
    ?assert(
-      ok =:= keyval_store:create(test_job, ?JOB)
+      ok =:= kvs:put(test_job, test_job_2, ?TJOB)
    ),
    timer:sleep(1000),
-   % 1st measurement is performed cycles increased
-   {ok, Job1} = keyval_store:lookup(test_job, test_job_1),
-   
    ?assert(
-      0 < proplists:get_value(cycle, Job1)
+      {ok, ?TJOB} =:= kvs:get(test_job, test_job_2)
    ),
    timer:sleep(1000),
-   % 2nd measurment is performed, ttl is decreased
-   {ok, Job2} = keyval_store:lookup(test_job, test_job_1),
    ?assert(
-      3 > proplists:get_value(ttl, Job2)
+      ok =:= kvs:put(test_job, test_job_2, ?TJOB)
    ),
-   timer:sleep(2000),
-   % ttl is expired
+   timer:sleep(1000),
    ?assert(
-      {error, not_found} =:= keyval_store:lookup(test_job, test_job_1)
-   ).
+      {ok, ?TJOB} =:= kvs:get(test_job, test_job_2)
+   ),
+   timer:sleep(1000),
+   ?assert(
+      {ok, ?TJOB} =:= kvs:get(test_job, test_job_2)
+   ),
+   timer:sleep(1000),
+   ?assert(
+      {error, not_found} =:= kvs:get(test_job, test_job_2)
+   ).   

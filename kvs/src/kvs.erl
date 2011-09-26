@@ -38,7 +38,7 @@
 %%%
 
 -export([
-   put/2,
+   put/3,
    get/2,
    has/2,
    remove/2
@@ -46,17 +46,17 @@
 
 
 %%%
-%%% put(Bucket, Item) -> {ok, Key} | {error, ...}
+%%% put(Bucket, Key, Item) -> ok | {error, ...}
 %%%    Bucket = bucket unique name, see kvs_bucket:define(...)
 %%%    Item   = item to store
 %%%    Key    = unique item identity (identity function over Item)
 %%% 
 %%% stores Item into Bucket
-put(Bucket, Item)  -> 
+put(Bucket, Key, Item)  -> 
    % retrive bucket metadata
    case kvs_sys:get(kvs_sys_bucket, Bucket) of
       {error,  _} -> {error, undefined_bucket};
-      {ok, Bmeta} -> gen_kvs_bucket:handle_put(Bmeta, Item)
+      {ok, Bmeta} -> gen_kvs_bucket:handle_put(Bmeta, Key, Item)
    end.
 
 %%%
