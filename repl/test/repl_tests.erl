@@ -66,7 +66,7 @@ setup() ->
 
 put() ->   
    ?assert(
-      {ok, a} =:= kvs:put(test_repl, {a, b, c})
+      ok =:= kvs:put(test_repl, a, {a, b, c})
    ),
    timer:sleep(400),
 %%   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, {'$1', test_repl, a, put, '$2'})] ]),
@@ -78,7 +78,7 @@ put() ->
 
 update() ->   
    ?assert(
-      {ok, a} =:= kvs:put(test_repl, {a, b, d})
+      ok =:= kvs:put(test_repl, a, {a, b, d})
    ),
    timer:sleep(400),
 %%   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, {'_', test_repl, a, put, '$1'})] ]),
@@ -93,7 +93,7 @@ remove() ->
       ok =:= kvs:remove(test_repl, a)
    ),
    timer:sleep(400),
-   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, {'_', test_repl, a, remove, '$1'})] ]),
+%%   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, {'_', test_repl, a, remove, '$1'})] ]),
    ?assert(
 	[[undefined]] =:= ets:match(repl_tslog, {'_', test_repl, a, remove, '$1'})
    ).
