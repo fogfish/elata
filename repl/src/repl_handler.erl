@@ -63,7 +63,7 @@ handle_event({put, Bucket, Key, Item}, State) ->
    %% TODO: 
    %% have configuration to check whether items of this bucket are to be monitored or not
    {Megasecs, Secs, Microsecs} = erlang:now(),
-   TS = Megasecs * 1000000000 + Secs *1000 + Microsecs,
+   TS = (Megasecs * 1000000000000) + (Secs *1000000) + Microsecs,
 %%   ets:insert(repl_tslog, {#b_log{ts=TS, op=put, bucket=Bucket, key=Key, item=Item}}),
    ets:insert(repl_tslog, {TS, Bucket, Key, put, Item}),
    error_logger:info_report(["Handle Event: put: ets list:", [ ets:tab2list(repl_tslog)] ]),
@@ -72,7 +72,7 @@ handle_event({put, Bucket, Key, Item}, State) ->
 
 handle_event({remove, Bucket, Key, Item}, State) ->
    {Megasecs, Secs, Microsecs} = erlang:now(),
-   TS = Megasecs * 1000000000 + Secs *1000 + Microsecs,
+   TS = (Megasecs * 1000000000000) + (Secs *1000000) + Microsecs,
 %%   ets:insert(repl_tslog, {#b_log{ts=TS, op=remove, bucket=Bucket, key=Key, item=Item}}),
    ets:insert(repl_tslog, {TS, Bucket, Key, remove, Item}),
    error_logger:info_report(["Handle Event: remove: ets list:", [ ets:tab2list(repl_tslog)] ]),

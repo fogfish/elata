@@ -81,10 +81,10 @@ update() ->
       ok =:= kvs:put(test_repl, a, {a, b, d})
    ),
    timer:sleep(400),
-%%   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, {'_', test_repl, a, put, '$1'})] ]),
+   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, {'_', test_repl, a, put, '$1'})] ]),
 %%   error_logger:info_report(["ets match:", [ ets:match(repl_tslog, '$1')] ]),
    ?assert(
-	[[{a,b,c}], [{a,b,d}]] =:= ets:match(repl_tslog, {'_', test_repl, a, put, '$1'})
+	[[{a,b,d}], [{a,b,c}]] =:= ets:match(repl_tslog, {'_', test_repl, a, put, '$1'})
    ).   
 
    
