@@ -48,7 +48,7 @@ start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->   
-   kvs_evt_sup:subscribe(repl_event_handler),
+   kvs_evt_sup:subscribe(repl_handler),
 
    Handler = {repl_handler, {repl_handler, start_link, []},
 		permanent, 2000, worker, [repl_handler]},
