@@ -81,7 +81,7 @@ init([Config]) ->
          template  = Template,
          sock      = undefined
       }
-   }.
+   }.                        
  
 handle_call({create, Storage}, _From, State) ->
    {reply, srv_create(Storage, State), State};   

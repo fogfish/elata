@@ -38,7 +38,7 @@
 -export([
    % supervisor
    start_link/1,
-   init/1,
+   init/1,                    
    % gen_kvs_bucket
    construct/1,
    config/0,

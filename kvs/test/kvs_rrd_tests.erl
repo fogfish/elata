@@ -39,7 +39,9 @@ kvs_rrd_ipc_test_() ->
       fun setup_rrd_ipc/0,
       fun cleanup/1,
       [
-      { "Put item", fun put/0}
+      { "Put item", fun put/0},
+      { "Has item", fun has/0},
+      { "Get item", fun get/0}
       ]
    }.
    
@@ -49,7 +51,9 @@ kvs_rrd_cache_test_() ->
       fun setup_rrd_cache/0,
       fun cleanup/1,
       [
-      { "Put item", fun put/0}
+      { "Put item", fun put/0},
+      { "Has item", fun has/0},
+      { "Get item", fun get/0}
       ]
    }.
    
@@ -88,9 +92,31 @@ put() ->
    ),
    timer:sleep(100), %% RRD put is async, we have to wait before file is created
    ?assert(
+      kvs:has(kvs_rrd_cache, key_to_stream(Key))
+   ),
+   ?assert(
       filelib:is_file("/private/tmp/kvs" ++ key_to_stream(Key))
    ).
 
+has() ->
+   Key1 = {<<"eu">>, <<"http://localhost">>, tcp},
+   Key2 = {<<"us">>, <<"http://localhost">>, tcp},  
+   ?assert(
+      true =:= kvs:has(test, Key1)
+   ),
+   ?assert(
+      false =:= kvs:has(test, Key2)
+   ).
+   
+get() ->
+   Key1 = {<<"eu">>, <<"http://localhost">>, tcp},
+   Key2 = {<<"us">>, <<"http://localhost">>, tcp},  
+   ?assert(
+      {ok, 1000} =:= kvs:get(test, Key1)
+   ),
+   ?assert(
+      {error, not_found} =:= kvs:get(test, Key2)
+   ).
    
 key_to_stream(Key) ->
    Hash = crypto:sha(term_to_binary(Key)),

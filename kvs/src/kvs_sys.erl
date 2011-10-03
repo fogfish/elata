@@ -76,6 +76,7 @@ start_link([kvs_sys_bucket]) ->
       
 start_link([Bucket | _]) ->
    Name = proplists:get_value(name, Bucket),
+   % TODO: options
    Ref  = ets:new(anonymous, [public]),
    ok   = kvs:put(kvs_sys_ref, Name, Ref),
    {ok, Ref}.   

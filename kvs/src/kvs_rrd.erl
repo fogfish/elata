@@ -135,6 +135,8 @@ init([Bucket]) ->
          % internal design assumes low performance OS IPC if proxy in not used.
          undefined   
    end,
+   % define in-memory bucket to keep a latest results of streams in memory
+   ok = kvs_bucket:define(kvs_rrd_cache, [{storage, kvs_sys}]),
    % register itself
    Name = proplists:get_value(name, Bucket),
    ok   = kvs:put(kvs_sys_ref, Name, self()),
@@ -150,9 +152,9 @@ init([Bucket]) ->
 %%
 %% handle_call
 handle_call({kvs_has, Key}, _From, State) ->
-   {reply, {error, not_implemented}, State};
+   {reply, impl_has(Key, State), State};
 handle_call({kvs_get, Key}, _From, State) ->
-   {reply, {error, not_implemented}, State};
+   {reply, impl_get(Key), State};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
 
@@ -214,7 +216,8 @@ impl_put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = S
             io_lib:format('UPDATE ~s ~b:~f~n', [DS, Timestamp, Value])
          ),
          gen_tcp:send(Sock, Msg)
-   end;   
+   end,
+   ok = kvs:put(kvs_rrd_cache, DS, {Timestamp, Value});   
 
 impl_put(Key, Item, State) when is_integer(Item) ->
    impl_put(Key, {timestamp(), Item}, State);   
@@ -227,6 +230,20 @@ impl_put(Key, Item, State) when is_list(Item) ->
 impl_put(Key, Item, State) ->
    {error, not_supported}.
 
+   
+%%
+%%
+impl_has(Key, #srv{stream = S}) ->
+   DS = key_to_stream(Key),
+   filelib:is_file(S#stream.datadir ++ DS).
+   
+impl_get(Key) ->
+   DS = key_to_stream(Key),
+   case kvs:get(kvs_rrd_cache, DS) of
+      {ok, {_, Value}} -> {ok, Value};
+      _                -> {error, not_found}
+   end.
+   
 %%
 %% converts a key into file name
 key_to_stream(Key) ->
