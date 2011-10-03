@@ -57,8 +57,8 @@ start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->   
-   {ok, _} = kvs_sys:construct([kvs_sys_ref]),
-   {ok, _} = kvs_sys:construct([kvs_sys_bucket]),
+   {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
+   {ok, _} = kvs_sys:start_link([kvs_sys_bucket]),
    % event management
    EvtManager = {
       kvs_evt,
@@ -94,16 +94,17 @@ add(Type, Mod, Args) ->
       {
          Mod,
          start_link,
-         [Args]
+         Args
       },
       permanent, 2000, Type, dynamic
    },
-   case supervisor:start_child(kvs_sup, Child) of 
-      {ok, Pid}    -> {ok, Pid};
-      {ok, Pid, _} -> {ok, Pid};
-      {error, already_present}     -> {ok, undefined};
-      {error,{already_started, _}} -> {ok, undefined};
-      Err ->
-         error_logger:error_report([{module, Mod}, {args, Args}, Err]),
-         Err
-   end.
+   supervisor:start_child(kvs_sup, Child).
+   %case supervisor:start_child(kvs_sup, Child) of 
+   %   {ok, Pid}    -> {ok, Pid};
+   %   {ok, Pid, _} -> {ok, Pid};
+   %   {error, already_present}     -> {ok, undefined};
+   %   {error,{already_started, _}} -> {ok, undefined};
+   %   Err ->
+   %      error_logger:error_report([{module, Mod}, {args, Args}, Err]),
+   %      Err
+   %end.

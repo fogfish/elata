@@ -41,7 +41,7 @@ kvs_cache_test_() ->
    {
       setup,
       fun setup/0,
-      [
+      [                                      
       { "Put item", fun put/0},
       { "Has item", fun has/0},
       { "Get item", fun get/0},

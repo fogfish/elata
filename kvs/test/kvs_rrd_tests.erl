@@ -29,45 +29,71 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_bucket_tests).
+-module(kvs_rrd_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
-basic_domain_test_() ->
+kvs_rrd_ipc_test_() ->
    {
       setup,
-      fun() -> 
-         kvs_sys:start_link([kvs_sys_ref]),
-         kvs_sys:start_link([kvs_sys_bucket])
-      end,
+      fun setup_rrd_ipc/0,
+      fun cleanup/1,
       [
-      { "Define domain", fun define/0},
-      { "Lookup domain", fun lookup/0},
-      { "Delete domain", fun delete/0},
-      { "Undefined domain", fun undefined/0} 
+      { "Put item", fun put/0}
       ]
    }.
    
-%%
-define() ->
+kvs_rrd_cache_test_() ->
+   {
+      setup,
+      fun setup_rrd_cache/0,
+      fun cleanup/1,
+      [
+      { "Put item", fun put/0}
+      ]
+   }.
+   
+setup_rrd_ipc() ->
+   {ok, Pid} = kvs_sup:start_link(),
+   ok = kvs_bucket:define(test, [
+      {storage, kvs_rrd},
+      {codepath, "/usr/local/macports"},
+      {datapath, "/private/tmp/kvs"}
+   ]),
+   Pid.
+
+setup_rrd_cache() ->
+   {ok, Pid} = kvs_sup:start_link(),
+   ok = kvs_bucket:define(test, [
+      {storage, kvs_rrd},
+      {codepath, "/usr/local/macports"},
+      {datapath, "/private/tmp/kvs"},
+      iocache,
+      {daemon, {"127.0.0.1", 42217}},
+      {flush,  120},
+      {iotime, 60}
+   ]),
+   Pid.   
+
+cleanup(Pid) ->
+   erlang:exit(Pid, normal),
+   timer:sleep(100),  %% switch a context to kill supervisor
+   os:cmd("rm -R /private/tmp/kvs"),
+   os:cmd("killall rrdcached").
+   
+put() ->
+   Key = {<<"eu">>, <<"http://localhost">>, tcp},
    ?assert(
-      ok =:= kvs_bucket:define(test, [{storage, kvs_sys}])
-   ).
- 
-%%
-lookup() ->
+      ok =:= kvs:put(test, Key, 1000)
+   ),
+   timer:sleep(100), %% RRD put is async, we have to wait before file is created
    ?assert(
-      {ok, [{name, test}, {storage, kvs_sys}]} =:= kvs_bucket:lookup(test)
+      filelib:is_file("/private/tmp/kvs" ++ key_to_stream(Key))
    ).
 
-%%
-delete() ->
-   ?assert(
-      ok =:= kvs_bucket:remove(test)
-   ).
    
-undefined() ->
-   ?assert(
-      {error, not_found} =:= kvs_bucket:lookup(test)
-   ).
-   
+key_to_stream(Key) ->
+   Hash = crypto:sha(term_to_binary(Key)),
+   Hex  = [ integer_to_list(X, 16) || X <- binary_to_list(Hash) ],
+   File = lists:append(Hex),
+   "/" ++ lists:sublist(File, 2) ++ "/" ++ File.   

@@ -37,6 +37,7 @@
 %%
 
 -export([
+   start_link/1,
    % public API
    construct/1,
    config/0,
@@ -48,13 +49,13 @@
 
 %%
 %%
-construct([kvs_sys_ref]) ->
+start_link([kvs_sys_ref]) ->
    % system bucket maps named instances to they physical reference
    Ref = ets:new(kvs_sys_ref, [public, named_table]),
    ets:insert(kvs_sys_ref, {kvs_sys_ref, kvs_sys_ref}),
    {ok, Ref};  
 
-construct([kvs_sys_bucket]) ->
+start_link([kvs_sys_bucket]) ->
    % system bucket contains metadata of other buckets
    Ref = ets:new(kvs_sys_bucket, [public, named_table]),
    ets:insert(kvs_sys_ref, {kvs_sys_bucket, kvs_sys_bucket}),
@@ -73,12 +74,17 @@ construct([kvs_sys_bucket]) ->
    error_logger:info_report(SysBkt),
    {ok, Ref};
       
-construct([Bucket | _]) ->
+start_link([Bucket | _]) ->
    Name = proplists:get_value(name, Bucket),
    Ref  = ets:new(anonymous, [public]),
    ok   = kvs:put(kvs_sys_ref, Name, Ref),
    {ok, Ref}.   
 
+%%
+%%
+construct(_) ->   
+   {error, not_supported}.
+   
 %%
 %%
 config() ->

@@ -69,7 +69,7 @@ behaviour_info(callbacks) ->
       {construct, 1}, %% construct([...])
       {config,    0}, %% bucket configuration
       {put,  3},      %% set(Pid, Key, Item)
-      {has,  2},      %% has(Pid, Key)
+      {has,  2},      %% has(Pid, Key)                       
       {get,  2},      %% get(Pid, Key)
       {remove, 2}     %% remove(Pid, Key)
    ];

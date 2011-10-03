@@ -24,6 +24,7 @@ ESRC = \
    src/kvs_cache_sup.erl \
    src/kvs_cache.erl \
    src/kvs_dets.erl \
+   src/kvs_rrd.erl \
    src/kvs_evt.erl \
    src/kvs_evt_sup.erl \
    src/kvs_evt_handler_sup.erl \

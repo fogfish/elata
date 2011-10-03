@@ -72,9 +72,9 @@ define(Name, Bucket) ->
          % create bucket instance
          Bmeta = lists:append([[{name, Name}], Cfg, Bucket]),
          {ok, Pid} = case proplists:get_value(supervise, Cfg) of
-            undefined  -> Mod:construct([Bmeta]);
-            supervisor -> kvs_sup:add(supervisor, Mod, Bmeta);
-            worker     -> kvs_sup:add(worker,     Mod, Bmeta)
+            undefined  -> Mod:start_link([Bmeta]);
+            supervisor -> kvs_sup:add(supervisor, Mod, [Bmeta]);
+            worker     -> kvs_sup:add(worker,     Mod, [Bmeta])
          end,
          % {ok, _Pid} = Mod:construct([Bmeta]),
          kvs:put(kvs_sys_bucket, Name, Bmeta),

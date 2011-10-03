@@ -37,8 +37,8 @@ kvs_sys_test_() ->
    {
       setup,
       fun() ->
-         {ok, _} = kvs_sys:construct([kvs_sys_ref]),
-         {ok, _} = kvs_sys:construct([kvs_sys_bucket])
+         {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
+         {ok, _} = kvs_sys:start_link([kvs_sys_bucket])
       end,
       fun(X) ->
          ets:delete(kvs_sys_ref),
@@ -56,8 +56,8 @@ kvs_sys_api_test_() ->
    {
       setup,
       fun() ->
-         {ok, _} = kvs_sys:construct([kvs_sys_ref]),
-         {ok, _} = kvs_sys:construct([kvs_sys_bucket])
+         {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
+         {ok, _} = kvs_sys:start_link([kvs_sys_bucket])
       end,
       fun(X) ->
          ets:delete(kvs_sys_ref),

@@ -78,9 +78,6 @@ init([]) ->
 %%% gen_kvs_entity
 %%%
 %%%------------------------------------------------------------------
-construct([Bucket]) ->
-   % nothing to do it is called from kvs_bucket
-   {ok, self()};
 construct([Bucket, Key, Item]) ->
    supervisor:start_child(?MODULE, [Bucket, Key, Item]).
 
