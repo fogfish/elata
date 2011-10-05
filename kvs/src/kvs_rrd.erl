@@ -47,7 +47,7 @@
 
 -export([
    start_link/1,
-   % gen_kvs_entity
+   % gen_kvs_bucket
    construct/1,
    config/0,
    put/3,
@@ -80,6 +80,7 @@
 }).
 
 start_link(Bucket) ->
+   % kvs_rrd bucket is singleton - one instance per node
    gen_server:start_link({local, ?MODULE}, ?MODULE, [Bucket], []).
    
 %%%------------------------------------------------------------------

@@ -38,7 +38,7 @@
    stop/1
 ]).
 
-start(_Type, _Args) ->
+start(_Type, _Args) -> 
    case kvs_sup:start_link() of
       {ok, Pid} ->
          {ok, Pid};

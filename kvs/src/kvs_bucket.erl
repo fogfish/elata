@@ -66,8 +66,10 @@ define(Name, Bucket) ->
          case proplists:get_value(keyspace, Cfg) of
             undefined ->
                ok;
-            _Keyspace  ->
-               ok = kvs_bucket:define({keyspace, Name}, [{storage, kvs_sys}, {id, {attr, 1}}])
+            true      ->
+               ok = kvs_bucket:define({keyspace, Name}, [{storage, kvs_sys}]);
+            Keyspace  ->
+               ok = kvs_bucket:define({keyspace, Name}, [{storage, Keyspace} | Bucket])   
          end,
          % create bucket instance
          Bmeta = lists:append([[{name, Name}], Cfg, Bucket]),

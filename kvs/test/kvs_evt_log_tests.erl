@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,84 +29,49 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_cache_tests).
+-module(kvs_evt_log_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
-%%
-%% Unit test of KVS proxy to ETS via keyval_store interface 
-%%
 
-kvs_cache_test_() ->
+kvs_bin_log_test_() ->
    {
       setup,
       fun setup/0,
-      [                                      
+      [
       { "Put item", fun put/0},
-      { "Has item", fun has/0},
-      { "Get item", fun get/0},
-      { "Has item", fun remove/0},
-      { "TTL item", {timeout, 10, fun ttl/0}}
+      { "Remove item", fun remove/0},
+      { "Expire", {timeout, 10, fun expire/0}}
       ]
    }.
-
+   
 setup() ->
    kvs_sup:start_link(),
-   kvs_bucket:define(test, [{storage, kvs_cache_sup}]).
-   
-%%%
-%%% 
-%%%
-put() ->
+   kvs_evt_sup:subscribe({kvs_evt_log, [[{ttl, 5}, {size, 10}]]}),
+   kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}]),
+   kvs_bucket:define(test, [{storage, kvs_sys}, event, evtlog]).
+
+
+
+put()  ->
+   Key = {key, 1},
+   ok = kvs:put(test, Key, {val, 1}),
+   timer:sleep(100),
    ?assert(
-      ok =:= kvs:put(test, a, {a, b, c})
-   ).
-   
-has() ->
-   ?assert(
-      true  =:= kvs:has(test, a)
-   ),
-   ?assert(
-      false =:= kvs:has(test, b)
-   ).
-   
-get() ->
-   ?assert(
-      {ok, {a, b, c}} =:= kvs:get(test, a)
-   ),
-   ?assert(
-      {error, not_found} =:= kvs:get(test, b)
+      {ok, [{ttl, 5}, {0, put, test, Key}]} =:= kvs:get(kvs_evt_log, 0)
    ).
    
 remove() ->
-   ?assert(
-      ok =:= kvs:remove(test, a)
-   ),
+   Key = {key, 1},
+   ok = kvs:remove(test, Key),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= kvs:get(test, a)
+      {ok, [{ttl, 5}, {0, put, test, Key}, {1, remove, test, Key}]} =:= kvs:get(kvs_evt_log, 0)
    ).
-
-ttl() ->
-   Item = [{ttl, 2}, value],
+   
+expire() ->   
+   timer:sleep(5500),
    ?assert(
-      ok =:= kvs:put(test, key, Item)
-   ),
-   timer:sleep(1000),
-   ?assert(
-      true  =:= kvs:has(test, key)
-   ),
-   ?assert(
-      {ok, Item} =:= kvs:get(test, key)
-   ),
-   timer:sleep(1000), %% get renew a lease time thus deadline time is restarted
-   ?assert(
-      true  =:= kvs:has(test, key)
-   ),
-   timer:sleep(2000),
-   ?assert(
-      false  =:= kvs:has(test, key)
-   ),
-   ?assert(
-      {error, not_found} =:= kvs:get(test, key)
+      {error, not_found} =:= kvs:get(kvs_evt_log, 0)
    ).
+   

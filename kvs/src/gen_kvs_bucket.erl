@@ -183,8 +183,9 @@ resolve(Bucket, Key) ->
 notify(put, Bucket, Key, Item) ->
    case proplists:is_defined(event, Bucket) of
       true  -> 
-         Bname = proplists:get_value(name, Bucket),
-         kvs_evt:put(Bname, Key, Item);
+         %Bname = proplists:get_value(name, Bucket),
+         %kvs_evt:put(Bname, Key, Item);
+         kvs_evt:put(Bucket, Key, Item);
       false -> 
          ok
    end;
@@ -192,8 +193,9 @@ notify(put, Bucket, Key, Item) ->
 notify(remove, Bucket, Key, Item) ->
    case proplists:is_defined(event, Bucket) of
       true  -> 
-         Bname = proplists:get_value(name, Bucket),
-         kvs_evt:remove(Bname, Key, Item);
+         %Bname = proplists:get_value(name, Bucket),
+         %kvs_evt:remove(Bname, Key, Item);
+         kvs_evt:remove(Bucket, Key, Item);
       false -> 
          ok
    end;

@@ -48,23 +48,49 @@
    code_change/3 
 ]).
 
+-record(srv, {
+   ttl,       % time-to-live in seconds
+   timestamp, % timestamp of last item i/o activity
+   bucket,    % name of bucket where key belongs
+   key,       % key
+   item       % value
+}).
+
 %%
 %%
 start_link(Bucket, Key, Item) ->
   gen_server:start_link(?MODULE, [Bucket, Key, Item], []).
   
 init([Bucket, Key, Item]) ->
+   TTL = case is_list(Item) of
+      true  -> proplists:get_value(ttl, Item);
+      false -> undefined
+   end,
+   ttl_timer(TTL),
    % register itself to keyspace
    Name = proplists:get_value(name, Bucket),
    ok   = kvs:put({keyspace, Name}, Key, self()),
-   {ok, {Name, Key, Item}}.
+   {ok, 
+      #srv{
+         ttl=TTL,
+         timestamp=timestamp(),
+         bucket=Name, 
+         key=Key,
+         item=Item
+      }
+   }.
    
-handle_call({kvs_put, Key, Item}, _From, {Name, Key, _}) ->
-   {reply, ok, {Name, Key, Item}};
-handle_call({kvs_has, Key}, _From, State) ->
-   {reply, true, State};
-handle_call({kvs_get, Key}, _From, {Name, Key, Item}) ->
-   {reply, {ok, Item}, {Name, Key, Item}};
+handle_call({kvs_put, Key, Item}, _From, S) ->
+   TTL = case is_list(Item) of
+      true  -> proplists:get_value(ttl, Item);
+      false -> undefined
+   end,
+   ttl_timer(TTL),
+   {reply, ok, S#srv{ttl=TTL, timestamp=timestamp(), item=Item}};
+handle_call({kvs_has, Key}, _From, S) ->
+   {reply, true, S};
+handle_call({kvs_get, Key}, _From, S) ->
+   {reply, {ok, S#srv.item}, S#srv{timestamp=timestamp()}};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
 handle_cast({kvs_remove, Key}, State) ->
@@ -72,11 +98,25 @@ handle_cast({kvs_remove, Key}, State) ->
 handle_cast(_Req, State) ->
    {noreply, State}.
 
+handle_info(expired, S) ->
+   case S#srv.ttl of
+      undefined -> {noreply, S};
+      TTL ->
+         Now      = timestamp(),
+         Deadline = S#srv.timestamp + S#srv.ttl,
+         if 
+            Deadline =< Now -> 
+               {stop, normal, S};
+            Deadline >  Now -> 
+               ttl_timer(TTL),
+               {noreply, S}
+         end
+   end;
 handle_info(_Msg, State) ->
    {noreply, State}.
    
-terminate(_Reason, {Name, Key, _}) ->
-   kvs:remove({keyspace, Name}, Key),
+terminate(_Reason, S) ->
+   kvs:remove({keyspace, S#srv.bucket}, S#srv.key),
    ok.
    
 code_change(_OldVsn, State, _Extra) ->
@@ -88,3 +128,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%%
 %%%------------------------------------------------------------------
 
+% return unix timestamp
+timestamp() ->
+   {Mega, Sec, _Micro} = erlang:now(),
+   Mega * 1000000 + Sec.
+   
+% starts time-to-live timer   
+ttl_timer(undefined) ->
+   ok;
+ttl_timer(TTL) ->   
+   timer:send_after(TTL * 1000, expired).   
