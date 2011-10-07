@@ -21,6 +21,7 @@ ESRC = \
    src/ek_ws.erl \
    src/ek_ws_sup.erl \
    src/ek_sup.erl \
+   src/ek_echo.erl \
    src/ek_app.erl
 
 

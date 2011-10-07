@@ -50,7 +50,10 @@ start(_Type, Args) ->
          Uri  = ek_uri:new(Node),
          Port = proplists:get_value(port, Uri),
          ek_ws_sup:listen(Port),
+         % create a node registry
          ets:new(ek_nodes, [public, named_table]),
+         % create a message dispatch table
+         ets:new(ek_dispatch, [public, named_table, bag]),
          % register itself 
          % TODO: automatic node discovery
          ets:insert(ek_nodes, {self, Node}),

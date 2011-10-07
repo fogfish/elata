@@ -122,8 +122,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-TESTS = kvs_sys_tests kvs_bucket_tests kvs_cache_tests kvs_evt_tests \
-	kvs_rrd_tests kvs_evt_log_tests
+TESTS = ek_tests
 CLEANFILES = $(TESTS) $(TESTS:=.beam)
 all: all-am
 
@@ -401,7 +400,7 @@ uninstall-am:
 .SECONDARY:
 
 % : %.beam
-	echo "erl -pa ../ebin -eval 'R = case eunit:test($@, [verbose]) of ok -> 0; _ -> 1 end, timer:apply_after(100, erlang, halt, [R]).'" > $@
+	echo "erl -sname dev@localhost -pa ../ebin -eval 'R = case eunit:test($@, [verbose]) of ok -> 0; _ -> 1 end, timer:apply_after(100, erlang, halt, [R]).'" > $@
 	chmod u+x $@ 
 
 %.beam : %.erl

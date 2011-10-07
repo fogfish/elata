@@ -1,5 +1,3 @@
-%%
-%%   Copyright (c) 2011, Nokia Corporation
 %%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
@@ -29,6 +27,55 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_peer).
--behaviour(gen_fsm).
+-module(ek_echo).
 -author(dmitry.kolesnikov@nokia.com).
+
+%%
+%% Example echo cluster
+%%
+
+-export([
+   join/1,
+   join/2,
+   ping/0
+]).
+
+join(Node) ->
+   {ok, Pid} = ek:start(Node),
+   spawn(
+      fun() ->
+         ek:subscribe("/echo"),
+         loop()
+      end
+   ).
+   
+join(Node, Peer) ->
+   {ok, Pid} = ek:start(Node),
+   ek:connect(Peer),
+   spawn(
+      fun() ->
+         ek:subscribe("/echo"),
+         loop()
+      end
+   ).
+   
+ping() ->
+   ping(0).
+ping(TTL) ->
+   Nodes = ek:nodes(),   
+   Index = random:uniform(length(Nodes)), 
+   Node  = lists:nth(Index, Nodes),
+   ek:send(Node ++ "/echo", {ping, ek:node(), TTL}).
+
+   
+loop() ->
+   receive
+      {ping, From, TTL} ->
+         io:format('ping from ~p (ttl=~p)~n', [From, TTL]),
+         timer:sleep(1000),
+         ping(TTL + 1),
+         loop();
+      Any ->
+         loop()
+   end.
+      

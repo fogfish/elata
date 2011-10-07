@@ -31,34 +31,52 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% ek is Erlang Cluster, alternative method to build 
-%% globally (geo) distributed Erlang clusters
+%% Erlang Cluster (ek) is an overlay to build a geo distributed clusters
+%% (alternative method to Erlang build in facilities)
 %%
+
 
 -export([
    start/1,
+   node/0,
    nodes/0,
    connect/1,
+   disconnect/1,
    monitor/1,
-   send/2
+   send/2,
+   subscribe/1,
+   unsubscribe/1
 ]).
 
 
 %%
-%% starts Erl Cluster node
+%% starts cluster management application
+%% Node - list(), local node identity, uri (e.g. node://168.192.0.1:8080).
 start(Node) ->
    ek_app:start(permanent, [{node, Node}]).
-
+           
 %%
-%% list of connected nodes
+%% Name of itself
+node() ->
+   [{_, Name}] = ets:lookup(ek_nodes, self),
+   Name.
+   
+%%
+%% Retrive list of connected nodes
 nodes() ->
    [N || {N,_} <- ets:tab2list(ek_nodes), is_list(N)].  
    
 %%
-%% connect to node
+%% Initiates a connection with remote node
+%% Node - list(), remote node identity
 connect(Node) ->
    ek_ws_sup:connect(Node).
 
+%%
+%% Forces to disconnect node
+disconnect(Node) ->
+   {error, not_implemented}.
+   
 %%
 %% monitor a node
 monitor(Node) ->
@@ -84,5 +102,12 @@ send(Uri, Msg) ->
          {error, not_found}
    end.
    
+%%
+%% subscribe
+subscribe(Path) ->
+   ets:insert(ek_dispatch, {list_to_binary(Path), self()}).
+
+unsubscribe(Path) ->
+   ets:delete_object(ek_dispath, {list_to_binary(Path), self()}).
    
    

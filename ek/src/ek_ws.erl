@@ -41,6 +41,11 @@
 %%   - HANDSHAKE:  WS Connection setup
 %%   - CONNECTED:
 
+%% TODO:
+%%   - message queue
+%%   - message separator
+
+
 -export([
    start_link/2,
    %% gen_fsm
@@ -64,7 +69,6 @@
    recon,   %% ref to node re-connect timer
    sock
 }).
-%%-define(SOCK_OPTS, [{active, true}, binary, {packet, 0}]).
 -define(SOCK_OPTS, [{active, true}, {mode, binary}]).
 
 -define(T_TCP_SOCK_CON,  20000).  %% timer for tcp socket connection
@@ -341,8 +345,14 @@ get_peer(<<H:8, T/binary>>, State, Acc) ->
    
    
 %%
-dispatch_msg({msg, Uri, Data}) ->
-   ok; 
+dispatch_msg({msg, Uri, Msg}) ->
+   U = ek_uri:new(Uri),
+   case ets:lookup(ek_dispatch, proplists:get_value(path, U)) of
+      []    -> ok;
+      List  ->
+         [ Pid ! Msg || {_, Pid} <- List],
+         ok
+   end;
    
 dispatch_msg(_) -> 
    ok.
