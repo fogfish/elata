@@ -1,3 +1,5 @@
+%%
+%%   Copyright (c) 2011, Nokia Corporation
 %%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
@@ -29,6 +31,7 @@
 %%
 -module(ek).
 -author(dmitry.kolesnikov@nokia.com).
+-include("include/ek.hrl").
 
 %%
 %% Erlang Cluster (ek) is an overlay to build a geo distributed clusters
@@ -38,12 +41,15 @@
 
 -export([
    start/1,
+   % node management
    node/0,
    nodes/0,
    connect/1,
    disconnect/1,
    monitor/1,
+   % messaging
    send/2,
+   
    subscribe/1,
    unsubscribe/1
 ]).
@@ -55,22 +61,32 @@
 start(Node) ->
    ek_app:start(permanent, [{node, Node}]).
            
+%%-------------------------------------------------------------------
+%%
+%% Node Management
+%%
+%%-------------------------------------------------------------------
+   
 %%
 %% Name of itself
 node() ->
-   [{_, Name}] = ets:lookup(ek_nodes, self),
-   Name.
+    [Node] = ets:match_object(ek_nodes, {ek_node, '_', self}),
+    Node#ek_node.uri.
    
 %%
 %% Retrive list of connected nodes
 nodes() ->
-   [N || {N,_} <- ets:tab2list(ek_nodes), is_list(N)].  
+   [N#ek_node.uri || N <- ets:match_object(ek_nodes, '_'), N#ek_node.pid =/= self].  
    
 %%
 %% Initiates a connection with remote node
-%% Node - list(), remote node identity
+%% connect(Node) -> {ok, Pid} | {error, ...}
+%%    Node - list(), remote node identity
 connect(Node) ->
-   ek_ws_sup:connect(Node).
+   case ets:lookup(ek_nodes, Node) of
+      [Node] -> {ok, Node#ek_node.pid};
+      _      -> ek_ws_sup:connect(Node)
+   end.
 
 %%
 %% Forces to disconnect node
@@ -91,16 +107,11 @@ monitor(Node) ->
 %%
 %% send a message to node
 send(Uri, Msg) ->
-   U    = ek_uri:new(Uri),
-   Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
-          binary_to_list(proplists:get_value(host, U)) ++ ":" ++
-          integer_to_list(proplists:get_value(port, U)),
-   case ets:lookup(ek_nodes, Node) of
-      [{Node, Pid}] ->
-         gen_fsm:send_event(Pid, {msg, Uri, Msg});
-      _             ->
-         {error, not_found}
-   end.
+   ek_prot:send(Uri, Msg).
+
+multicast(Uris, Msg) ->
+   ek_prot:multicast(Uris, Msg).
+   
    
 %%
 %% subscribe

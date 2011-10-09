@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,52 +29,12 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(ek_ws_sup).
--author(dmitry.kolesnikov@nokia.com).
+%%   @author dmitry.kolesnikov@nokia.com
 
--behaviour(supervisor).
+%%
+%% Internal data structures
 
--export([
-   % supervisor
-   start_link/1,
-   init/1,                    
-   % api
-   listen/1,
-   accept/1,
-   connect/1
-]).
-
-
-listen(Uri) ->
-   supervisor:start_child(?MODULE, [{listen, Uri}]).
-
-accept(Sock) ->
-   supervisor:start_child(?MODULE, [{accept, Sock}]).
-   
-connect(Node) ->
-   supervisor:start_child(?MODULE, [{connect, Node}]).
-   
-%%%------------------------------------------------------------------
-%%%
-%%% Supervisor
-%%%
-%%%------------------------------------------------------------------
-start_link(Config) ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
-   
-init([Config]) ->
-   Process = {
-      ek_ws,         % child id
-      {
-         ek_ws,      % Mod
-         start_link, % Fun
-         [Config]    % Args
-      },
-      temporary, 2000, worker, dynamic 
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.
+-record(ek_node, {
+   uri,   %% node uri
+   pid    %% node transport management process 
+}).

@@ -221,13 +221,19 @@ ESRC = \
    src/ek_uri.erl \
    src/ek_ws.erl \
    src/ek_ws_sup.erl \
+   src/ek_prot.erl \
    src/ek_sup.erl \
    src/ek_echo.erl \
+   src/ek_evt.erl \
+   src/ek_node_sup.erl \
    src/ek_app.erl
+
+EINC = \
+   include/ek.hrl
 
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 #EBIN += ebin/elata_ek.app
-nobase_pkgliberl_SCRIPTS = $(EBIN)
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC)
 CLEANFILES = $(EBIN)
 EXTRA_DIST = $(ESRC)
 all: all-recursive

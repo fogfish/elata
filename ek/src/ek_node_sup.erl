@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,52 +29,51 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(ek_ws_sup).
+-module(ek_node_sup).
+-behaviour(gen_event).
 -author(dmitry.kolesnikov@nokia.com).
 
--behaviour(supervisor).
+%%
+%% Observes node connection and restart, if it is broken
+%%
 
 -export([
-   % supervisor
-   start_link/1,
-   init/1,                    
-   % api
-   listen/1,
-   accept/1,
-   connect/1
+   % gen_event
+   init/1,
+   handle_event/2,
+   handle_call/2,
+   handle_info/2,
+   terminate/2,                      
+   code_change/3
 ]).
 
 
-listen(Uri) ->
-   supervisor:start_child(?MODULE, [{listen, Uri}]).
+%%%------------------------------------------------------------------
+%%%
+%%%  gen_event
+%%%
+%%%------------------------------------------------------------------
+init([]) ->
+   {ok, []}.
+   
+handle_event({join, Node}, S) -> 
+   {ok, proplists:delete(Node, S)};
+handle_event({leave, Node}, S) ->
+   Cnt  = proplists:get_value(Node, S, 0),
+   Wait = erlang:round(math:pow(2, erlang:min(10, Cnt)) * 1000),
+   timer:apply_after(Wait, ek, connect, [Node]),
+   {ok, [{Node, Cnt + 1} | proplists:delete(Node, S)]};
+handle_event(Evt, State) ->
+   {ok, State}.
+   
+handle_call(_Req, State) ->
+   {ok, undefined, State}.
+   
+handle_info(_Msg, State) ->
+   {ok, State}.
+   
+terminate(_Reason, _State) ->
+   ok.
 
-accept(Sock) ->
-   supervisor:start_child(?MODULE, [{accept, Sock}]).
-   
-connect(Node) ->
-   supervisor:start_child(?MODULE, [{connect, Node}]).
-   
-%%%------------------------------------------------------------------
-%%%
-%%% Supervisor
-%%%
-%%%------------------------------------------------------------------
-start_link(Config) ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
-   
-init([Config]) ->
-   Process = {
-      ek_ws,         % child id
-      {
-         ek_ws,      % Mod
-         start_link, % Fun
-         [Config]    % Args
-      },
-      temporary, 2000, worker, dynamic 
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.
+code_change(_OldVsn, State, _Extra) -> 
+   {ok, State}.   

@@ -55,10 +55,19 @@ init([Config]) ->
       },
       permanent, 2000, supervisor, dynamic
    },
+   Evt = {
+      ek_evt,
+      {
+         ek_evt,
+         start_link,
+         []
+      },
+      permanent, 2000, worker, dynamic
+   },
    {ok,
       {
          {one_for_one, 4, 1800},
-         [Protocol]
+         [Protocol, Evt]
       }
    }.
 

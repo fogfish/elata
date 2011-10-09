@@ -1,3 +1,5 @@
+%%
+%%   Copyright (c) 2011, Nokia Corporation
 %%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
@@ -28,30 +30,23 @@
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
 -module(ek_echo).
+-behaviour(gen_event).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Example echo cluster
-%%
+%% Example ping echo cluster
+%% to start:
+%%    ek_echo:join(["ws://localhost:8080", "ws://localhost:8081"]).
 
 -export([
+   % echo api
    join/1,
-   join/2,
    ping/0
 ]).
 
-join(Node) ->
+join([Node | Peers]) ->
    {ok, Pid} = ek:start(Node),
-   spawn(
-      fun() ->
-         ek:subscribe("/echo"),
-         loop()
-      end
-   ).
-   
-join(Node, Peer) ->
-   {ok, Pid} = ek:start(Node),
-   ek:connect(Peer),
+   [ek:connect(P) || P <- Peers],
    spawn(
       fun() ->
          ek:subscribe("/echo"),
@@ -76,6 +71,8 @@ loop() ->
          ping(TTL + 1),
          loop();
       Any ->
+         io:format('msg: ~p~n', [Any]),
          loop()
    end.
-      
+         
+   

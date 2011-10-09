@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,52 +29,50 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(ek_ws_sup).
+-module(ek_prot).
 -author(dmitry.kolesnikov@nokia.com).
+-include("include/ek.hrl").
 
--behaviour(supervisor).
+%%
+%% Implemeny ek protocol
+%%
 
 -export([
-   % supervisor
-   start_link/1,
-   init/1,                    
-   % api
-   listen/1,
-   accept/1,
-   connect/1
+   send/2,
+   multicast/2,
+   recv/1
 ]).
 
 
-listen(Uri) ->
-   supervisor:start_child(?MODULE, [{listen, Uri}]).
+send(Uri, Data) ->
+   U    = ek_uri:new(Uri),
+   Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
+          binary_to_list(proplists:get_value(host, U)) ++ ":" ++
+          integer_to_list(proplists:get_value(port, U)),
+   case ets:lookup(ek_nodes, Node) of
+      [N] ->
+         Msg = term_to_binary({msg, Uri, Data}),
+         gen_fsm:send_event(N#ek_node.pid, {tx, Msg});
+      _             ->
+         {error, not_found}
+   end.
 
-accept(Sock) ->
-   supervisor:start_child(?MODULE, [{accept, Sock}]).
+multicast(Uris, Data) ->
+   lists:foreach(fun(U) -> send(U, Data) end, Uris).
    
-connect(Node) ->
-   supervisor:start_child(?MODULE, [{connect, Node}]).
+
+recv(Msg) ->
+   {msg, Uri, Data} = binary_to_term(Msg),
+   U = ek_uri:new(Uri),
+   case ets:lookup(ek_dispatch, proplists:get_value(path, U)) of
+      []    -> ok;
+      List  ->
+         [ Pid ! Data || {_, Pid} <- List],
+         ok
+   end.
    
 %%%------------------------------------------------------------------
 %%%
-%%% Supervisor
+%%% Private
 %%%
 %%%------------------------------------------------------------------
-start_link(Config) ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
-   
-init([Config]) ->
-   Process = {
-      ek_ws,         % child id
-      {
-         ek_ws,      % Mod
-         start_link, % Fun
-         [Config]    % Args
-      },
-      temporary, 2000, worker, dynamic 
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.

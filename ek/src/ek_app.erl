@@ -32,11 +32,14 @@
 -module(ek_app).
 -behaviour(application).
 -author(dmitry.kolesnikov@nokia.com).
+-include("include/ek.hrl").
 
 -export([
    start/2,
    stop/1
 ]).
+
+% TODO: automatic discovery of node name/ip address
 
 -define(APPNAME,  elata_ek).
 -define(NODE,     "ws://localhost:8080"). 
@@ -45,18 +48,16 @@ start(_Type, Args) ->
    % Config
    Config = config(?APPNAME, Args, [{node, ?NODE}, proxy]),
    case ek_sup:start_link(Config) of
-      {ok, Pid} ->
-         Node = proplists:get_value(node, Config),
-         Uri  = ek_uri:new(Node),
-         Port = proplists:get_value(port, Uri),
-         ek_ws_sup:listen(Port),
-         % create a node registry
-         ets:new(ek_nodes, [public, named_table]),
+      {ok, Pid} ->% create a node registry
+         ets:new(ek_nodes, [public, named_table, {keypos, 2}]),
          % create a message dispatch table
          ets:new(ek_dispatch, [public, named_table, bag]),
-         % register itself 
-         % TODO: automatic node discovery
-         ets:insert(ek_nodes, {self, Node}),
+         % listen incomming connections
+         Node = proplists:get_value(node, Config),
+         ek_ws_sup:listen(Node),
+         % start node supervisor
+         NodeSup = proplists:get_value(node_sup, Config, ek_node_sup),
+         ek_evt:subscribe(ek_node_sup),
          {ok,Pid};
       Other     -> {error, Other}
    end. 
@@ -70,6 +71,9 @@ stop(_State) ->
 %%%  Private 
 %%%
 %%%------------------------------------------------------------------   
+
+%%
+%% merges default, sys.config and application configurations
 config(App, DList, List) ->
    config(App, DList, List, []).
 

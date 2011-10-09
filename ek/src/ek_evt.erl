@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,52 +29,39 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(ek_ws_sup).
+-module(ek_evt).
 -author(dmitry.kolesnikov@nokia.com).
 
--behaviour(supervisor).
+%%
+%% Erlang Cluster Events
+%%
 
+%% Public API
 -export([
-   % supervisor
-   start_link/1,
-   init/1,                    
-   % api
-   listen/1,
-   accept/1,
-   connect/1
+   start_link/0,
+   subscribe/1,
+   unsubscribe/1,
+   join/1,
+   leave/1
 ]).
 
+start_link() ->
+   gen_event:start_link({local, ?MODULE}).
 
-listen(Uri) ->
-   supervisor:start_child(?MODULE, [{listen, Uri}]).
-
-accept(Sock) ->
-   supervisor:start_child(?MODULE, [{accept, Sock}]).
+subscribe({Handler, Args}) ->
+   gen_event:add_handler(?MODULE, Handler, Args);
+subscribe(Handler) ->
+   gen_event:add_handler(?MODULE, Handler, []).
    
-connect(Node) ->
-   supervisor:start_child(?MODULE, [{connect, Node}]).
+unsubscribe({Handler, Args}) ->
+   gen_event:delete_handler(?MODULE, Handler, Args);
+unsubscribe(Handler) ->
+   gen_event:delete_handler(?MODULE, Handler, []).   
    
-%%%------------------------------------------------------------------
-%%%
-%%% Supervisor
-%%%
-%%%------------------------------------------------------------------
-start_link(Config) ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
-init([Config]) ->
-   Process = {
-      ek_ws,         % child id
-      {
-         ek_ws,      % Mod
-         start_link, % Fun
-         [Config]    % Args
-      },
-      temporary, 2000, worker, dynamic 
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.
+join(Node) ->
+   gen_event:notify(?MODULE, {join, Node}).
+   
+leave(Node) ->
+   gen_event:notify(?MODULE, {leave, Node}).
+      
