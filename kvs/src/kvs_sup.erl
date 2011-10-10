@@ -57,8 +57,6 @@ start_link() ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
    
 init([]) ->   
-   {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
-   {ok, _} = kvs_sys:start_link([kvs_sys_bucket]),
    % event management
    EvtManager = {
       kvs_evt,
@@ -86,7 +84,7 @@ init([]) ->
    }.
    
 %%%   
-%%% Adds a module into supervisor tree
+%%% Adds a module into supervisor tree (called via kvs_define)
 %%%
 add(Type, Mod, Args) ->
    Child = {  % child spec

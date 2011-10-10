@@ -49,9 +49,10 @@ start_link() ->
    gen_event:start_link({local, ?MODULE}).
 
 subscribe({Handler, Args}) ->
-   gen_event:add_sup_handler(?MODULE, Handler, Args);
+   ok = gen_event:add_sup_handler(?MODULE, Handler, Args);
 subscribe(Handler) ->
-   gen_event:add_sup_handler(?MODULE, Handler, []).
+   io:format('subscribe: ~p~n', [Handler]),
+   ok = gen_event:add_sup_handler(?MODULE, Handler, []).
    
 unsubscribe({Handler, Args}) ->
    gen_event:delete_handler(?MODULE, Handler, Args);

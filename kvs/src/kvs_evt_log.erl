@@ -35,10 +35,13 @@
 -author(erkki.riekkola@nokia.com).
 
 %%
-%% KVS event logger
+%% Logs bucket I/O events into event log
 %%
 
 -export([
+   % api
+   config/0,
+   % gen_event
    init/1,
    handle_event/2,
    handle_call/2,
@@ -53,16 +56,28 @@
    clock         % clock
 }).
 
+config() ->
+   gen_event:call(kvs_evt, kvs_evt_log, config).  
+
+
 %%%------------------------------------------------------------------
 %%%
 %%%  gen_event
 %%%
 %%%------------------------------------------------------------------
+init([]) ->
+   {ok, 
+      #srv{
+         chunk_size = 512,
+         chunk_ttl  = 7 * 24 * 3600,
+         clock      = 0
+      }
+   };
 init([Config]) ->
    {ok, 
       #srv{
-         chunk_size = proplists:get_value(size, Config, 512),
-         chunk_ttl  = proplists:get_value(ttl,  Config, 24 * 3600),
+         chunk_size = proplists:get_value(chunk, Config, 512),
+         chunk_ttl  = proplists:get_value(ttl,   Config, 7 * 24 * 3600),
          clock      = 0
       }
    }.
@@ -71,12 +86,12 @@ handle_event({put, Bucket, Key, Item}, S) ->
    case proplists:is_defined(evtlog, Bucket) of
       true  -> 
          ChnkId = S#srv.clock div S#srv.chunk_size,
-         Chunk  = case kvs:get(kvs_evt_log, ChnkId) of
-            {error, not_found} -> [{ttl,S#srv.chunk_ttl}];
+         {chunk, TTL, Log}  = case kvs:get(kvs_evt_log, ChnkId) of
+            {error, not_found} -> {chunk, S#srv.chunk_ttl, []};
             {ok, Chnk}         -> Chnk 
          end,
          Name = proplists:get_value(name, Bucket),
-         kvs:put(kvs_evt_log, ChnkId, Chunk ++ [{S#srv.clock, put, Name, Key}]),
+         kvs:put(kvs_evt_log, ChnkId, {chunk, TTL, Log ++ [{S#srv.clock, put, Name, Key}]}),
          {ok, S#srv{clock = S#srv.clock + 1}};
       false -> 
          {ok, S}
@@ -85,12 +100,12 @@ handle_event({remove, Bucket, Key, Item}, S) ->
    case proplists:is_defined(evtlog, Bucket) of
       true  ->
          ChnkId = S#srv.clock div S#srv.chunk_size,
-         Chunk  = case kvs:get(kvs_evt_log, ChnkId) of
-            {error, not_found} -> [{ttl,S#srv.chunk_ttl}];
+         {chunk, TTL, Log}  = case kvs:get(kvs_evt_log, ChnkId) of
+            {error, not_found} -> {chunk, S#srv.chunk_ttl, []};
             {ok, Chnk}         -> Chnk 
          end,
          Name = proplists:get_value(name, Bucket),
-         kvs:put(kvs_evt_log, ChnkId, Chunk ++ [{S#srv.clock, remove, Name, Key}]),
+         kvs:put(kvs_evt_log, ChnkId, {chunk, TTL, Log ++ [{S#srv.clock, remove, Name, Key}]}),
          {ok, S#srv{clock = S#srv.clock + 1}};
       false -> 
          {ok, S}
@@ -98,6 +113,8 @@ handle_event({remove, Bucket, Key, Item}, S) ->
 handle_event(Evt, State) ->
    {ok, State}.
    
+handle_call(config, State) ->
+   {ok, {State#srv.chunk_size, State#srv.chunk_ttl, State#srv.clock}, State};
 handle_call(_Req, State) ->
    {ok, undefined, State}.
    

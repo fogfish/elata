@@ -24,6 +24,14 @@ DOCONF += \
    -e "s,@ERL@,$(ERL)," \
    -e "s,@pkgliberldir@,$(pkgliberldir)," 
 
+ifndef CCFLAGS
+  CCFLAGS =
+endif
+
+ifeq ($(BUILD),debug)
+   CCFLAGS += +debug_info -DDEBUG
+endif
+
 #
 # compile
 ebin/%.beam : src/%.erl
@@ -79,5 +87,8 @@ priv/% : priv/%.in
 	cat $^ | sed $(DOCONF) >> $@ ; \
 	chmod ugo+x $@
 
+debug:
+	$(MAKE) BUILD=debug
+
 run:
-	$(ERL) -pa ./ebin -pa ./*/ebin -pa ./priv -pa ./*/priv
+	$(ERL) -pa ./ebin -pa ../*/ebin -pa ./priv -pa ../*/priv

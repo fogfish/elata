@@ -38,13 +38,56 @@
    stop/1
 ]).
 
+-define(APPNAME,  elata_kvs).
+
 start(_Type, _Args) -> 
+   Config = config(?APPNAME, [
+      evt_log, 
+      {evt_log_ttl, 7 * 24 * 3600}, 
+      {evt_log_chunk, 128}
+   ]),
    case kvs_sup:start_link() of
       {ok, Pid} ->
+         % start system buckets
+         {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
+         {ok, _} = kvs_sys:start_link([kvs_sys_bucket]),
+         % start evt_log with default config
+         case proplists:is_defined(evt_log, Config) of
+            true  ->
+               kvs_evt_sup:subscribe({kvs_evt_log, [[
+                  {ttl,  proplists:get_value(evt_log_ttl,   Config)}, 
+                  {chunk,proplists:get_value(evt_log_chunk, Config)}
+               ]]}),
+               kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}]);
+            false ->
+               ok
+         end,
          {ok, Pid};
       Other     -> {error, Other}
    end. 
 
 stop(_State) ->
         ok.
-        
+
+%%%------------------------------------------------------------------
+%%%
+%%%  Private 
+%%%
+%%%------------------------------------------------------------------   
+config(App, List) ->
+   config(App, List, []).
+config(App, [{Key, Default} | T], Acc) ->        
+   Val = case application:get_env(App, Key) of 
+      undefined   -> Default;
+      {ok, Value} -> Value
+   end,
+   config(App, T, [{Key, Val} | Acc]);
+config(App, [Key | T], Acc) ->
+   case application:get_env(App, Key) of 
+      undefined -> config(App, T, Acc);
+      {ok, Val} -> config(App, T, [{Key, Val} | Acc])
+   end;   
+config(_, [], Acc) ->
+   Acc.
+   
+   
