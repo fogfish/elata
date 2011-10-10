@@ -64,10 +64,19 @@ init([Config]) ->
       },
       permanent, 2000, worker, dynamic
    },
+   EvtSrv = {
+      ek_evt_srv,
+      {
+         ek_evt_srv,
+         start_link,
+         []
+      },
+      permanent, 2000, worker, dynamic
+   },
    {ok,
       {
          {one_for_one, 4, 1800},
-         [Protocol, Evt]
+         [Protocol, Evt, EvtSrv]
       }
    }.
 

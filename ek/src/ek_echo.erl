@@ -30,7 +30,6 @@
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
 -module(ek_echo).
--behaviour(gen_event).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
@@ -49,7 +48,8 @@ join([Node | Peers]) ->
    [ek:connect(P) || P <- Peers],
    spawn(
       fun() ->
-         ek:subscribe("/echo"),
+         ek:monitor(),
+         ek:listen("/echo"),
          loop()
       end
    ).
@@ -69,6 +69,15 @@ loop() ->
          io:format('ping from ~p (ttl=~p)~n', [From, TTL]),
          timer:sleep(1000),
          ping(TTL + 1),
+         loop();
+      {join, Node}  ->
+         io:format('Node joined ~p~n', [Node]),
+         loop();
+      {leave, Node} ->
+         io:format('Node left ~p~n', [Node]),
+         loop();
+      ek_evt_failed ->
+         ek:monitor(),
          loop();
       Any ->
          io:format('msg: ~p~n', [Any]),

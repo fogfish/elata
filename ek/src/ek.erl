@@ -46,12 +46,15 @@
    nodes/0,
    connect/1,
    disconnect/1,
+   monitor/0,
    monitor/1,
+   demonitor/0,
+   demonitor/1,
    % messaging
    send/2,
-   
-   subscribe/1,
-   unsubscribe/1
+   multicast/2,
+   broadcast/2,
+   listen/1
 ]).
 
 
@@ -92,17 +95,18 @@ connect(Node) ->
 %% Forces to disconnect node
 disconnect(Node) ->
    {error, not_implemented}.
-   
-%%
-%% monitor a node
-monitor(Node) ->
-   case ets:lookup(ek_nodes, Node) of
-      [{Node, Pid}] ->
-         erlang:monitor(process, Pid);
-      _             ->
-         {error, not_found}
-   end.
 
+%%
+%% monitor/demonitor cluster events
+monitor() ->
+   ek_evt_srv:subscribe(self()).
+monitor(EvtHandler) ->
+   ek_evt:subscribe(EvtHandler).
+
+demonitor() ->
+   ek_evt_srv:unsubscribe(self()).
+demonitor(EvtHandler) ->
+   ek_evt:unsubscribe(EvtHandler).
    
 %%
 %% send a message to node
@@ -111,14 +115,22 @@ send(Uri, Msg) ->
 
 multicast(Uris, Msg) ->
    ek_prot:multicast(Uris, Msg).
-   
+
+broadcast(EP, Msg) ->
+   lists:foreach(
+      fun(N) ->
+         Uri = N ++ EP,
+         ek_prot:send(Uri, Msg)
+      end,
+      ek:nodes()
+   ).
    
 %%
 %% subscribe
-subscribe(Path) ->
-   ets:insert(ek_dispatch, {list_to_binary(Path), self()}).
+listen(Path) ->
+   ets:insert(ek_dispatch, {list_to_binary(Path), self()});
 
-unsubscribe(Path) ->
+listen({drop, Path}) ->
    ets:delete_object(ek_dispath, {list_to_binary(Path), self()}).
    
    

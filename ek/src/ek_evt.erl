@@ -33,13 +33,13 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Erlang Cluster Events
+%% Erlang Cluster Events (based on gen_event framework)
 %%
 
 %% Public API
 -export([
    start_link/0,
-   subscribe/1,
+   subscribe/1,                                    
    unsubscribe/1,
    join/1,
    leave/1
@@ -60,8 +60,11 @@ unsubscribe(Handler) ->
    
    
 join(Node) ->
+   % relay notification to srv
+   ek_evt_srv:join(Node),
    gen_event:notify(?MODULE, {join, Node}).
    
 leave(Node) ->
+   ek_evt_srv:leave(Node),
    gen_event:notify(?MODULE, {leave, Node}).
       
