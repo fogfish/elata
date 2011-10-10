@@ -42,22 +42,23 @@
 % TODO: automatic discovery of node name/ip address
 
 -define(APPNAME,  elata_ek).
--define(NODE,     "ws://localhost:8080"). 
 
-start(_Type, Args) -> 
+start(_Type, _Args) -> 
    % Config
-   Config = config(?APPNAME, Args, [{node, ?NODE}, proxy]),
+   Config = config(?APPNAME, [node, proxy, {node_sup, ek_node_sup}]),
    case ek_sup:start_link(Config) of
       {ok, Pid} ->% create a node registry
          ets:new(ek_nodes, [public, named_table, {keypos, 2}]),
          % create a message dispatch table
          ets:new(ek_dispatch, [public, named_table, bag]),
          % listen incomming connections
-         Node = proplists:get_value(node, Config),
-         ek_ws_sup:listen(Node),
+         {ok, _} = case proplists:get_value(node, Config) of
+            undefined -> {ok, self()};
+            Node      -> ek_ws_sup:listen(Node)
+         end,
          % start node supervisor
-         NodeSup = proplists:get_value(node_sup, Config, ek_node_sup),
-         ek_evt:subscribe(ek_node_sup),
+         NodeSup = proplists:get_value(node_sup, Config),
+         ek_evt:subscribe(NodeSup),
          {ok,Pid};
       Other     -> {error, Other}
    end. 
@@ -72,30 +73,19 @@ stop(_State) ->
 %%%
 %%%------------------------------------------------------------------   
 
-%%
-%% merges default, sys.config and application configurations
-config(App, DList, List) ->
-   config(App, DList, List, []).
-
-config(App, DList, [{Key, Default} | T], Acc) ->
-   AppCfgVal = case application:get_env(App, Key) of 
+config(App, List) ->
+   config(App, List, []).
+config(App, [{Key, Default} | T], Acc) ->        
+   Val = case application:get_env(App, Key) of 
       undefined   -> Default;
       {ok, Value} -> Value
    end,
-   Val = proplists:get_value(Key, DList, AppCfgVal),
-   config(App, DList, T, [{Key, Val} | Acc]);
-
-config(App, DList, [Key | T], Acc) ->
-   AppCfgVal = case application:get_env(App, Key) of 
-      undefined   -> undefined;
-      {ok, Value} -> Value
-   end,
-   Val = proplists:get_value(Key, DList, AppCfgVal),
-   case Val of 
-      undefined   -> config(App, T, Acc);
-      _           -> config(App, T, [{Key, Val} | Acc])
-   end;
-   
-config(_App, DList, [], Acc) ->
+   config(App, T, [{Key, Val} | Acc]);
+config(App, [Key | T], Acc) ->
+   case application:get_env(App, Key) of 
+      undefined -> config(App, T, Acc);
+      {ok, Val} -> config(App, T, [{Key, Val} | Acc])
+   end;   
+config(_, [], Acc) ->
    Acc.
-   
+

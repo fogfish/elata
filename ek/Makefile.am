@@ -32,11 +32,12 @@ EINC = \
    include/ek.hrl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
-#EBIN += ebin/elata_ek.app
+EBIN += ebin/elata_ek.app
 
 nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC)
 CLEANFILES = $(EBIN)
 EXTRA_DIST = $(ESRC)
+
 
 include $(top_builddir)/Makefile.erlang
 

@@ -62,7 +62,14 @@
 %% starts cluster management application
 %% Node - list(), local node identity, uri (e.g. node://168.192.0.1:8080).
 start(Node) ->
-   ek_app:start(permanent, [{node, Node}]).
+   {ok, _} = case erlang:whereis(ek_sup) of
+      undefined -> ek_app:start(permanent, []);
+      Pid       -> {ok, Pid}
+   end,
+   case ek:node() of
+      undefined -> {ok, _} = ek_ws_sup:listen(Node);
+      Uri       -> {error, {already_exists, Uri}}
+   end.
            
 %%-------------------------------------------------------------------
 %%
@@ -73,8 +80,11 @@ start(Node) ->
 %%
 %% Name of itself
 node() ->
-    [Node] = ets:match_object(ek_nodes, {ek_node, '_', self}),
-    Node#ek_node.uri.
+    case ets:match_object(ek_nodes, {ek_node, '_', self}) of
+       []     -> undefined;
+       [Node] -> Node#ek_node.uri;
+       List   -> lists:map(fun(N) -> N#ek_node.uri end, List)
+    end.
    
 %%
 %% Retrive list of connected nodes
@@ -127,10 +137,12 @@ broadcast(EP, Msg) ->
    
 %%
 %% subscribe
-listen(Path) ->
-   ets:insert(ek_dispatch, {list_to_binary(Path), self()});
-
 listen({drop, Path}) ->
-   ets:delete_object(ek_dispath, {list_to_binary(Path), self()}).
+   ets:delete_object(ek_dispatch, {list_to_binary(Path), self()});
+   
+listen(Path) ->
+   ets:insert(ek_dispatch, {list_to_binary(Path), self()}).
+
+
    
    

@@ -48,7 +48,6 @@
 
 
 %% TODO:
-%%   - message queue
 %%   - message separator
 
 
@@ -68,17 +67,26 @@
 ]).
 
 -record(fsm, {
-   passive,     % flag indicates that connection is established by remote peer  
    node,        % remote peer id
    config,      % cluster configuration
    sock,        % remote peer socket
    q            % message queue 
 }).
+
 -define(SOCK_OPTS, [{active, true}, {mode, binary}]).
 
 -define(T_TCP_SOCK_CON,  20000).  %% timer for tcp socket connection
 -define(T_WEB_SOCK_CON,  20000).  %% timer for web socket connection
 -define(T_PEER_INACTIVE, 60000).  %% timer to node reconnect
+
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report(M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
+
 
 %%
 %%
@@ -98,15 +106,14 @@ init([Config, {listen, Uri}]) ->
    ets:insert(ek_nodes, #ek_node{uri=Uri, pid=self}),
    {ok, 
       'LISTEN', 
-      #fsm{
-         passive = true, 
-         node    = undefined,
-         config  = Config, 
-         sock    = Sock,
-         q       = []
-      }, 
-      0   %% timeout jumps to accept
-   };
+       #fsm{
+          node    = undefined,
+          config  = Config, 
+          sock    = Sock,
+          q       = []
+       }, 
+       0   %% timeout jumps to accept
+    };
    
 init([Config, {accept, Sock}]) ->
    % incomming connection has been established, 
@@ -115,7 +122,6 @@ init([Config, {accept, Sock}]) ->
    {ok, 
       'LISTEN', 
       #fsm{
-         passive = true, 
          node    = undefined,
          config  = Config, 
          sock    = Sock,
@@ -125,12 +131,10 @@ init([Config, {accept, Sock}]) ->
    };
 
 init([Config, {connect, Node}]) ->
-   io:format('connecting ~p ~p~n', [Node, self()]),
    % connect request is instantiated
    {ok,
       'CONNECTING',
       #fsm{
-         passive = false, 
          node    = Node,
          config  = Config, 
          sock    = undefined,
@@ -151,6 +155,7 @@ init([Config, {connect, Node}]) ->
       false ->
          % initiate connection with remote peer
          {Host, Port, Msg} = ws_con_req(State#fsm.node, State#fsm.config),
+         ?DEBUG([connecting, {node, State#fsm.node}]),
          case gen_tcp:connect(Host, Port, ?SOCK_OPTS, ?T_TCP_SOCK_CON) of
             {ok, Sock}  ->
                % socket connected, send a message
@@ -230,22 +235,23 @@ handle_sync_event(_Req, _From, Name, State) ->
 %% Handle incoming socket data 
 %%
 %%-------------------------------------------------------------------
-handle_info({tcp, Sock, Data}, 'HANDSHAKE', State) ->
+handle_info({tcp, _Sock, Data}, 'HANDSHAKE', State) ->
    % parse incoming indication
    case ws_con_ind(Data) of
       {ok,  Node} ->
          % accept connection request from remote peer
          gen_tcp:send(State#fsm.sock, ws_con_rsp()),
-         ws_connect_peer(State#fsm.passive, Node),
-         error_logger:info_report([join, {Node, self()}]),
+         ws_connect_peer(Node),
+         ?DEBUG([join, {Node, self()}]),
          {next_state, 'CONNECTED', State#fsm{node = Node}};
       ok          ->
          % peer is connected
-         ws_connect_peer(State#fsm.passive, State#fsm.node),
-         error_logger:info_report([join, {State#fsm.node, self()}]),
+         ws_connect_peer(State#fsm.node),
+         ?DEBUG([join, {State#fsm.node, self()}]),
          {next_state, 'CONNECTED', State};
       {error, {already_exists, Node}} ->
          % decline connection request from peer
+         gen_tcp:send(State#fsm.sock, ws_con_err()),
          error_logger:error_report([already_exists, {Node, self()}]),
          {stop, {error, already_exists}, State};
       {error, Err}      ->
@@ -253,10 +259,10 @@ handle_info({tcp, Sock, Data}, 'HANDSHAKE', State) ->
          error_logger:error_report([declined, {State#fsm.node, self()}]),
          {stop, {error, Err}, State}
    end;
-handle_info({tcp, Sock, Data}, 'CONNECTED', State) ->
+handle_info({tcp, _Sock, Data}, 'CONNECTED', State) ->
    ek_prot:recv(Data),
    {next_state, 'CONNECTED', State};
-handle_info({tcp, Sock, Data}, Name, State) ->
+handle_info({tcp, _Sock, _Data}, Name, State) ->
    {next_state, Name, State};   
 
 %%-------------------------------------------------------------------   
@@ -267,13 +273,13 @@ handle_info({tcp, Sock, Data}, Name, State) ->
    
 %%
 %% Sock closed
-handle_info({tcp_closed, Sock}, Name, State) ->
+handle_info({tcp_closed, _Sock}, _Name, State) ->
    {stop, {error, tcp_closed}, State};
    
 %%
 %% Sock error
-handle_info({tcp_error, Sock, Reason}, Name, State) ->
-   {stop, {error, tcp_error}, State};   
+handle_info({tcp_error, _Sock, Reason}, _Name, State) ->
+   {stop, {error, {tcp_error, Reason}}, State};   
    
 handle_info(_Msg, Name, State) ->
    {next_state, Name, State}.
@@ -281,6 +287,11 @@ handle_info(_Msg, Name, State) ->
 %% 
 %% terminate
 terminate(normal, Name, State) ->
+   ?DEBUG([
+      {error, normal},
+      {state, Name},
+      {node, State#fsm.node}
+   ]),
    ets:delete(ek_nodes, State#fsm.node),
    ek_evt:leave(State#fsm.node),
    ok;
@@ -327,7 +338,7 @@ ws_check_peer(Node) ->
          end
    end.
    
-ws_connect_peer(Passive, Node) ->
+ws_connect_peer(Node) ->
    % Hanshake is over
    ek_evt:join(Node),
    ets:insert(ek_nodes, #ek_node{uri=Node, pid=self()}).
@@ -392,16 +403,16 @@ ws_con_ind(<<"GET / HTTP/1.1\r\n", Rest/binary>>) ->
       false -> {ok, Node}
    end;
    
-ws_con_ind(<<"HTTP/1.1 101 Switching Protocols\r\n", Rest/binary>>) ->   
+ws_con_ind(<<"HTTP/1.1 101 Switching Protocols\r\n", _/binary>>) ->   
    ok;
-ws_con_ind(<<"HTTP/1.1 500 Internal Server Error\r\n", Rest/binary>>) ->
+ws_con_ind(<<"HTTP/1.1 500 Internal Server Error\r\n", _/binary>>) ->
    {error, 500}.
 
 %%
 %%
-get_peer(<<"Peer: ", Str/binary>>, State, Acc) ->
+get_peer(<<"Peer: ", Str/binary>>, _State, _Acc) ->
    get_peer(Str, peer, <<>>);
-get_peer(<<"\r\n", Str/binary>>, peer, Acc) ->
+get_peer(<<"\r\n", _/binary>>, peer, Acc) ->
    binary_to_list(Acc);
 get_peer(<<H:8, T/binary>>, State, Acc) ->
    get_peer(T, State, <<Acc/binary, H>>).
