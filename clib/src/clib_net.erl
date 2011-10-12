@@ -30,6 +30,7 @@
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
 -module(clib_net).
+-author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
@@ -43,6 +44,7 @@
 %% 
 
 -export([
+   uri_parse/2,
    tcp_connect/2,
    tcp_close/2,
    ssl_connect/2,
@@ -50,9 +52,14 @@
 ]).
 
 %%
+%% Uri Parser
+uri_parse([Uri], _) ->
+   {ok, [ek_uri:new(Uri)]}.
+
+%%
 %% Establish TCP/IP connection, and measure its latency
-tcp_connect([Uri],     _) when is_list(Uri) ->
-   tcp_connect([ek_uri:new(Uri), []], {});
+tcp_connect([Uri],     _)  ->
+   tcp_connect([Uri, []], undefined);
 tcp_connect([Uri, Ds], _) ->
    {Ttcp, {ok, Tcp}} = timer:tc(
       gen_tcp, 

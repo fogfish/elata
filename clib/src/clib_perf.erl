@@ -29,6 +29,37 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(clib_http).
+-module(clib_perf).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
+
+%%
+%% Latency measurment strategy
+%%
+
+-export([
+   net/1
+]).
+
+
+%%
+%% Measures network latency
+net(X) ->
+   {ok, [Uri | _]} = clib:seq([fun clib_net:uri_parse/2], [X]),
+   {ok, [_,  Raw]} = case proplists:get_value(schema, Uri) of
+      tcp -> 
+         clib:seq([
+            fun clib_net:tcp_connect/2, 
+            fun clib_net:tcp_close/2
+         ], [Uri]);
+      ssl -> 
+         clib:seq([
+            fun clib_net:tcp_connect/2, 
+            fun clib_net:ssl_connect/2, 
+            fun clib_net:ssl_close/2
+         ], [Uri])
+   end,
+   {ok, [X, Raw]}.
+
+
+

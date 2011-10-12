@@ -18,7 +18,8 @@ SUBDIRS = test
 ESRC = \
    src/clib.erl \
    src/clib_net.erl \
-   src/clib_http.erl
+   src/clib_http.erl \
+   src/clib_perf.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 

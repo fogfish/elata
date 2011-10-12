@@ -34,20 +34,27 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -export([
+   seq/2,
    seq/3
 ]).
 
 
 %%
 %% Sequence a function chain
-seq([], In, State) -> In;
+seq(Seq, In) ->
+   seq(Seq, In, undefined).
+seq([], In, State) -> {ok, In};
 seq([{Mod, Fun} | T], In, State) ->
    case Mod:Fun(In, State) of
+      ok           -> seq(T, In, State);
+      {ok, Out}    -> seq(T, Out, State);
       {ok, [],  S} -> seq(T, In,  S);
       {ok, Out, S} -> seq(T, Out, S)
    end;
 seq([Fun | T], In, State) ->
    case Fun(In, State) of
+      ok           -> seq(T, In, State);
+      {ok, Out}    -> seq(T, Out, State);
       {ok, [],  S} -> seq(T, In,  S);
       {ok, Out, S} -> seq(T, Out, S)
    end.
