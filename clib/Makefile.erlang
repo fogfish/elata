@@ -80,4 +80,4 @@ priv/% : priv/%.in
 	chmod ugo+x $@
 
 run:
-	$(ERL) -pa ./ebin -pa ./*/ebin -pa ./priv -pa ./*/priv
+	$(ERL) -pa ./ebin -pa ../*/ebin -pa ./priv -pa ../*/priv

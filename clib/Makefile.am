@@ -16,11 +16,11 @@
 SUBDIRS = test
 
 ESRC = \
-   src/job_uri.erl \
-   src/job_script.erl
+   src/clib.erl \
+   src/clib_net.erl \
+   src/clib_http.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
-#EBIN += ebin/elata_job.app
 
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)
