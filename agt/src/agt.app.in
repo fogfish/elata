@@ -29,7 +29,8 @@
             ssl,
             inets,
             ek,
-            kvs
+            kvs,
+            clib
          ]
       },
       {mod, {agt_app, []}}

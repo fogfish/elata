@@ -22,6 +22,7 @@ ESRC = \
    src/clib_perf.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
+EBIN += ebin/clib.app
 
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)

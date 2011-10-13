@@ -14,6 +14,12 @@
 #   under the License.
 #
 
+#
+# Start-up script for Erlang Latency Agent
+# $1 - action start/stop etc.
+
+# 1. We have to re-base an path to Erlang run-time.
+# path within erl script reflects build machine
 ROOT=`pwd`
 ERTS=`ls $ROOT | grep erts`
 ERL=$ROOT/$ERTS/bin/erl
@@ -30,15 +36,18 @@ SCRIPT=`basename $0`
 TOERL=$ROOT/$ERTS/bin/to_erl
 RUNERL=$ROOT/$ERTS/bin/run_erl
 
+#detect node name (same as release name)
+NODE=`ls releases/*.rel | sed -n "s,releases/\(.*\)\.rel,\1,p"`
+
 case "$1" in
     start)
         if [ "$(ls -A $PIPEDIR)" ]; then
             echo "Agent is already running"
-	else
+	     else
             $RUNERL -daemon $PIPEDIR/ $LOGDIR/ \
-                "$ERL -sname @PKG@ \
+                "$ERL -sname $NODE \
                 -boot $ROOT/releases/@VSN@/start \
-                -config $ROOT/lib/@PKG@-@VSN@/priv/sys"
+                -config $ROOT/releases/@VSN@/sys"
             echo "OK"
         fi
         ;;
@@ -54,7 +63,7 @@ case "$1" in
 
     attach)
         if [ "$(ls -A $PIPEDIR)" ]; then
-	    exec $TOERL $PIPEDIR/
+	         exec $TOERL $PIPEDIR/
         else
             echo "Agent is not running"
         fi

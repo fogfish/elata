@@ -13,7 +13,7 @@
 %%     under the License.
 %%
 {release,
-   {"elata_agt", "@VSN@"},
+   {"agt", "@VSN@"},
    {erts,  "5.8.3"},
    [                                          
       {kernel, "2.14.3"},
@@ -27,6 +27,7 @@
       {webmachine, "1.8.1"},
       {ek,  "0.1.0"},
       {kvs, "0.2.0"},
+      {clib,"0.1.0"},
       {agt, "@VSN@"}
    ]
 }.

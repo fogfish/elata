@@ -222,7 +222,7 @@ ESRC = \
    src/clib_http.erl \
    src/clib_perf.erl
 
-EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
+EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) ebin/clib.app
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)
 EXTRA_DIST = $(ESRC)

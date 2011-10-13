@@ -659,7 +659,10 @@ uninstall-am:
 
 rel: $(SRC)
 
-include $(top_builddir)/Makefile.erlang
+rel-clean:
+	rm $(SRC)
+
+include $(top_builddir)/Makefile.rel
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

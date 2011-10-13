@@ -20,5 +20,8 @@ SRC  = agt-$(VERSION).tgz
 
 rel: $(SRC)
 
-include $(top_builddir)/Makefile.erlang
+rel-clean:
+	rm $(SRC)
+
+include $(top_builddir)/Makefile.rel
 
