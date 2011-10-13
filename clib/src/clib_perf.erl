@@ -38,13 +38,16 @@
 %%
 
 -export([
-   net/1
+   net/1,
+   net/2
 ]).
 
 
 %%
 %% Measures network latency
 net(X) ->
+   net(X, undefined).
+net(X, _) ->
    {ok, [Uri | _]} = clib:seq([fun clib_net:uri_parse/2], [X]),
    {ok, [_,  Raw]} = case proplists:get_value(schema, Uri) of
       tcp -> 

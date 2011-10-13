@@ -34,7 +34,7 @@ ESRC = \
 
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
-EBIN += ebin/elata_kvs.app
+EBIN += ebin/kvs.app
 
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)

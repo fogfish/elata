@@ -50,12 +50,12 @@ ebin/%.script:
 
 ebin/%.boot : ebin/%.rel
 	l=`cat $^ | sed -n -e 's|.*{\([a-z]*\),.*|\1|p'` ; \
-	for d in $$l ; do f="$$f -pa ../$$d -pa ../$$d/ebin"; done; \
+	for d in $$l ; do f="$$f -pa ./$$d -pa ./$$d/ebin"; done; \
 	$(ERLC) $(CCFLAGS) $$f -o ebin $<
 
-ebin/%.tar.gz : ebin/%.rel $(ESRC) $(EBIN)
+ebin/%.tar.gz : ebin/%.rel ebin/%.boot
 	l=`cat $< | sed -n -e 's|.*{\([a-z]*\),.*|\1|p'` ; \
-	for d in $$l ; do f="$$f -pa ../$$d -pa ../$$d/ebin"; done; \
+	for d in $$l ; do f="$$f -pa ./$$d -pa ./$$d/ebin"; done; \
 	n=`echo $< | sed -n -e 's|ebin/\(.*\).rel|"ebin/\1"|p'` ; \
 	$(ERL) -noshell $$f -eval "systools:make_tar($$n, [{dirs, [src]}, {erts, code:root_dir()}]),halt(0)" ; \
 

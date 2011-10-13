@@ -233,8 +233,7 @@ ESRC = \
    src/kvs_sync.erl \
    src/kvs_app.erl
 
-EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
-	ebin/elata_kvs.app
+EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) ebin/kvs.app
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)
 EXTRA_DIST = $(ESRC)

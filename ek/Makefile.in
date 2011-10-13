@@ -232,8 +232,7 @@ ESRC = \
 EINC = \
    include/ek.hrl
 
-EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
-	ebin/elata_ek.app
+EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) ebin/ek.app
 nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC)
 CLEANFILES = $(EBIN)
 EXTRA_DIST = $(ESRC)

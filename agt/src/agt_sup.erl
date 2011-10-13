@@ -29,53 +29,31 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(elata_agt_app).
--behaviour(application).
+-module(agt_sup).
+-behaviour(supervisor).
 -author(dmitry.kolesnikov@nokia.com).
 
 -export([
-   start/2,
-   stop/1
+   start_link/1,
+   init/1
 ]).
 
-%%%------------------------------------------------------------------   
-%%% Default Config
-%%%------------------------------------------------------------------   
--define(APPNAME,  elata_agt).
--define(PORT,     8080).  
-
-%%
-%% start application
-start(_Type, _Args) ->
-   {ok, Config} = config(),
-   boot_storage(Config),
-   elata_agt_sup:start_link(Config).
+start_link(Config)->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
-stop(_State) ->
-   ok.
-   
-%%%------------------------------------------------------------------   
-%%%
-%%% Private Functions
-%%%
-%%%------------------------------------------------------------------   
-
-%% read application config key
-get_conf(Key, Default) ->
-   case application:get_env(?APPNAME, Key) of 
-      undefined   -> Default;
-      {ok, Value} -> Value
-   end.
-   
-%% return an application configuration
-config() ->
-   {ok, [
-      {port,   get_conf(port,   ?PORT)}
-   ]}.
-   
-%% boot application storage   
-boot_storage(_Config) ->
-   kvs_bucket:define(elata_job,   [{storage, agt_job_sup}]),
-   kvs_bucket:define(elata_telemetry, [{storage, kvs_sys}]),
-   kvs_bucket:define(elata_document,  [{storage, kvs_sys}]),
-   ok.
+init([Config]) ->
+   AgtJobSup = {
+      agt_job_sup,
+      {
+         agt_job_sup,
+         start_link,
+         [proplists:get_value(worker, Config)]
+      },
+      permanent, 1000, supervisor, dynamic
+   }, 
+   {ok,
+      {
+         {one_for_one, 4, 3600},
+         []
+      }
+   }.

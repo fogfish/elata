@@ -15,26 +15,30 @@
 SUBDIRS = test
 
 ESRC = \
-   src/elata_agt.erl \
-   src/elata_agt_app.erl \
-   src/elata_agt_sup.erl \
-   src/agt_job.erl \
-   src/agt_job_sup.erl
-   
-#src/agt_rest_api.erl
+   src/agt.erl \
+   src/agt_app.erl \
+   src/agt_sup.erl \
+   src/agt_proc.erl \
+   src/agt_proc_sup.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 EBIN += \
    priv/sys.config \
    priv/elata_agt \
-   ebin/elata_agt.app \
-   ebin/elata_agt.rel \
-   ebin/elata_agt.script \
-   ebin/elata_agt.boot
+   ebin/agt.app
 
-nobase_pkgliberl_SCRIPTS = $(EBIN) $(ESRC) $(distdir).tgz
-CLEANFILES = $(EBIN) $(distdir).tgz 
+#   ebin/elata_agt.rel \
+#   ebin/elata_agt.script \
+#   ebin/elata_agt.boot
+
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(ESRC)
+#nobase_pkgliberl_SCRIPTS = $(EBIN) $(ESRC) $(distdir).tgz
+CLEANFILES = $(EBIN) 
+#CLEANFILES = $(EBIN) $(distdir).tgz 
 EXTRA_DIST = $(ESRC)
+
+rel: $(distdir).tgz ebin/agt.boot
+
 
 include $(top_builddir)/Makefile.erlang
 

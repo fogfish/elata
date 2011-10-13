@@ -216,19 +216,22 @@ top_srcdir = @top_srcdir@
 #
 SUBDIRS = test
 ESRC = \
-   src/elata_agt.erl \
-   src/elata_agt_app.erl \
-   src/elata_agt_sup.erl \
-   src/agt_job.erl \
-   src/agt_job_sup.erl
+   src/agt.erl \
+   src/agt_app.erl \
+   src/agt_sup.erl \
+   src/agt_proc.erl \
+   src/agt_proc_sup.erl
 
-
-#src/agt_rest_api.erl
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
-	priv/sys.config priv/elata_agt ebin/elata_agt.app \
-	ebin/elata_agt.rel ebin/elata_agt.script ebin/elata_agt.boot
-nobase_pkgliberl_SCRIPTS = $(EBIN) $(ESRC) $(distdir).tgz
-CLEANFILES = $(EBIN) $(distdir).tgz 
+	priv/sys.config priv/elata_agt ebin/agt.app
+
+#   ebin/elata_agt.rel \
+#   ebin/elata_agt.script \
+#   ebin/elata_agt.boot
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(ESRC)
+#nobase_pkgliberl_SCRIPTS = $(EBIN) $(ESRC) $(distdir).tgz
+CLEANFILES = $(EBIN) 
+#CLEANFILES = $(EBIN) $(distdir).tgz 
 EXTRA_DIST = $(ESRC)
 all: all-recursive
 
@@ -740,6 +743,8 @@ uninstall-am: uninstall-nobase_pkgliberlSCRIPTS
 	mostlyclean-generic pdf pdf-am ps ps-am tags tags-recursive \
 	uninstall uninstall-am uninstall-nobase_pkgliberlSCRIPTS
 
+
+rel: $(distdir).tgz ebin/agt.boot
 
 include $(top_builddir)/Makefile.erlang
 

@@ -29,40 +29,61 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(elata_agt_sup).
--behaviour(supervisor).
+-module(agt_app).
+-behaviour(application).
 -author(dmitry.kolesnikov@nokia.com).
 
 -export([
-   start_link/1,
-   init/1
+   start/2,
+   stop/1
 ]).
 
-start_link(Config)->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
+%%%------------------------------------------------------------------   
+%%% Default Config
+%%%------------------------------------------------------------------   
+-define(APPNAME,  elata_agt).
+
+%%
+%% start application
+start(_Type, _Args) ->
+   Config = config(?APPNAME, []),
+   case agt_sup:start_link(Config) of
+      {ok, Pid} ->
+         % bucket to keep a definition of jobs
+         kvs_bucket:define(bckt_proc, [{storage, agt_proc_sup}]),
+         % bucket to keep raw telemetry 
+         kvs_bucket:define(bckt_ds,   [{storage, kvs_sys}, event, evtlog]),
+         % bucket to keep documents
+         kvs_bucket:define(bckt_doc,  [{storage, kvs_sys}, event, evtlog]),
+         {ok, Pid};
+      Other     -> 
+         {error, Other}
+   end.
    
-init([Config]) ->
-   AgtWrkSup = {
-      agt_wrk_sup,
-      {
-         agt_wrk_sup,
-         start_link,
-         [proplists:get_value(worker, Config)]
-      },
-      permanent, 1000, supervisor, dynamic
-   },
-   WebAppApi = {
-      web_app_api,
-      {
-         restd_sup,
-         start_link,
-         [proplists:get_value(port, Config), agt_rest_api]
-      },
-      permanent, 1000, supervisor, dynamic
-   }, 
-   {ok,
-      {
-         {one_for_one, 4, 3600},
-         []
-      }
-   }.
+stop(_State) ->
+   ok.
+   
+   
+   
+   
+%%%------------------------------------------------------------------   
+%%%
+%%% Private Functions
+%%%
+%%%------------------------------------------------------------------   
+config(App, List) ->
+   config(App, List, []).
+config(App, [{Key, Default} | T], Acc) ->        
+   Val = case application:get_env(App, Key) of 
+      undefined   -> Default;
+      {ok, Value} -> Value
+   end,
+   config(App, T, [{Key, Val} | Acc]);
+config(App, [Key | T], Acc) ->
+   case application:get_env(App, Key) of 
+      undefined -> config(App, T, Acc);
+      {ok, Val} -> config(App, T, [{Key, Val} | Acc])
+   end;   
+config(_, [], Acc) ->
+   Acc.
+

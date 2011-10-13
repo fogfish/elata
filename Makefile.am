@@ -14,5 +14,11 @@
 #  under the License.
 #
 
-SUBDIRS = kvs rest tsa agt be fe
+SUBDIRS = ek kvs agt
+
+SRC  = agt-$(VERSION).tgz
+
+rel: $(SRC)
+
+include $(top_builddir)/Makefile.erlang
 

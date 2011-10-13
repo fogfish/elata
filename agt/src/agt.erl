@@ -29,78 +29,18 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(agt_job_sup).
+-module(agt).
 -author(dmitry.kolesnikov@nokia.com).
 
--behaviour(supervisor).
--behaviour(gen_kvs_bucket).
+-export([start/0]).
 
-%%%
-%%% ELATA Job Factory
-%%%
-
-
--export([
-   % supervisor
-   start_link/0,
-   init/1,
-   % gen_kvs_domain
-   construct/1,
-   config/0,
-   put/3,
-   has/2,
-   get/2,
-   remove/2
-]).
-
-%%%------------------------------------------------------------------
-%%%
-%%% Supervisor
-%%%
-%%%------------------------------------------------------------------
-start_link() ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-   
-init([]) ->
-   Process = {
-      kvs_ets,       % child id
-      {
-         agt_job,    % Mod
-         start_link, % Fun
-         []          % Args
-      },
-      transient, 2000, worker, dynamic 
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.
-
-%%%------------------------------------------------------------------
-%%%
-%%% gen_kvs_entity
-%%%
-%%%------------------------------------------------------------------
-construct([Bucket]) ->
-   % nothing to do, it is called from kvs_bucket
-   {ok, self()};
-construct([Bucket, Key, Item]) ->
-   supervisor:start_child(?MODULE, [Bucket, Key, Item]).
-
-config() ->
-   [supervise, keyspace].
-
-put(Pid, Key, Item) ->
-   gen_server:call(Pid, {kvs_put, Key, Item}).
-   
-has(Pid, Key) ->
-   gen_server:call(Pid, {kvs_has, Key}).
-   
-get(Pid, Key) ->
-   gen_server:call(Pid, {kvs_get, Key}).
-   
-remove(Pid, Key) ->
-   gen_server:cast(Pid, {kvs_remove, Key}).
-      
+start() ->
+   {file, Module} = code:is_loaded(?MODULE),
+   AppFile = filename:dirname(Module) ++ "/" ++ atom_to_list(?MODULE) ++ ".app",
+   {ok, [{application, _, List}]} = file:consult(AppFile), 
+   Apps = proplists:get_value(applications, List, []),
+   lists:foreach(
+      fun(X) -> application:start(X) end,
+      Apps
+   ),
+   application:start(?MODULE).

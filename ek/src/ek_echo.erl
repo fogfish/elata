@@ -40,7 +40,9 @@
 -export([
    % echo api
    join/1,
-   ping/0
+   ping/0,
+   proc/1,
+   pow2/1
 ]).
 
 join([Node | Peers]) ->
@@ -62,6 +64,11 @@ ping(TTL) ->
    Node  = lists:nth(Index, Nodes),
    ek:send(Node ++ "/echo", {ping, ek:node(), TTL}).
 
+proc(F) ->   
+   Nodes = ek:nodes(),   
+   Index = random:uniform(length(Nodes)), 
+   Node  = lists:nth(Index, Nodes),
+   ek:send(Node ++ "/echo", {proc, F}).
    
 loop() ->
    receive
@@ -69,6 +76,10 @@ loop() ->
          io:format('ping from ~p (ttl=~p)~n', [From, TTL]),
          timer:sleep(1000),
          ping(TTL + 1),
+         loop();
+      {proc, F} ->
+         X = random:uniform(100),
+         io:format('proc: F(~p) = ~p  (~p)~n', [X, F(X), F]),
          loop();
       {join, Node}  ->
          io:format('Node joined ~p~n', [Node]),
@@ -85,3 +96,5 @@ loop() ->
    end.
          
    
+   
+pow2(X) -> X*X.   
