@@ -36,5 +36,5 @@
 
 -record(ek_node, {
    uri,   %% node uri
-   pid    %% node transport management process 
+   pid    %% node management process 
 }).

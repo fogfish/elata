@@ -41,24 +41,29 @@
 
 % TODO: automatic discovery of node name/ip address
 
--define(APPNAME,  elata_ek).
+-define(APPNAME,  ek).
 
-start(_Type, _Args) -> 
+start(_Type, Args) -> 
    % Config
-   Config = config(?APPNAME, [node, proxy, {node_sup, ek_node_sup}]),
+   DefNodeSup = proplists:get_value(node_sup, Args, ek_node_sup),
+   DefNode    = proplists:get_value(node,     Args, undefined),
+   Config = config(?APPNAME, [{node, DefNode}, nodes, proxy, {node_sup, DefNodeSup}]),
+   % create a node registry
+   ets:new(ek_nodes, [public, named_table, {keypos, 2}]),
+   % create a message dispatch table
+   ets:new(ek_dispatch, [public, named_table, bag]),
    case ek_sup:start_link(Config) of
-      {ok, Pid} ->% create a node registry
-         ets:new(ek_nodes, [public, named_table, {keypos, 2}]),
-         % create a message dispatch table
-         ets:new(ek_dispatch, [public, named_table, bag]),
-         % listen incomming connections
-         {ok, _} = case proplists:get_value(node, Config) of
-            undefined -> {ok, self()};
-            Node      -> ek_ws_sup:listen(Node)
-         end,
+      {ok, Pid} ->
          % start node supervisor
-         NodeSup = proplists:get_value(node_sup, Config),
-         ek_evt:subscribe(NodeSup),
+         % case proplists:get_value(node_sup, Config) of
+         %   false   -> ok;
+         %   NodeSup -> ek_evt:subscribe(NodeSup)
+         % end,
+         % initiate connections to nodes defined in config
+         lists:foreach(
+            fun ek:connect/1, 
+            proplists:get_value(nodes, Config, [])
+         ),
          {ok,Pid};
       Other     -> {error, Other}
    end. 

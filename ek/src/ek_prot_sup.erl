@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All Rights Reserved.
+%%   All rights reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,51 +29,43 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(ek_node_sup).
--behaviour(gen_event).
+-module(ek_prot_sup).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% Observes node connection and restart, if it is broken
-%%
+-behaviour(supervisor).
 
 -export([
-   % gen_event
-   init/1,
-   handle_event/2,
-   handle_call/2,
-   handle_info/2,
-   terminate/2,                      
-   code_change/3
+   % supervisor
+   start_link/1,
+   init/1,                    
+   % api
+   create/1
 ]).
 
-
+create(Node) ->
+   supervisor:start_child(?MODULE, [Node]).
+   
 %%%------------------------------------------------------------------
 %%%
-%%%  gen_event
+%%% Supervisor
 %%%
 %%%------------------------------------------------------------------
-init([]) ->
-   {ok, []}.
+start_link(Config) ->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
-handle_event({join, Node}, S) -> 
-   {ok, proplists:delete(Node, S)};
-handle_event({leave, Node}, S) ->
-   Cnt  = proplists:get_value(Node, S, 0),
-   Wait = erlang:round(math:pow(2, erlang:min(10, Cnt)) * 1000),
-   timer:apply_after(Wait, ek, connect, [Node]),
-   {ok, [{Node, Cnt + 1} | proplists:delete(Node, S)]};
-handle_event(Evt, State) ->
-   {ok, State}.
-   
-handle_call(_Req, State) ->
-   {ok, undefined, State}.
-   
-handle_info(_Msg, State) ->
-   {ok, State}.
-   
-terminate(_Reason, _State) ->
-   ok.
-
-code_change(_OldVsn, State, _Extra) -> 
-   {ok, State}.   
+init([Config]) ->
+   Process = {
+      ek_prot,       % child id
+      {
+         ek_prot,    % Mod
+         start_link, % Fun
+         [Config]    % Args
+      },
+      transient, brutal_kill, worker, dynamic 
+   },
+   {ok,
+      {
+         {simple_one_for_one, 30, 60},   % 30 faults per minute
+         [Process]
+      }
+   }.

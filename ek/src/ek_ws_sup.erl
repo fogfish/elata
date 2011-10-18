@@ -39,20 +39,11 @@
    start_link/1,
    init/1,                    
    % api
-   listen/1,
-   accept/1,
-   connect/1
+   create/1
 ]).
 
-
-listen(Uri) ->
-   supervisor:start_child(?MODULE, [{listen, Uri}]).
-
-accept(Sock) ->
-   supervisor:start_child(?MODULE, [{accept, Sock}]).
-   
-connect(Node) ->
-   supervisor:start_child(?MODULE, [{connect, Node}]).
+create(Con) ->
+   supervisor:start_child(?MODULE, [Con]).
    
 %%%------------------------------------------------------------------
 %%%
@@ -70,11 +61,11 @@ init([Config]) ->
          start_link, % Fun
          [Config]    % Args
       },
-      temporary, 2000, worker, dynamic 
+      temporary, brutal_kill, worker, dynamic 
    },
    {ok,
       {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
+         {simple_one_for_one, 30, 60},   % 30 faults per minute
          [Process]
       }
    }.

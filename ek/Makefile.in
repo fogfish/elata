@@ -222,11 +222,11 @@ ESRC = \
    src/ek_ws.erl \
    src/ek_ws_sup.erl \
    src/ek_prot.erl \
+   src/ek_prot_sup.erl \
    src/ek_sup.erl \
    src/ek_echo.erl \
    src/ek_evt.erl \
    src/ek_evt_srv.erl \
-   src/ek_node_sup.erl \
    src/ek_app.erl
 
 EINC = \

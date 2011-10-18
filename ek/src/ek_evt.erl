@@ -58,12 +58,16 @@ unsubscribe({Handler, Args}) ->
 unsubscribe(Handler) ->
    gen_event:delete_handler(?MODULE, Handler, []).   
    
-   
+join(undefined) ->
+   ok;
 join(Node) ->
    % relay notification to srv
    ek_evt_srv:join(Node),
    gen_event:notify(?MODULE, {join, Node}).
    
+leave(undefined) ->
+   % any error at handshake causes undefined node
+   ok;
 leave(Node) ->
    ek_evt_srv:leave(Node),
    gen_event:notify(?MODULE, {leave, Node}).

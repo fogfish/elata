@@ -36,7 +36,9 @@
 -export([
    % supervisor
    start_link/1,
-   init/1
+   init/1,
+   % api
+   listen/1
 ]).
 
 %%%
@@ -46,7 +48,30 @@ start_link(Config) ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
 init([Config]) -> 
-   Protocol = {
+   {ok,
+      {
+         {one_for_one, 4, 1800},
+         prot(Config) ++ event(Config) ++ listener(Config)
+      }
+   }.
+
+%% used from ek:start   
+listen(Config) ->
+   [P|_] = listener(Config),
+   supervisor:start_child(ek_sup, P).   
+   
+
+%%-------------------------------------------------------------------
+%%
+%% Process config
+%%
+%%-------------------------------------------------------------------
+
+%% protocol stack
+prot(Config) ->
+   [
+   %% socket based transport
+   {
       ek_ws_sup,
       {
          ek_ws_sup,
@@ -55,7 +80,39 @@ init([Config]) ->
       },
       permanent, 2000, supervisor, dynamic
    },
-   Evt = {
+   %% cluster management protocol
+   {
+      ek_prot_sup,
+      {
+         ek_prot_sup,
+         start_link,
+         [Config]
+      },
+      permanent, 2000, supervisor, dynamic
+   }
+   ].
+   
+%% message listener
+listener(Config) ->
+   case proplists:get_value(node, Config) of
+      undefined -> [];
+      Uri       ->
+         [{
+            ek_ws,
+            {
+               ek_ws,
+               start_link,
+               [Config, {listen, Uri}]
+            },
+            permanent, 2000, worker, dynamic
+         }]
+   end.
+   
+%% event management
+event(Config) ->
+   [
+   % gen_event notification 
+   {
       ek_evt,
       {
          ek_evt,
@@ -64,7 +121,8 @@ init([Config]) ->
       },
       permanent, 2000, worker, dynamic
    },
-   EvtSrv = {
+   % message passing notification
+   {
       ek_evt_srv,
       {
          ek_evt_srv,
@@ -72,12 +130,6 @@ init([Config]) ->
          []
       },
       permanent, 2000, worker, dynamic
-   },
-   {ok,
-      {
-         {one_for_one, 4, 1800},
-         [Protocol, Evt, EvtSrv]
-      }
-   }.
-
-
+   }
+   ].   
+   

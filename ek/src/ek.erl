@@ -41,6 +41,7 @@
 
 -export([
    start/1,
+   start/2,
    % node management
    node/0,
    nodes/0,
@@ -62,12 +63,14 @@
 %% starts cluster management application
 %% Node - list(), local node identity, uri (e.g. node://168.192.0.1:8080).
 start(Node) ->
+   start(Node, []).
+start(Node, Config) ->
    {ok, _} = case erlang:whereis(ek_sup) of
-      undefined -> ek_app:start(permanent, []);
+      undefined -> ek_app:start(permanent, Config);
       Pid       -> {ok, Pid}
    end,
    case ek:node() of
-      undefined -> {ok, _} = ek_ws_sup:listen(Node);
+      undefined -> {ok, _} = ek_sup:listen([{node, Node}]);
       Uri       -> {error, {already_exists, Uri}}
    end.
            
@@ -89,7 +92,17 @@ node() ->
 %%
 %% Retrive list of connected nodes
 nodes() ->
-   [N#ek_node.uri || N <- ets:match_object(ek_nodes, '_'), N#ek_node.pid =/= self].  
+   SF = fun(X) ->
+      {ok, Info} = ek_prot:node_info(X#ek_node.pid),
+      case proplists:get_value(state, Info) of
+         'CONNECTED' -> true;
+         _           -> false
+      end
+   end,
+   [
+      N#ek_node.uri || N <- ets:match_object(ek_nodes, '_'), 
+                       N#ek_node.pid =/= self, SF(N) =:= true
+   ].  
    
 %%
 %% Initiates a connection with remote node
@@ -98,7 +111,7 @@ nodes() ->
 connect(Node) ->
    case ets:lookup(ek_nodes, Node) of
       [Node] -> {ok, Node#ek_node.pid};
-      _      -> ek_ws_sup:connect(Node)
+      _      -> ek_prot_sup:create(Node)
    end.
 
 %%
@@ -119,21 +132,36 @@ demonitor(EvtHandler) ->
    ek_evt:unsubscribe(EvtHandler).
    
 %%
-%% send a message to node
+%% send a message to uri (node + ep)
 send(Uri, Msg) ->
-   ek_prot:send(Uri, Msg).
+   U    = ek_uri:new(Uri),
+   Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
+          binary_to_list(proplists:get_value(host, U)) ++ ":" ++
+          integer_to_list(proplists:get_value(port, U)),
+   case ets:lookup(ek_nodes, Node) of
+      [N] ->
+         ek_prot:send(N#ek_node.pid, Uri, Msg);
+       _             ->
+         {error, node_not_found}
+   end.
 
+%%
+%% send a message to multiple uri
 multicast(Uris, Msg) ->
-   ek_prot:multicast(Uris, Msg).
+   lists:foreach(fun(U) -> send(U, Msg) end, Uris).
 
+%%
+%% send a message to ep of connected nodes
 broadcast(EP, Msg) ->
    lists:foreach(
       fun(N) ->
          Uri = N ++ EP,
-         ek_prot:send(Uri, Msg)
+         send(Uri, Msg)
       end,
       ek:nodes()
    ).
+   
+   
    
 %%
 %% subscribe
