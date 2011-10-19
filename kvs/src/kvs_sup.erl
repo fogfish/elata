@@ -35,7 +35,7 @@
 
 -export([
    % supervisor
-   start_link/0,
+   start_link/1,
    init/1,
    % custom
    add/3
@@ -53,10 +53,10 @@
 %%%  - storage plug-in defined by application via keyval_bucket:create
 %%%
 
-start_link() ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+start_link(Config) ->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
-init([]) ->   
+init([Config]) ->   
    % event management
    EvtManager = {
       kvs_evt,
@@ -76,10 +76,23 @@ init([]) ->
       },
       permanent, 2000, worker, dynamic
    },
+   Sync = {
+      kvs_sync,
+      {
+         kvs_sync,
+         start_link,
+         [proplists:get_value(sync, Config, 30)]
+      },
+      permanent, 2000, worker, dynamic
+   },
+   Proc = case proplists:is_defined(sync, Config) of
+      true  -> [EvtManager, EvtFactory, Sync];
+      false -> [EvtManager, EvtFactory]
+   end,
    {ok,
       {
          {one_for_one, 4, 1800},
-         [EvtManager, EvtFactory]
+         Proc
       }
    }.
    
@@ -96,12 +109,14 @@ add(Type, Mod, Args) ->
       },
       permanent, 2000, Type, dynamic
    },
-   supervisor:start_child(kvs_sup, Child).
-   %case supervisor:start_child(kvs_sup, Child) of 
-   %   {ok, Pid}    -> {ok, Pid};
-   %   {ok, Pid, _} -> {ok, Pid};
+   case supervisor:start_child(kvs_sup, Child) of 
+      {ok, Pid}    -> {ok, Pid};
+      {ok, Pid, _} -> {ok, Pid};
+      {error,{already_started, Pid}} -> {ok, Pid}
+   end.   
+      
    %   {error, already_present}     -> {ok, undefined};
-   %   {error,{already_started, _}} -> {ok, undefined};
+   %   
    %   Err ->
    %      error_logger:error_report([{module, Mod}, {args, Args}, Err]),
    %      Err

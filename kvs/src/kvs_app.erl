@@ -38,7 +38,7 @@
    stop/1
 ]).
 
--define(APPNAME,  elata_kvs).
+-define(APPNAME,  kvs).
 
 start(_Type, _Args) -> 
    Config = config(?APPNAME, [
@@ -46,7 +46,7 @@ start(_Type, _Args) ->
       {evt_log_ttl, 7 * 24 * 3600}, 
       {evt_log_chunk, 128}
    ]),
-   case kvs_sup:start_link() of
+   case kvs_sup:start_link(Config) of
       {ok, Pid} ->
          % start system buckets
          {ok, _} = kvs_sys:start_link([kvs_sys_ref]),

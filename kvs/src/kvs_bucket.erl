@@ -49,7 +49,7 @@
 %%
 %% Name   = string() unique domain name
 %% Bucket = [opt]                                       
-%%    opt = event | {storage, Module}
+%%    opt = {storage, Module} | event | evtlog
 %%    event  = bucket generates events when data is changed
 %%    Module = plugin implementation gen_kvs_bucket
 %%    Args   = list(), list of arguments supplied to factory method

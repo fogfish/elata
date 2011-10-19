@@ -114,7 +114,7 @@ remove(Pid, Key) ->
 %%%------------------------------------------------------------------   
 init([Bucket]) ->
    % configure data stream storage
-   Data  = proplists:get_value(datapath, Bucket, "/var/lib/kvs/rrd"), 
+   Data  = proplists:get_value(datapath, Bucket,  "/var/lib/kvs/rrd"), 
    Hbeat = proplists:get_value(heartbeat, Bucket, 60),
    Type  = proplists:get_value(type,      Bucket, "GAUGE"),
    Tout  = proplists:get_value(timeout,   Bucket, Hbeat * 3),

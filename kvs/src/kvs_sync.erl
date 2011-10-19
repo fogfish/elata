@@ -38,6 +38,8 @@
 %% simple solution over evt_log
 %%
 
+%% TODO: full resync
+
 -export([
    start_link/0,
    start_link/1,
