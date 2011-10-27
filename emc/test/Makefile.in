@@ -122,7 +122,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-TESTS = job_uri_tests job_script_tests
+TESTS = emc_tests emc_net_tests
 CLEANFILES = $(TESTS) $(TESTS:=.beam)
 all: all-am
 
@@ -396,11 +396,12 @@ uninstall-am:
 	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am uninstall \
 	uninstall-am
 
+#TESTS += job_script_tests
 
 .SECONDARY:
 
 % : %.beam
-	echo "erl -pa ../ebin -eval 'R = case eunit:test($@, [verbose]) of ok -> 0; _ -> 1 end, timer:apply_after(100, erlang, halt, [R]).'" > $@
+	echo "erl -pa ../ebin -pa ../../*/ebin -eval 'R = case eunit:test($@, [verbose]) of ok -> 0; _ -> 1 end, timer:apply_after(100, erlang, halt, [R]).'" > $@
 	chmod u+x $@ 
 
 %.beam : %.erl

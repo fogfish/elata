@@ -1,4 +1,4 @@
-%%
+%
 %%   Copyright (c) 2011, Nokia Corporation
 %%   All rights reserved.
 %%
@@ -29,33 +29,38 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(clib).
--author(sergey.boldyrev@nokia.com).
+-module(emc_net_tests).
 -author(dmitry.kolesnikov@nokia.com).
+-include_lib("eunit/include/eunit.hrl").
 
--export([
-   seq/2,
-   seq/3
-]).
+   
+emc_net_tcp_test() ->
+   C = emc:do(emc_performance,
+   [
+      fun emc_net:uri_parse/1, 
+      fun emc_net:tcp/1,
+      fun emc_net:close/1
+   ]),
+   R1= C("tcp://google.com:80"),
+   error_logger:info_report([R1]),
+   R2= C("tcp://ovi.com:80"),
+   error_logger:info_report([R2]).
+   
 
+emc_net_ssl_test() ->
+   application:start(crypto),
+   application:start(public_key),
+   application:start(ssl),
+   C = emc:do(emc_performance,
+   [
+      fun emc_net:uri_parse/1, 
+      fun emc_net:tcp/1,
+      fun emc_net:ssl/1,
+      fun emc_net:close/1
+   ]),
+   R1= C("ssl://google.com:443"),
+   error_logger:info_report([R1]).   
+   
+   
 
-%%
-%% Sequence a function chain
-seq(Seq, In) ->
-   seq(Seq, In, undefined).
-seq([], In, State) -> {ok, In};
-seq([{Mod, Fun} | T], In, State) ->
-   case Mod:Fun(In, State) of
-      ok           -> seq(T, In, State);
-      {ok, Out}    -> seq(T, Out, State);
-      {ok, [],  S} -> seq(T, In,  S);
-      {ok, Out, S} -> seq(T, Out, S)
-   end;
-seq([Fun | T], In, State) ->
-   case Fun(In, State) of
-      ok           -> seq(T, In, State);
-      {ok, Out}    -> seq(T, Out, State);
-      {ok, [],  S} -> seq(T, In,  S);
-      {ok, Out, S} -> seq(T, Out, S)
-   end.
 

@@ -15,7 +15,7 @@
 %%
 {application, clib,
    [
-      {description, "Erlang Latency Agenet: Computation primitives"},
+      {description, "Erlang Monadic Computation"},
       {vsn,         "@VSN@"},
       {modules,   
          [@ESRC@]},
@@ -26,6 +26,6 @@
             stdlib
          ]
       } %,
-      %{mod, {kvs_app, []}}
+      %{mod, {emc_app, []}}
    ]
 }.

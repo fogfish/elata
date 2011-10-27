@@ -16,13 +16,15 @@
 SUBDIRS = test
 
 ESRC = \
-   src/clib.erl \
-   src/clib_net.erl \
-   src/clib_http.erl \
-   src/clib_perf.erl
+   src/emc.erl \
+   src/emc_identity.erl \
+   src/emc_performance.erl \
+   src/emc_net.erl 
+#   src/clib_http.erl \
+#   src/clib_perf.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
-EBIN += ebin/clib.app
+EBIN += ebin/emc.app
 
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)

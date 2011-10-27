@@ -29,12 +29,15 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--record(uri, {
-   schema   = undefined,
-   host     = <<>>,
-   port     = 0,
-   path     = <<>>,
-   q        = <<>>,
-   fragment = <<>>
+-record(monad, {
+   eval,   %% evaluates lambda-expression within monad context 
+           %% eval(X, Fun, M) -> {Fun(X), New_M} end
+   bind,
+   return,
+
+
+
+   type,   %% monad type (Module)
+   inner   %% inner monad
 }).
 

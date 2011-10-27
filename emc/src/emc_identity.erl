@@ -29,69 +29,33 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(clib_net).
+-module(emc_identity).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
+-include("include/emc.hrl").
+
 
 %%
-%% Computation primitives: network 
+%% Identity monad
 %%
-%% Each primitive follows the interface notation
-%%    fun(Input, State) -> {ok, Output, State}
-%%    Input  = list() of input arguments [Arg1, Arg2, ...]
-%%    Output = list() of output results 
-%%    State  = tuple() transfered state 
-%% 
 
 -export([
-   uri_parse/2,
-   tcp_connect/2,
-   tcp_close/2,
-   ssl_connect/2,
-   ssl_close/2
+   eval/3,
+   bind/3,
+   return/2
 ]).
 
 %%
-%% Uri Parser
-uri_parse([Uri], _) ->
-   {ok, [ek_uri:new(Uri)]}.
+%% evaluate function within monad context
+eval(Fun, X, _) ->
+   Fun(X).
+   
+%%
+%%
+bind(X, Seq, M) ->
+   emc:eval(X, Seq, M).
 
 %%
-%% Establish TCP/IP connection, and measure its latency
-tcp_connect([Uri],     _)  ->
-   tcp_connect([Uri, []], undefined);
-tcp_connect([Uri, Ds], _) ->
-   {Ttcp, {ok, Tcp}} = timer:tc(
-      gen_tcp, 
-      connect, 
-      [
-         binary_to_list(proplists:get_value(host, Uri)), 
-         proplists:get_value(port, Uri), 
-         [binary, {packet, 0}, {active, false}]
-      ]
-   ),
-   {ok, [Uri, [{tcp, Ttcp} | Ds]], {net, Tcp}}.
-
 %%
-%% 
-tcp_close([Uri, Ds], {net,Sock}) ->
-   gen_tcp:close(Sock),
-   {ok, [Uri, Ds], {}}.
-   
-%%
-%% Establish SSL connection and measures its latency
-ssl_connect([Uri, Ds], {net, Sock}) ->
-   {Tssl, {ok, Ssl}} = timer:tc(
-      ssl,
-      connect, 
-      [Sock, []]
-   ),   
-   {ok, [Uri, [{ssl, Tssl} | Ds]], {net, Ssl}}.
- 
-%%
-%%
-ssl_close([Uri, Ds], {net, Sock}) ->
-   ssl:close(Sock),
-   {ok, [Uri, Ds], {}}.
-   
-   
+return(X, _) ->
+   X.
