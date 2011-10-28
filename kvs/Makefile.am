@@ -29,7 +29,8 @@ ESRC = \
    src/kvs_evt_sup.erl \
    src/kvs_evt_handler_sup.erl \
    src/kvs_evt_log.erl \
-   src/kvs_sync.erl \
+   src/kvs_log_sync.erl \
+   src/kvs_ht.erl \
    src/kvs_app.erl
 
 

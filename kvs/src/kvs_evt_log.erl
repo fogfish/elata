@@ -91,7 +91,7 @@ handle_event({put, Bucket, Key, Item}, S) ->
             {ok, Chnk}         -> Chnk 
          end,
          Name = proplists:get_value(name, Bucket),
-         kvs:put(kvs_evt_log, ChnkId, {chunk, TTL, Log ++ [{S#srv.clock, put, Name, Key}]}),
+         kvs:put(kvs_evt_log, ChnkId, {chunk, TTL, Log ++ [{put, S#srv.clock, Name, Key, Item}]}),
          {ok, S#srv{clock = S#srv.clock + 1}};
       false -> 
          {ok, S}
@@ -105,7 +105,7 @@ handle_event({remove, Bucket, Key, Item}, S) ->
             {ok, Chnk}         -> Chnk 
          end,
          Name = proplists:get_value(name, Bucket),
-         kvs:put(kvs_evt_log, ChnkId, {chunk, TTL, Log ++ [{S#srv.clock, remove, Name, Key}]}),
+         kvs:put(kvs_evt_log, ChnkId, {chunk, TTL, Log ++ [{remove, S#srv.clock, Name, Key}]}),
          {ok, S#srv{clock = S#srv.clock + 1}};
       false -> 
          {ok, S}

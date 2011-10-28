@@ -82,7 +82,11 @@ construct([Bucket, Key, Item]) ->
    supervisor:start_child(?MODULE, [Bucket, Key, Item]).
 
 config() ->
-   [{supervise, supervisor}, keyspace].
+   [
+      keyspace,                % key-to-pid management by ext process
+      {supervise, supervisor}, % storage plugin is supervisor
+      {feature, [map]}         % map feature is supported
+   ].
    
 put(Pid, Key, Item) ->
    gen_server:call(Pid, {kvs_put, Key, Item}).

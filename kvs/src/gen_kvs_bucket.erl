@@ -54,6 +54,7 @@
    handle_has/2,
    handle_get/2,
    handle_remove/2,
+   handle_map/2,
    % custom behaviour
    behaviour_info/1
 ]).
@@ -71,7 +72,8 @@ behaviour_info(callbacks) ->
       {put,  3},      %% set(Pid, Key, Item)
       {has,  2},      %% has(Pid, Key)                       
       {get,  2},      %% get(Pid, Key)
-      {remove, 2}     %% remove(Pid, Key)
+      {remove, 2},    %% remove(Pid, Key)
+      {map,    2}     %% map(Pid, Fun)
    ];
 
 behaviour_info(_) -> 
@@ -131,6 +133,31 @@ handle_remove(Bucket, Key) ->
    end,
    notify(remove, Bucket, Key, undefined),
    ok.
+   
+handle_map(Bucket, Fun) ->
+   case lists:member(map, proplists:get_value(feature, Bucket, [])) of
+      false ->
+         {error, not_supported};
+      true  ->
+         Bid = proplists:get_value(name,    Bucket),
+         Mod = proplists:get_value(storage, Bucket),
+         % resolve keyspace management
+         case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
+            {error, not_found}  ->
+               % no key space management
+               {ok, Pid} = kvs_sys:get(kvs_sys_ref, Bid),
+               Mod:map(Pid, Fun);
+            {ok, Keyspace}      ->
+               % there is a key space management process
+               kvs_sys:map(Keyspace, 
+                  fun(Key, Pid) ->
+                     {ok, Item} = Mod:get(Pid, Key),
+                     Fun(Key, Item)
+                  end
+               )
+         end
+   end.
+   
    
 %%%------------------------------------------------------------------
 %%%

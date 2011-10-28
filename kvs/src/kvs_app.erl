@@ -42,6 +42,7 @@
 
 start(_Type, _Args) -> 
    Config = config(?APPNAME, [
+      sync,
       evt_log, 
       {evt_log_ttl, 7 * 24 * 3600}, 
       {evt_log_chunk, 128}

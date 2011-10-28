@@ -31,6 +31,7 @@
 %%
 -module(kvs_sys).
 -author(dmitry.kolesnikov@nokia.com).
+-include_lib("stdlib/include/qlc.hrl").
 
 %%
 %% kvs_sys is a system buckets, used by kvs application to manage buckets metadata
@@ -44,7 +45,8 @@
    put/3,
    has/2,
    get/2,
-   remove/2
+   remove/2,
+   map/2
 ]).
 
 %%
@@ -62,11 +64,13 @@ start_link([kvs_sys_bucket]) ->
    % register all system buckets (enables access via kvs interface)
    SysRef = [
       {name,    kvs_sys_ref},
-      {storage, ?MODULE}
+      {storage, ?MODULE},
+      {feature, [map]}
    ],
    SysBkt = [
       {name,    kvs_sys_bucket},
-      {storage, ?MODULE}
+      {storage, ?MODULE},
+      {feature, [map]}
    ],
    ets:insert(kvs_sys_bucket, {kvs_sys_ref,    SysRef}),
    ets:insert(kvs_sys_bucket, {kvs_sys_bucket, SysBkt}),
@@ -91,7 +95,10 @@ construct(_) ->
 %%
 %%
 config() ->
-   [].
+   [
+      % optional supported features
+      {feature, [map]}
+   ].
 
 %%
 %%
@@ -123,3 +130,10 @@ remove(Name, Key) ->
    ets:delete(Name, Key),
    ok.
 
+%%
+%%
+map(Name, Fun) ->
+   F = fun({K, V}) -> Fun(K, V) end,
+   Q = qlc:q([ F(X) || X <- ets:table(Name)]),
+   qlc:e(Q).
+   

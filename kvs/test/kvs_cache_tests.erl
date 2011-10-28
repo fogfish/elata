@@ -51,7 +51,7 @@ kvs_cache_test_() ->
    }.
 
 setup() ->
-   kvs_sup:start_link(),
+   application:start(kvs),
    kvs_bucket:define(test, [{storage, kvs_cache_sup}]).
    
 %%%

@@ -58,7 +58,7 @@ kvs_evt_test_() ->
    }.
    
 setup() ->
-   kvs_sup:start_link(),
+   application:start(kvs),
    kvs_evt_sup:subscribe(kvs_evt_tests),
    kvs_bucket:define(test_src, [event, {storage, kvs_cache_sup}]),
    kvs_bucket:define(test_dst, [{storage, kvs_sys}]).

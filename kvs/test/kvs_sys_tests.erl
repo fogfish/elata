@@ -48,7 +48,8 @@ kvs_sys_test_() ->
          {"Put item into sys bucket", fun put/0},
          {"Has item in sys bucket", fun has/0},
          {"Get item in sys bucket", fun get/0},
-         {"Remove item in sys bucket", fun remove/0}
+         {"Remove item in sys bucket", fun remove/0},
+         {"Map items in sys bucket", fun map/0}
       ]
    }.
 
@@ -67,7 +68,8 @@ kvs_sys_api_test_() ->
          {"KVS Put", fun kvs_put/0},
          {"KVS Has", fun kvs_has/0},
          {"KVS Get", fun kvs_get/0},
-         {"KVS Remove", fun kvs_remove/0}
+         {"KVS Remove", fun kvs_remove/0},
+         {"KVS Map", fun kvs_map/0}
       ]
   }.
   
@@ -94,6 +96,16 @@ remove() ->
       {error, not_found} =:= kvs_sys:get(kvs_sys_bucket, test)
    ).
 
+map() ->
+   ok = kvs_sys:put(kvs_sys_bucket, 1, a),
+   ok = kvs_sys:put(kvs_sys_bucket, 2, b),
+   ok = kvs_sys:put(kvs_sys_bucket, 3, c),
+   L  = kvs_sys:map(kvs_sys_bucket, fun(K,V) -> {K,V} end),
+   ?assert( lists:member({1,a}, L) ),
+   ?assert( lists:member({2,b}, L) ),
+   ?assert( lists:member({3,c}, L) ).
+   
+   
 kvs_put() ->
    ?assert(
       ok =:= kvs:put(kvs_sys_bucket, test, [{name, test}, {val, abc}])
@@ -120,3 +132,11 @@ kvs_remove() ->
       {error, not_found} =:= kvs:get(kvs_sys_bucket, test)
    ).
    
+kvs_map() ->
+   ok = kvs:put(kvs_sys_bucket, 1, a),
+   ok = kvs:put(kvs_sys_bucket, 2, b),
+   ok = kvs:put(kvs_sys_bucket, 3, c),
+   L  = kvs:map(kvs_sys_bucket, fun(K,V) -> {K,V} end),
+   ?assert( lists:member({1,a}, L) ),
+   ?assert( lists:member({2,b}, L) ),
+   ?assert( lists:member({3,c}, L) ).   

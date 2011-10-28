@@ -46,9 +46,9 @@ kvs_bin_log_test_() ->
    }.
    
 setup() ->
-   kvs_sup:start_link(),
-   kvs_evt_sup:subscribe({kvs_evt_log, [[{ttl, 5}, {size, 10}]]}),
-   kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}]),
+   application:start(kvs),
+   kvs_evt_sup:subscribe({kvs_evt_log, [[{ttl, 5}, {chunk, 10}]]}),
+   kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}, {ttlpos, 2}]),
    kvs_bucket:define(test, [{storage, kvs_sys}, event, evtlog]).
 
 
@@ -58,7 +58,7 @@ put()  ->
    ok = kvs:put(test, Key, {val, 1}),
    timer:sleep(100),
    ?assert(
-      {ok, [{ttl, 5}, {0, put, test, Key}]} =:= kvs:get(kvs_evt_log, 0)
+      {ok, {chunk, 5, [{put, 0, test, Key, {val, 1}}]}} =:= kvs:get(kvs_evt_log, 0)
    ).
    
 remove() ->
@@ -66,11 +66,11 @@ remove() ->
    ok = kvs:remove(test, Key),
    timer:sleep(100),
    ?assert(
-      {ok, [{ttl, 5}, {0, put, test, Key}, {1, remove, test, Key}]} =:= kvs:get(kvs_evt_log, 0)
+      {ok, {chunk, 5, [{put, 0, test, Key, {val, 1}}, {remove, 1, test, Key}]}} =:= kvs:get(kvs_evt_log, 0)
    ).
    
 expire() ->   
-   timer:sleep(5500),
+   timer:sleep(6000),
    ?assert(
       {error, not_found} =:= kvs:get(kvs_evt_log, 0)
    ).

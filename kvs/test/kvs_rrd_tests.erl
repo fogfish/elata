@@ -58,16 +58,15 @@ kvs_rrd_cache_test_() ->
    }.
    
 setup_rrd_ipc() ->
-   {ok, Pid} = kvs_sup:start_link(),
+   application:start(kvs),
    ok = kvs_bucket:define(test, [
       {storage, kvs_rrd},
       {codepath, "/usr/local/macports"},
       {datapath, "/private/tmp/kvs"}
-   ]),
-   Pid.
+   ]).
 
 setup_rrd_cache() ->
-   {ok, Pid} = kvs_sup:start_link(),
+   application:start(kvs),
    ok = kvs_bucket:define(test, [
       {storage, kvs_rrd},
       {codepath, "/usr/local/macports"},
@@ -76,11 +75,10 @@ setup_rrd_cache() ->
       {daemon, {"127.0.0.1", 42217}},
       {flush,  120},
       {iotime, 60}
-   ]),
-   Pid.   
+   ]).   
 
 cleanup(Pid) ->
-   erlang:exit(Pid, normal),
+   application:stop(kvs),
    timer:sleep(100),  %% switch a context to kill supervisor
    os:cmd("rm -R /private/tmp/kvs"),
    os:cmd("killall rrdcached").
@@ -90,7 +88,7 @@ put() ->
    ?assert(
       ok =:= kvs:put(test, Key, 1000)
    ),
-   timer:sleep(100), %% RRD put is async, we have to wait before file is created
+   timer:sleep(500), %% RRD put is async, we have to wait before file is created
    ?assert(
       kvs:has(kvs_rrd_cache, key_to_stream(Key))
    ),

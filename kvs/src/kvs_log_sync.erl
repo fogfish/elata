@@ -29,13 +29,12 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_sync).
+-module(kvs_log_sync).
 -behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Sync local buckets with remote peers 
-%% simple solution over evt_log
+%% Log-based bucket synchronization  
 %%
 
 %% TODO: full resync
@@ -96,8 +95,8 @@ handle_info(sync, State) ->
    lists:map(
       fun(N) ->
          case lists:keyfind(N, 1, State#srv.nodes) of
-            {Node, Clock} -> sync_node_req(N, Clock);
-            false         -> sync_node_req(N, -1)
+            {_Node, Clock} -> req_node_sync(N, Clock);
+            false          -> req_node_sync(N, -1)      
          end
       end,
       ek:nodes()
@@ -106,31 +105,35 @@ handle_info(sync, State) ->
    {noreply, State};
 
 %%   
-%% handle sync request   
-handle_info({sync_req, From, undefined}, State) ->
-   % full sync is requested
-   {noreply, State};
+%% handle sync request, all events from Clock   
 handle_info({sync_req, From, Clock}, State) ->
-   % sync from pos Clock is requested
    {ChnkSize, ChnkTTL, SrvClk} = kvs_evt_log:config(),
-   ChnkId = Clock div ChnkSize,
-   LastId = SrvClk div ChnkSize,
-   sync_rsp(From, ChnkId, LastId),
+   ChnkId = Clock  div ChnkSize,  % Id of log chunk to start with
+   LastId = SrvClk div ChnkSize,  % Id of log chunk to finish
+   ?DEBUG([
+      {sync, ind},
+      {node, From},
+      {chunk, {ChnkId, LastId}}
+   ]),
+   rsp_node_sync(From, ChnkId, LastId), 
    {noreply, State};
 
 %%
 %% handle sync response
 handle_info({sync_rsp, From, Log}, State) ->
+   % what is last log position
    Clock = case lists:keyfind(From, 1, State#srv.nodes) of
      {Node, Clk} -> Clk;
      false       -> -1
    end,
+   % replay log 
    NClock = replay_log(Clock, Log),
    ?DEBUG([
       {sync, rsp},
       {node, From},
       {clock, {Clock, NClock}}
    ]),
+   % update log position
    Nodes  = [{From, NClock} | lists:keydelete(From, 1, State#srv.nodes)],
    {noreply, State#srv{nodes = Nodes}};
    
@@ -161,32 +164,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%%------------------------------------------------------------------   
 
 %%
-%% Request node sync
-sync_node_req(Node, undefined) ->
+%% Initializes a sync procedure with node
+req_node_sync(Node, Clock) ->
    ?DEBUG([
-      {sync, {req, full}},
-      {clock, undefined},
-      {node, Node}
-   ]),
-   ek:send(Node ++ ?KVS_SYNC_EP, {sync_req, ek:node(), undefined});
-sync_node_req(Node, Clock) ->
-   ?DEBUG([
-      {sync, req},
+      {sync,  req},
       {clock, Clock},
-      {node, Node}
+      {node,  Node}
    ]),
    ek:send(Node ++ ?KVS_SYNC_EP, {sync_req, ek:node(), Clock}).   
 
 %%
-%%
-sync_rsp(Node, ChnkId, LastId) when ChnkId > LastId ->
+%% Response on sync request
+rsp_node_sync(Node, ChnkId, LastId) when ChnkId > LastId ->
    % sync completed
    ?DEBUG([
       {sync, completed},
       {node, Node}
    ]),
    ok;
-sync_rsp(Node, ChnkId, LastId) ->
+rsp_node_sync(Node, ChnkId, LastId) ->
    % read chunk
    case kvs:get(kvs_evt_log, ChnkId) of
       {error, not_found} ->
@@ -197,47 +193,35 @@ sync_rsp(Node, ChnkId, LastId) ->
          ]),
          ok;
       {ok, {chunk, _, Log}}        ->
-         % transfer a chunk
-         Data = lists:map(
-            fun ({Clk, put, Bucket, Key}) ->
-               Item = case kvs:get(Bucket, Key) of
-                  {error, not_found} -> undefined;
-                  {ok, Val}          -> Val
-               end,
-               {Clk, put, Bucket, Key, Item};
-               ({Clk, remove, Bucket, Key}) ->
-               {Clk, remove, Bucket, Key, undefined}
-            end,
-            Log
-         ),
          ?DEBUG([
             {sync, {chunk, ChnkId, LastId}},
             {node, Node}
          ]),
-         ek:send(Node ++ ?KVS_SYNC_EP, {sync_rsp, ek:node(), Data}),
-         sync_rsp(Node, ChnkId + 1, LastId)
+         ek:send(Node ++ ?KVS_SYNC_EP, {sync_rsp, ek:node(), Log}),
+         rsp_node_sync(Node, ChnkId + 1, LastId)
    end.  
-   
-   
+
 %%
 %%
 replay_log(Clock, Log) ->
    lists:foldl(
-      fun({C, Act, Bckt, Key, Item}, Clk) ->
+      fun
+      ({put, EvtClk, Bckt, Key, Item}, Clk) ->
          if
-            C > Clk ->
-               case {Act, Item} of
-                  {put, undefined}    -> 
-                     ok;
-                  {put, Item}         ->
-                     kvs:put(Bckt, Key, Item);
-                  {remove, undefined} -> 
-                     kvs:remove(Bckt, Key)
-               end,
-               C;
-            true    ->
+            EvtClk =:= Clk + 1 -> 
+               kvs:put(Bckt, Key, Item),
+               EvtClk;
+            true ->
                Clk
-         end   
+         end;
+      ({remove, EvtClk, Bckt, Key}, Clk) ->
+         if
+            EvtClk =:= Clk + 1 ->
+               kvs:remove(Bckt, Key),
+               EvtClk;
+            true ->
+               Clk
+         end
       end,
       Clock,
       Log

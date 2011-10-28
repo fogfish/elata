@@ -57,6 +57,14 @@
 }).
 
 %%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
+
+%%
 %%
 start_link(Bucket, Key, Item) ->
   gen_server:start_link(?MODULE, [Bucket, Key, Item], []).
@@ -64,7 +72,10 @@ start_link(Bucket, Key, Item) ->
 init([Bucket, Key, Item]) ->
    TTL = case is_list(Item) of
       true  -> proplists:get_value(ttl, Item);
-      false -> undefined
+      false -> case proplists:get_value(ttlpos, Bucket) of
+                  undefined -> undefined;
+                  Pos       -> erlang:element(Pos, Item)
+               end
    end,
    ttl_timer(TTL),
    % register itself to keyspace
@@ -74,16 +85,19 @@ init([Bucket, Key, Item]) ->
       #srv{
          ttl=TTL,
          timestamp=timestamp(),
-         bucket=Name, 
+         bucket=Bucket, 
          key=Key,
          item=Item
       }
-   }.
+   }. 
    
 handle_call({kvs_put, Key, Item}, _From, S) ->
    TTL = case is_list(Item) of
       true  -> proplists:get_value(ttl, Item);
-      false -> undefined
+      false -> case proplists:get_value(ttlpos, S#srv.bucket) of
+                  undefined -> undefined;
+                  Pos       -> erlang:element(Pos, Item)
+               end
    end,
    ttl_timer(TTL),
    {reply, ok, S#srv{ttl=TTL, timestamp=timestamp(), item=Item}};
@@ -97,26 +111,33 @@ handle_cast({kvs_remove, Key}, State) ->
    {stop, normal, State};
 handle_cast(_Req, State) ->
    {noreply, State}.
-
+ 
 handle_info(expired, S) ->
    case S#srv.ttl of
       undefined -> {noreply, S};
       TTL ->
          Now      = timestamp(),
          Deadline = S#srv.timestamp + S#srv.ttl,
+         ?DEBUG([
+            {ttl, S#srv.ttl}, 
+            {now, Now}, 
+            {deadline, Deadline},
+            {key, S#srv.key}
+         ]),
          if 
             Deadline =< Now -> 
                {stop, normal, S};
             Deadline >  Now -> 
                ttl_timer(TTL),
-               {noreply, S}
+               {noreply, S} 
          end
    end;
 handle_info(_Msg, State) ->
    {noreply, State}.
    
 terminate(_Reason, S) ->
-   kvs:remove({keyspace, S#srv.bucket}, S#srv.key),
+   Name = proplists:get_value(name, S#srv.bucket),
+   kvs:remove({keyspace, Name}, S#srv.key),
    ok.
    
 code_change(_OldVsn, State, _Extra) ->
@@ -137,4 +158,5 @@ timestamp() ->
 ttl_timer(undefined) ->
    ok;
 ttl_timer(TTL) ->   
+   ?DEBUG([{ttl, TTL * 1000}]),
    timer:send_after(TTL * 1000, expired).   

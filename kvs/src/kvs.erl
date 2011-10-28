@@ -41,7 +41,8 @@
    put/3,
    get/2,
    has/2,
-   remove/2
+   remove/2,
+   map/2
 ]).
 
 
@@ -92,6 +93,17 @@ remove(Bucket, Key) ->
       {ok, Bmeta} -> gen_kvs_bucket:handle_remove(Bmeta, Key)
    end.
 
+%%%
+%%% map(Bucket, Fun) -> [...] | {error, ...}
+%%%    Bucket = bucket unique name, see kvs_bucket:define(...)
+%%%    Fun    = Fun(Key, Item) -> Val
+%%% maps function over bucket
+map(Bucket, Fun) ->
+   case kvs_sys:get(kvs_sys_bucket, Bucket) of
+      {error,  _} -> {error, undefined_bucket};
+      {ok, Bmeta} -> gen_kvs_bucket:handle_map(Bmeta, Fun)
+   end.   
+   
 %%%------------------------------------------------------------------
 %%%
 %%% Private Functions
