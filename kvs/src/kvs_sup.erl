@@ -38,7 +38,7 @@
    start_link/1,
    init/1,
    % custom
-   add/3
+   start_category/1
 ]).
 
 %%%
@@ -57,8 +57,17 @@ start_link(Config) ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
 init([Config]) ->   
-   % event management
-   EvtManager = {
+   {ok,
+      {
+         {one_for_one, 4, 1800},
+         [event(), factory()]
+      }
+   }.
+
+%%
+%%
+event() ->  
+   {
       kvs_evt,
       {
          kvs_evt,
@@ -66,8 +75,12 @@ init([Config]) ->
          []
       },
       permanent, 2000, worker, dynamic
-   },
-   EvtFactory = {
+   }.   
+
+%%   
+%%   
+factory() ->
+   {
       kvs_evt_sup,
       {
          kvs_evt_sup,
@@ -75,37 +88,36 @@ init([Config]) ->
          []
       },
       permanent, 2000, worker, dynamic
-   },
-   Sync = {
-      kvs_sync,
-      {
-         kvs_sync,
-         start_link,
-         [proplists:get_value(sync, Config, 30)]
-      },
-      permanent, 2000, worker, dynamic
-   },
-   Proc = case proplists:is_defined(sync, Config) of
-      true  -> [EvtManager, EvtFactory, Sync];
-      false -> [EvtManager, EvtFactory]
-   end,
-   {ok,
-      {
-         {one_for_one, 4, 1800},
-         Proc
-      }
    }.
    
 %%%   
-%%% Adds a module into supervisor tree (called via kvs_define)
+%%% Dynamically start bucket adds a module into supervisor tree (called via kvs_define)
 %%%
-add(Type, Mod, Args) ->
+start_category(Cat) ->
+   Name = proplists:get_value(name,    Cat),
+   Mod  = proplists:get_value(storage, Cat),
+   % check module type
+   TypeOf = fun(T, M) ->
+      lists:member(T, 
+         lists:flatten(
+            proplists:get_all_values(
+               behaviour,  
+               M:module_info(attributes)
+            )
+         )
+      )
+   end,
+   % define child spec
+   Type = case TypeOf(supervisor, Mod) of
+      true  -> supervisor;
+      false -> worker
+   end,
    Child = {  % child spec
-      Mod,
+      Name,
       {
-         Mod,
-         start_link,
-         Args
+         Mod,                     
+         start_link, 
+         [Cat]
       },
       permanent, 2000, Type, dynamic
    },
@@ -114,10 +126,4 @@ add(Type, Mod, Args) ->
       {ok, Pid, _} -> {ok, Pid};
       {error,{already_started, Pid}} -> {ok, Pid}
    end.   
-      
-   %   {error, already_present}     -> {ok, undefined};
-   %   
-   %   Err ->
-   %      error_logger:error_report([{module, Mod}, {args, Args}, Err]),
-   %      Err
-   %end.
+

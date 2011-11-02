@@ -29,8 +29,9 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(gen_kvs_bucket).
+-module(gen_kvs).
 -author(dmitry.kolesnikov@nokia.com).
+-include_lib("stdlib/include/qlc.hrl").
 
 %%
 %% Bucket is a hashtable, composed of
@@ -50,11 +51,16 @@
 %% (Used as a proxy to exised persistent/in-memory storage)
 %%
 -export([
-   handle_put/3,
-   handle_has/2,
-   handle_get/2,
-   handle_remove/2,
-   handle_map/2,
+   % plugin utility api
+   init/1,
+   init/2,
+   terminate/1,
+   key_to_pid/2,
+   vinit/2,
+   vterminate/2,
+   vattr/3,
+   key_map/3,
+   key_fold/4,
    % custom behaviour
    behaviour_info/1
 ]).
@@ -67,13 +73,12 @@
 %%%------------------------------------------------------------------
 behaviour_info(callbacks) ->
    [
-      {construct, 1}, %% construct([...])
-      {config,    0}, %% bucket configuration
-      {put,  3},      %% set(Pid, Key, Item)
-      {has,  2},      %% has(Pid, Key)                       
-      {get,  2},      %% get(Pid, Key)
-      {remove, 2},    %% remove(Pid, Key)
-      {map,    2}     %% map(Pid, Fun)
+      {put,  3},      %% put(Pid, Key, Item) -> ok | {error, ...}
+      {has,  2},      %% has(Pid, Key)  -> true | false                     
+      {get,  2},      %% get(Pid, Key)  -> {ok, Item} | {error, ...}
+      {remove, 2},    %% remove(Pid, Key) -> ok | {error, ...}
+      {map,    2},    %% map(Pid, Fun) -> Result | {error, ...}
+      {fold,   3}     %% fold(Pid, Acc, Fun) -> Result | {error, ...}
    ];
 
 behaviour_info(_) -> 
@@ -81,23 +86,81 @@ behaviour_info(_) ->
    
 %%%------------------------------------------------------------------
 %%%
+%%% Utility interface
+%%%
+%%%------------------------------------------------------------------
+   
+%%
+%%
+init(Spec) ->
+   init(self(), Spec).
+init(Pid, Spec) ->
+   Name   = proplists:get_value(name,    Spec),
+   Mod    = proplists:get_value(storage, Spec),
+   ok     = kvs:put(kvs_sys_ref, Name, {Mod, Pid}),
+   ok     = kvs:put(kvs_sys_cat, Name, Spec).
+
+%%
+%%
+terminate(Spec) ->   
+   Name = proplists:get_value(name, Spec),
+   kvs:remove(kvs_sys_ref, Name),
+   ok.
+   
+%%   
+%% key_to_pid(Cat, Key) -> {ok, Pid} | {error, ...} 
+%%
+key_to_pid(Cat, Key) ->
+   {ok, {Mod, Ref}} = kvs:get(kvs_sys_ref, {key, Cat}),
+   Mod:get(Ref, Key).
+
+%%
+%% register key
+vinit(Cat, Key) ->
+   ok = kvs:put({key, Cat}, Key, self()).
+   
+vterminate(Cat, Key) ->
+   ok = kvs:remove({key, Cat}, Key).
+
+%%
+%%
+%%
+vattr(Cat, Attr, Val) ->
+   {ok, Spec} = kvs:get(kvs_sys_cat, Cat),
+   case proplists:get_value(getter, Spec) of
+      undefined -> undefined;
+      Get       -> Get(Attr, Val)
+   end.
+   
+%%
+%%
+%%
+key_map(Cat, Get, Fun) ->
+   kvs:map(
+      {key, Cat}, 
+      fun(Key, Pid) ->
+         {ok, Val} = Get(Pid, Key),
+         Fun(Key, Val)
+      end
+   ).
+
+key_fold(Cat, Acc, Get, Fun) ->
+   kvs:fold(
+      {key, Cat},
+      Acc,
+      fun(Key, Pid, Acc1) ->
+         {ok, Val} = Get(Pid, Key),
+         Fun(Key, Val, Acc1)
+      end
+   ).
+
+   
+%%%------------------------------------------------------------------
+%%%
 %%% Protected Functions (kvs interface)
 %%%
 %%%------------------------------------------------------------------
-handle_put(Bucket, Key, Item) ->
-   Bid = proplists:get_value(name,    Bucket),
-   Mod = proplists:get_value(storage, Bucket),
-   % calculate item identity
-   % IdF = proplists:get_value(id, Bucket),
-   % Key = identity(IdF, Item),
-   case resolve(Bid, Key) of
-      undefined -> 
-         {ok, _Pid} = Mod:construct([Bucket, Key, Item]);
-      Pid       -> 
-         ok = Mod:put(Pid, Key, Item)
-   end,
-   notify(put, Bucket, Key, Item),
-   ok.
+
 
 handle_has(Bucket, Key) ->
    Bid = proplists:get_value(name,    Bucket),
@@ -158,6 +221,32 @@ handle_map(Bucket, Fun) ->
          end
    end.
    
+handle_fold(Bucket, Acc, Fun) ->
+   case lists:member(map, proplists:get_value(feature, Bucket, [])) of
+      false ->
+         {error, not_supported};
+      true  ->
+         Bid = proplists:get_value(name,    Bucket),
+         Mod = proplists:get_value(storage, Bucket),
+         % resolve keyspace management
+         case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
+            {error, not_found}  ->
+               % no key space management
+               {ok, Pid} = kvs_sys:get(kvs_sys_ref, Bid),
+               Mod:fold(Pid, Acc, Fun);
+            {ok, Keyspace}      ->
+               % there is a key space management process
+               kvs_sys:fold(Keyspace, Acc,
+                  fun(Key, Pid, AccIn) ->
+                     {ok, Item} = Mod:get(Pid, Key),
+                     case Fun(Key, Item) of
+                        undefined -> AccIn;
+                        AccOut    -> AccOut
+                     end
+                  end
+               )
+         end
+   end.
    
 %%%------------------------------------------------------------------
 %%%

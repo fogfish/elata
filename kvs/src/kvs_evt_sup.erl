@@ -51,7 +51,7 @@ start_link() ->
    
 init([]) ->
    Process = {
-      kvs_ets,       % child id
+      kvs_evt_handler,       % child id
       {
          kvs_evt_handler_sup, % Mod
          start_link,          % Fun

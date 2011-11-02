@@ -217,22 +217,21 @@ top_srcdir = @top_srcdir@
 #
 SUBDIRS = test
 ESRC = \
-   src/gen_kvs_bucket.erl \
-   src/kvs_sys.erl \
    src/kvs.erl \
-   src/kvs_bucket.erl \
+   src/kvs_app.erl \
    src/kvs_sup.erl \
-   src/kvs_cache_sup.erl \
-   src/kvs_cache.erl \
-   src/kvs_dets.erl \
-   src/kvs_rrd.erl \
+   src/kvs_sys.erl \
    src/kvs_evt.erl \
    src/kvs_evt_sup.erl \
    src/kvs_evt_handler_sup.erl \
-   src/kvs_evt_log.erl \
-   src/kvs_log_sync.erl \
+   src/gen_kvs.erl \
+   src/kvs_ets.erl \
+   src/kvs_dets.erl \
+   src/kvs_cache_sup.erl \
+   src/kvs_cache.erl \
+   src/kvs_rrd.erl \
    src/kvs_ht.erl \
-   src/kvs_app.erl
+   src/kvs_sync_ht_tx.erl
 
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) ebin/kvs.app
 nobase_pkgliberl_SCRIPTS = $(EBIN)

@@ -29,45 +29,92 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_bucket_tests).
+-module(kvs_dets_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
-basic_domain_test_() ->
+%%
+%% Unit test of KVS proxy to ETS via keyval_store interface 
+%%
+
+kvs_dets_test_() ->
    {
       setup,
-      fun() -> 
-         kvs_sys:start_link([kvs_sys_ref]),
-         kvs_sys:start_link([kvs_sys_bucket])
+      fun() ->
+         kvs:start(),
+         {ok, _} = kvs:new(test, [{storage, kvs_dets}, {file, "/tmp/test.dets"}]),
+         true = filelib:is_file("/tmp/test.dets")
       end,
-      [
-      { "Define domain", fun define/0},
-      { "Lookup domain", fun lookup/0},
-      { "Delete domain", fun delete/0},
-      { "Undefined domain", fun undefined/0} 
+      fun(_) ->
+         file:delete("/tmp/test.dets")
+      end,
+      [                                      
+      { "Put item", fun put/0},
+      { "Has item", fun has/0},
+      { "Get item", fun get/0},
+      { "Remove item", fun remove/0},
+      { "Map items", fun map/0},
+      { "Fold items", fun fold/0}
       ]
    }.
    
-%%
-define() ->
+-define(VAL, "value").   
+   
+%%%
+%%% 
+%%%
+put() ->
    ?assert(
-      ok =:= kvs_bucket:define(test, [{storage, kvs_sys}])
-   ).
- 
-%%
-lookup() ->
-   ?assert(
-      {ok, [{name, test}, {storage, kvs_sys}]} =:= kvs_bucket:lookup(test)
-   ).
-
-%%
-delete() ->
-   ?assert(
-      ok =:= kvs_bucket:remove(test)
+      ok =:= kvs:put(test, key, ?VAL)
    ).
    
-undefined() ->
+has() ->
    ?assert(
-      {error, not_found} =:= kvs_bucket:lookup(test)
+      true  =:= kvs:has(test, key)
+   ),
+   ?assert(
+      false =:= kvs:has(test, nokey)
    ).
+   
+get() ->
+   ?assert(
+      {ok, ?VAL} =:= kvs:get(test, key)
+   ),
+   ?assert(
+      {error, not_found} =:= kvs:get(test, nokey)
+   ).
+   
+remove() ->
+   ?assert(
+      ok =:= kvs:remove(test, key)
+   ),
+   timer:sleep(100),
+   ?assert(
+      {error, not_found} =:= kvs:get(test, key)
+   ).
+
+map() ->
+   lists:foreach(
+      fun(X) -> kvs:put(test, X, X) end,
+      lists:seq(1, 5)
+   ),
+   R1 = kvs:map(test, fun(_, V) -> V * V end),
+   lists:foreach(
+      fun(X) -> kvs:remove(test, X) end,
+      lists:seq(1, 5)
+   ),
+   ?assert( [1, 4, 9, 16, 25] =:= R1).
+   
+fold() ->
+   lists:foreach(
+      fun(X) -> kvs:put(test, X, X) end,
+      lists:seq(1, 5)
+   ),
+   R1 = kvs:fold(test, 0, fun(_, V, Acc) -> Acc + V end),
+   lists:foreach(
+      fun(X) -> kvs:remove(test, X) end,
+      lists:seq(1, 5)
+   ),
+   ?assert( R1 =:= 15 ).
+
    

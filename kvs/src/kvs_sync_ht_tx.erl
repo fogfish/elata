@@ -29,35 +29,64 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_evt).
+-module(kvs_sync_ht_tx).
+-behaviour(gen_fsm).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% kvs I/O events
-%%
+%%%
+%%% Bucket Sync TX based on hash tree
+%%%
 
-%% Public API
 -export([
-   start_link/0,
-   subscribe/1,
-   unsubscribe/1,
-   notify/4
+   start_link/1,
+   % gen_fsm
+   init/1,
+   'DIFF'/2,
+   'DATA'/2,
+   handle_event/3,
+   handle_sync_event/4,
+   handle_info/3,
+   terminate/3,
+   code_change/4
 ]).
 
-start_link() ->
-   gen_event:start_link({local, ?MODULE}).
 
-subscribe({Handler, Args}) ->
-   ok = gen_event:add_sup_handler(?MODULE, Handler, Args);
-subscribe(Handler) ->
-   io:format('subscribe: ~p~n', [Handler]),
-   ok = gen_event:add_sup_handler(?MODULE, Handler, []).
+
+%%%------------------------------------------------------------------   
+%%%
+%%% gen_fsm
+%%%
+%%%------------------------------------------------------------------
+start_link(Bucket) ->
+   gen_fsm:start_link(?MODULE, [Bucket]).
    
-unsubscribe({Handler, Args}) ->
-   gen_event:delete_handler(?MODULE, Handler, Args);
-unsubscribe(Handler) ->
-   gen_event:delete_handler(?MODULE, Handler, []).   
+init([Bucket]) ->
+   {ok, 'DIFF', []}.
+
+%%%
+%%%
+'DIFF'(_Evt, State) ->
+   {next_state, 'DIFF', State}.
    
-notify(Act, Cat, Key, Val) ->
-   gen_event:notify(?MODULE, {Act, Cat, Key, Val}).
-      
+%%%
+%%%
+'DATA'(_Evt, State) ->
+   {next_state, 'DATA', State}.
+
+%%%
+%%% 
+handle_event(Msg, Name, State) ->
+   erlang:apply(?MODULE, Name, [Msg, State]).
+   
+handle_info(Msg, Name, State) ->
+   erlang:apply(?MODULE, Name, [Msg, State]).
+
+terminate(Reason, Name, State) ->
+   ok.
+   
+code_change(_OldVsn, Name, State, _Extra) ->
+   {ok, Name, State}.    
+   
+handle_sync_event(_Req, _From, Name, State) ->
+   {reply, {error, not_supported}, Name, State}.   
+   

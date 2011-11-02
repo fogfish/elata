@@ -59,7 +59,7 @@ kvs_rrd_cache_test_() ->
    
 setup_rrd_ipc() ->
    application:start(kvs),
-   ok = kvs_bucket:define(test, [
+   {ok, _} = kvs:new(test, [
       {storage, kvs_rrd},
       {codepath, "/usr/local/macports"},
       {datapath, "/private/tmp/kvs"}
@@ -67,7 +67,7 @@ setup_rrd_ipc() ->
 
 setup_rrd_cache() ->
    application:start(kvs),
-   ok = kvs_bucket:define(test, [
+   {ok, _} = kvs:new(test, [
       {storage, kvs_rrd},
       {codepath, "/usr/local/macports"},
       {datapath, "/private/tmp/kvs"},

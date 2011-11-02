@@ -37,106 +37,42 @@ kvs_sys_test_() ->
    {
       setup,
       fun() ->
-         {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
-         {ok, _} = kvs_sys:start_link([kvs_sys_bucket])
+         {ok, _} = kvs_sys:start_link(kvs_sys_ref),
+         {ok, _} = kvs_sys:start_link(kvs_sys_cat)
       end,
       fun(X) ->
          ets:delete(kvs_sys_ref),
-         ets:delete(kvs_sys_bucket)
+         ets:delete(kvs_sys_cat)
       end,
       [
-         {"Put item into sys bucket", fun put/0},
-         {"Has item in sys bucket", fun has/0},
-         {"Get item in sys bucket", fun get/0},
-         {"Remove item in sys bucket", fun remove/0},
-         {"Map items in sys bucket", fun map/0}
+         {"New sys", fun new/0},
+         {"Put sys", fun put/0},
+         {"Get sys", fun get/0},
+         {"Remove sys", fun remove/0}
       ]
    }.
-
-kvs_sys_api_test_() ->
-   {
-      setup,
-      fun() ->
-         {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
-         {ok, _} = kvs_sys:start_link([kvs_sys_bucket])
-      end,
-      fun(X) ->
-         ets:delete(kvs_sys_ref),
-         ets:delete(kvs_sys_bucket)
-      end,
-      [
-         {"KVS Put", fun kvs_put/0},
-         {"KVS Has", fun kvs_has/0},
-         {"KVS Get", fun kvs_get/0},
-         {"KVS Remove", fun kvs_remove/0},
-         {"KVS Map", fun kvs_map/0}
-      ]
-  }.
   
+new() ->
+   {ok, _} = kvs:new(test, [{storage, kvs_sys}]),
+   {ok, _} = kvs:get(kvs_sys_ref, test),
+   {ok, _} = kvs:get(kvs_sys_cat, test).
+   
 put() ->
    ?assert(
-      ok =:= kvs_sys:put(kvs_sys_bucket, test, {a, b, c})
+      ok =:= kvs:put(test, key, self())
    ).
 
-has() ->
-   ?assert(
-      true =:= kvs_sys:has(kvs_sys_bucket, test)
-   ).
-   
 get() ->
    ?assert(
-      {ok, {a, b, c}} =:= kvs_sys:get(kvs_sys_bucket, test)
+      {ok, self()} =:= kvs:get(test, key)
    ).
    
 remove() ->
    ?assert(
-      ok =:= kvs_sys:remove(kvs_sys_bucket, test)
+      ok =:= kvs:remove(test, key)
    ),
    ?assert(
-      {error, not_found} =:= kvs_sys:get(kvs_sys_bucket, test)
+      {error, not_found} =:= kvs:get(test, key)
    ).
 
-map() ->
-   ok = kvs_sys:put(kvs_sys_bucket, 1, a),
-   ok = kvs_sys:put(kvs_sys_bucket, 2, b),
-   ok = kvs_sys:put(kvs_sys_bucket, 3, c),
-   L  = kvs_sys:map(kvs_sys_bucket, fun(K,V) -> {K,V} end),
-   ?assert( lists:member({1,a}, L) ),
-   ?assert( lists:member({2,b}, L) ),
-   ?assert( lists:member({3,c}, L) ).
-   
-   
-kvs_put() ->
-   ?assert(
-      ok =:= kvs:put(kvs_sys_bucket, test, [{name, test}, {val, abc}])
-   ).
-   
-kvs_has() ->
-   ?assert(
-      true  =:= kvs:has(kvs_sys_bucket, test)
-   ),
-   ?assert(
-      false =:= kvs:has(kvs_sys_bucket, undef)
-   ).
 
-kvs_get() ->
-   ?assert(
-      {ok, [{name, test}, {val, abc}]} =:= kvs:get(kvs_sys_bucket, test)
-   ).
-   
-kvs_remove() ->
-   ?assert(
-      ok =:= kvs:remove(kvs_sys_bucket, test)
-   ),
-   ?assert(
-      {error, not_found} =:= kvs:get(kvs_sys_bucket, test)
-   ).
-   
-kvs_map() ->
-   ok = kvs:put(kvs_sys_bucket, 1, a),
-   ok = kvs:put(kvs_sys_bucket, 2, b),
-   ok = kvs:put(kvs_sys_bucket, 3, c),
-   L  = kvs:map(kvs_sys_bucket, fun(K,V) -> {K,V} end),
-   ?assert( lists:member({1,a}, L) ),
-   ?assert( lists:member({2,b}, L) ),
-   ?assert( lists:member({3,c}, L) ).   

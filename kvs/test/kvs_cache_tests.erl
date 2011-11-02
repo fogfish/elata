@@ -40,53 +40,89 @@
 kvs_cache_test_() ->
    {
       setup,
-      fun setup/0,
+      fun() ->
+         kvs:start(),
+         {ok, _} = kvs:new(test, [
+            {storage, kvs_cache_sup}, 
+            {getter, 
+               fun
+                  (A, V) when is_list(V) -> proplists:get_value(A, V);
+                  (A, V) -> undefined
+               end
+            }
+         ])
+      end,
       [                                      
       { "Put item", fun put/0},
       { "Has item", fun has/0},
       { "Get item", fun get/0},
       { "Has item", fun remove/0},
+      { "Map items", fun map/0},
+      { "Fold items", fun fold/0},
       { "TTL item", {timeout, 10, fun ttl/0}}
       ]
    }.
-
-setup() ->
-   application:start(kvs),
-   kvs_bucket:define(test, [{storage, kvs_cache_sup}]).
    
+-define(VAL, "value").   
+
 %%%
 %%% 
 %%%
 put() ->
    ?assert(
-      ok =:= kvs:put(test, a, {a, b, c})
+      ok =:= kvs:put(test, key, ?VAL)
    ).
    
 has() ->
    ?assert(
-      true  =:= kvs:has(test, a)
+      true  =:= kvs:has(test, key)
    ),
    ?assert(
-      false =:= kvs:has(test, b)
+      false =:= kvs:has(test, nokey)
    ).
    
 get() ->
    ?assert(
-      {ok, {a, b, c}} =:= kvs:get(test, a)
+      {ok, ?VAL} =:= kvs:get(test, key)
    ),
    ?assert(
-      {error, not_found} =:= kvs:get(test, b)
+      {error, not_found} =:= kvs:get(test, nokey)
    ).
    
 remove() ->
    ?assert(
-      ok =:= kvs:remove(test, a)
+      ok =:= kvs:remove(test, key)
    ),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= kvs:get(test, a)
+      {error, not_found} =:= kvs:get(test, key)
    ).
 
+map() ->
+   lists:foreach(
+      fun(X) -> kvs:put(test, X, X) end,
+      lists:seq(1, 5)
+   ),
+   R1 = kvs:map(test, fun(_, V) -> V * V end),
+   lists:foreach(
+      fun(X) -> kvs:remove(test, X) end,
+      lists:seq(1, 5)
+   ),
+   ?assert( [1, 4, 9, 16, 25] =:= R1).
+   
+fold() ->
+   lists:foreach(
+      fun(X) -> kvs:put(test, X, X) end,
+      lists:seq(1, 5)
+   ),
+   R1 = kvs:fold(test, 0, fun(_, V, Acc) -> Acc + V end),
+   lists:foreach(
+      fun(X) -> kvs:remove(test, X) end,
+      lists:seq(1, 5)
+   ),
+   ?assert( R1 =:= 15 ).   
+   
+   
 ttl() ->
    Item = [{ttl, 2}, value],
    ?assert(

@@ -33,19 +33,19 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -behaviour(supervisor).
--behaviour(gen_kvs_bucket).
+-behaviour(gen_kvs).
 
 -export([
    % supervisor
    start_link/1,
    init/1,                    
    % gen_kvs_bucket
-   construct/1,
-   config/0,
    put/3,
    has/2,
    get/2,
-   remove/2
+   remove/2,
+   map/2,
+   fold/3
 ]).
 
 %%%------------------------------------------------------------------
@@ -53,50 +53,76 @@
 %%% Supervisor
 %%%
 %%%------------------------------------------------------------------
-start_link(Bucket) ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+start_link(Spec) ->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, [Spec]).
    
-init([]) ->
-   Process = {
+init([Spec]) ->
+   Cat     = proplists:get_value(name, Spec), 
+   {ok, _} = kvs:new({key, Cat}, [{storage, kvs_sys}]),
+   gen_kvs:init(Cat, Spec),
+   {ok,
+      {
+         {simple_one_for_one, 2, 1},   % 2 faults per second
+         [element(Cat)]
+      }
+   }.
+
+element(Cat) ->
+   {
       kvs_cache,       % child id
       {
          kvs_cache,  % Mod
          start_link, % Fun
-         []          % Args
+         [Cat]       % Args
       },
       transient, 2000, worker, dynamic 
-   },
-   {ok,
-      {
-         {simple_one_for_one, 2, 1},   % 2 faults per second
-         [Process]
-      }
-   }.
-
+   }.   
+   
 %%%------------------------------------------------------------------
 %%%
 %%% gen_kvs_entity
 %%%
 %%%------------------------------------------------------------------
-construct([Bucket, Key, Item]) ->
-   supervisor:start_child(?MODULE, [Bucket, Key, Item]).
-
-config() ->
-   [
-      keyspace,                % key-to-pid management by ext process
-      {supervise, supervisor}, % storage plugin is supervisor
-      {feature, [map]}         % map feature is supported
-   ].
+put(Cat, Key, Val) ->
+   case gen_kvs:key_to_pid(Cat, Key) of
+      {error, not_found} ->
+         {ok, _} = supervisor:start_child(?MODULE, [Key, Val]),
+         ok;
+      {ok, Pid}          ->
+         gen_server:call(Pid, {kvs_put, Key, Val})
+   end.
    
-put(Pid, Key, Item) ->
-   gen_server:call(Pid, {kvs_put, Key, Item}).
+has(Cat, Key) ->
+   case gen_kvs:key_to_pid(Cat, Key) of
+      {error, not_found} -> false;
+      {ok, _}            -> true
+   end.
    
-has(Pid, Key) ->
-   gen_server:call(Pid, {kvs_has, Key}).
+get(Cat, Key) ->
+   case gen_kvs:key_to_pid(Cat, Key) of
+      {ok, Pid} -> gen_server:call(Pid, {kvs_get, Key});
+      Error     -> Error
+   end.
    
-get(Pid, Key) ->
-   gen_server:call(Pid, {kvs_get, Key}).
-   
-remove(Pid, Key) ->
-   gen_server:cast(Pid, {kvs_remove, Key}).
+remove(Cat, Key) ->
+   case gen_kvs:key_to_pid(Cat, Key) of
+      {ok, Pid}          -> gen_server:cast(Pid, {kvs_remove, Key});
+      {error, not_found} -> ok
+   end.
       
+map(Cat, Fun) ->
+   gen_kvs:key_map(
+      Cat, 
+      fun(Pid, Key) -> gen_server:call(Pid, {kvs_get, Key}) end,
+      Fun
+   ).
+
+
+fold(Cat, Acc, Fun) ->
+   gen_kvs:key_fold(
+      Cat,
+      Acc,
+      fun(Pid, Key) -> gen_server:call(Pid, {kvs_get, Key}) end,
+      Fun
+   ).
+   

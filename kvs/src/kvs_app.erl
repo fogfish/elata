@@ -41,28 +41,29 @@
 -define(APPNAME,  kvs).
 
 start(_Type, _Args) -> 
-   Config = config(?APPNAME, [
-      sync,
-      evt_log, 
-      {evt_log_ttl, 7 * 24 * 3600}, 
-      {evt_log_chunk, 128}
-   ]),
-   case kvs_sup:start_link(Config) of
+   %Config = config(?APPNAME, [
+   %   sync,
+   %   evt_log, 
+   %   {evt_log_ttl, 7 * 24 * 3600}, 
+   %   {evt_log_chunk, 128}
+   %]),
+   {ok, _} = kvs_sys:start_link(kvs_sys_ref),
+   {ok, _} = kvs_sys:start_link(kvs_sys_cat),
+   case kvs_sup:start_link([]) of
       {ok, Pid} ->
          % start system buckets
-         {ok, _} = kvs_sys:start_link([kvs_sys_ref]),
-         {ok, _} = kvs_sys:start_link([kvs_sys_bucket]),
+         
          % start evt_log with default config
-         case proplists:is_defined(evt_log, Config) of
-            true  ->
-               kvs_evt_sup:subscribe({kvs_evt_log, [[
-                  {ttl,  proplists:get_value(evt_log_ttl,   Config)}, 
-                  {chunk,proplists:get_value(evt_log_chunk, Config)}
-               ]]}),
-               kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}]);
-            false ->
-               ok
-         end,
+         %case proplists:is_defined(evt_log, Config) of
+         %   true  ->
+         %      kvs_evt_sup:subscribe({kvs_evt_log, [[
+         %         {ttl,  proplists:get_value(evt_log_ttl,   Config)}, 
+         %         {chunk,proplists:get_value(evt_log_chunk, Config)}
+         %      ]]}),
+         %      kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}]);
+         %   false ->
+         %      ok
+         %end,
          {ok, Pid};
       Other     -> {error, Other}
    end. 

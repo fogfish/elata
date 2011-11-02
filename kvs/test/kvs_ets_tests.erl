@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,49 +29,88 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_evt_log_tests).
+-module(kvs_ets_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
+%%
+%% Unit test of KVS proxy to ETS via keyval_store interface 
+%%
 
-kvs_bin_log_test_() ->
+kvs_ets_test_() ->
    {
       setup,
-      fun setup/0,
-      [
+      fun() ->
+         kvs:start(),
+         {ok, _} = kvs:new(test, [{storage, kvs_ets}])
+      end,
+      [                                      
       { "Put item", fun put/0},
+      { "Has item", fun has/0},
+      { "Get item", fun get/0},
       { "Remove item", fun remove/0},
-      { "Expire", {timeout, 10, fun expire/0}}
+      { "Map items", fun map/0},
+      { "Fold items", fun fold/0}
       ]
    }.
    
-setup() ->
-   application:start(kvs),
-   kvs_evt_sup:subscribe({kvs_evt_log, [[{ttl, 5}, {chunk, 10}]]}),
-   kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}, {ttlpos, 2}]),
-   kvs_bucket:define(test, [{storage, kvs_sys}, event, evtlog]).
-
-
-
-put()  ->
-   Key = {key, 1},
-   ok = kvs:put(test, Key, {val, 1}),
-   timer:sleep(100),
+-define(VAL, "value").   
+   
+%%%
+%%% 
+%%%
+put() ->
    ?assert(
-      {ok, {chunk, 5, [{put, 0, test, Key, {val, 1}}]}} =:= kvs:get(kvs_evt_log, 0)
+      ok =:= kvs:put(test, key, ?VAL)
+   ).
+   
+has() ->
+   ?assert(
+      true  =:= kvs:has(test, key)
+   ),
+   ?assert(
+      false =:= kvs:has(test, nokey)
+   ).
+   
+get() ->
+   ?assert(
+      {ok, ?VAL} =:= kvs:get(test, key)
+   ),
+   ?assert(
+      {error, not_found} =:= kvs:get(test, nokey)
    ).
    
 remove() ->
-   Key = {key, 1},
-   ok = kvs:remove(test, Key),
+   ?assert(
+      ok =:= kvs:remove(test, key)
+   ),
    timer:sleep(100),
    ?assert(
-      {ok, {chunk, 5, [{put, 0, test, Key, {val, 1}}, {remove, 1, test, Key}]}} =:= kvs:get(kvs_evt_log, 0)
+      {error, not_found} =:= kvs:get(test, key)
    ).
+
+map() ->
+   lists:foreach(
+      fun(X) -> kvs:put(test, X, X) end,
+      lists:seq(1, 5)
+   ),
+   R1 = kvs:map(test, fun(_, V) -> V * V end),
+   lists:foreach(
+      fun(X) -> kvs:remove(test, X) end,
+      lists:seq(1, 5)
+   ),
+   ?assert( [1, 4, 9, 16, 25] =:= R1).
    
-expire() ->   
-   timer:sleep(6000),
-   ?assert(
-      {error, not_found} =:= kvs:get(kvs_evt_log, 0)
-   ).
+fold() ->
+   lists:foreach(
+      fun(X) -> kvs:put(test, X, X) end,
+      lists:seq(1, 5)
+   ),
+   R1 = kvs:fold(test, 0, fun(_, V, Acc) -> Acc + V end),
+   lists:foreach(
+      fun(X) -> kvs:remove(test, X) end,
+      lists:seq(1, 5)
+   ),
+   ?assert( R1 =:= 15 ).
+
    

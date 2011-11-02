@@ -50,20 +50,18 @@
 kvs_evt_test_() ->
    {
       setup,
-      fun setup/0,
+      fun() ->
+         kvs:start(),
+         kvs_evt_sup:subscribe(kvs_evt_tests),
+         kvs:new(test_src, [{storage, kvs_sys}, event]),
+         kvs:new(test_dst, [{storage, kvs_sys}])
+      end,
       [
       { "Put    event", fun put/0},
       { "Remove event", fun remove/0}
       ]
    }.
    
-setup() ->
-   application:start(kvs),
-   kvs_evt_sup:subscribe(kvs_evt_tests),
-   kvs_bucket:define(test_src, [event, {storage, kvs_cache_sup}]),
-   kvs_bucket:define(test_dst, [{storage, kvs_sys}]).
-   
-
 put() ->   
    ?assert(
       ok =:= kvs:put(test_src, a, {a, b, c})

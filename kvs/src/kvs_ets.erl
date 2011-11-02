@@ -29,14 +29,14 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_dets).
+-module(kvs_ets).
 -behaviour(gen_kvs).
 -behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("stdlib/include/qlc.hrl").
 
 %%
-%%  Wrapper of Key/Value Interface to ETS
+%% In-Memory bucket (uses ETS internally)
 %%
 
 -export([
@@ -48,13 +48,13 @@
    remove/2,
    map/2,
    fold/3,
-   %% gen_server
+   % gen_server
    init/1, 
    handle_call/3,
    handle_cast/2, 
    handle_info/2, 
    terminate/2, 
-   code_change/3 
+   code_change/3
 ]).
 
 %%
@@ -71,16 +71,17 @@
 }).
 
 %%
-%% On-disk key/val storage
+%% In-memory key/val storage
 %%    Storage specific options
-%%       {file, ...}
+%%       {type,   ...} type, (default set)
+%%       {scope,  ...} scope (default private)
 start_link(Spec) ->
-  gen_server:start_link(?MODULE, [Spec], []).
-  
+   gen_server:start_link(?MODULE, [Spec], []).
+
 init([Spec]) ->
-   Cat       = proplists:get_value(name,  Spec),
-   File      = proplists:get_value(file,  Spec),
-   {ok, Ref} = dets:open_file(Cat, [{file, File}]),
+   Type   = proplists:get_value(type,  Spec, ordered_set),
+   Access = proplists:get_value(scope, Spec, public),
+   Ref    = ets:new(kvs_bucket, [Access, Type]),
    gen_kvs:init(Spec),
    ?DEBUG(Spec),
    {ok, 
@@ -88,7 +89,7 @@ init([Spec]) ->
          ref = Ref,
          cat = Spec
       }
-   }.
+   }. 
 
 %%%------------------------------------------------------------------   
 %%%
@@ -102,7 +103,8 @@ put(Pid, Key, Val) ->
    gen_server:call(Pid, {kvs_put, Key, Val}).
 
 kvs_put(Key, Val, S) ->
-   dets:insert(S#srv.ref, {Key, Val}).
+   ets:insert(S#srv.ref, {Key, Val}),
+   ok.
 
 %%
 %%
@@ -110,9 +112,9 @@ has(Pid, Key) ->
    gen_server:call(Pid, {kvs_has, Key}).
 
 kvs_has(Key, S) ->
-   case dets:lookup(S#srv.ref, Key) of
+   case ets:lookup(S#srv.ref, Key) of
       [Val] -> true;
-      _     -> false
+      []    -> false
    end.   
    
 %%
@@ -121,10 +123,9 @@ get(Pid, Key) ->
    gen_server:call(Pid, {kvs_get, Key}).
   
 kvs_get(Key, S) ->
-   case dets:lookup(S#srv.ref, Key) of
+   case ets:lookup(S#srv.ref, Key) of
       [{Key, Val}] -> {ok, Val};
-      []           -> {error, not_found};
-      Err          -> Err
+      []           -> {error, not_found}
    end.    
    
 %%
@@ -133,7 +134,8 @@ remove(Pid, Key) ->
    gen_server:call(Pid, {kvs_remove, Key}).
   
 kvs_remove(Key, S) ->  
-   dets:delete(S#srv.ref, Key).
+   ets:delete(S#srv.ref, Key),
+   ok.   
 
 %%
 %%
@@ -142,7 +144,7 @@ map(Pid, Fun)  ->
 
 kvs_map(Fun, S) ->
    Map = fun({K, V}) -> Fun(K, V) end,
-   Q = qlc:q([ Map(X) || X <- dets:table(S#srv.ref)]),
+   Q = qlc:q([ Map(X) || X <- ets:table(S#srv.ref)]),
    qlc:e(Q). 
 
 %%   
@@ -152,10 +154,9 @@ fold(Pid, Acc, Fun) ->
    
 kvs_fold(Acc, Fun, S) ->
    Fold = fun({K, V}, A) -> Fun(K, V, A) end,
-   Q = qlc:q([ X || X <- dets:table(S#srv.ref)]),
-   qlc:fold(Fold, Acc, Q).   
-   
-   
+   Q = qlc:q([ X || X <- ets:table(S#srv.ref)]),
+   qlc:fold(Fold, Acc, Q).
+
 %%%------------------------------------------------------------------   
 %%%
 %%% gen_server
@@ -188,7 +189,7 @@ terminate(_Reason, S) ->
    
 code_change(_OldVsn, State, _Extra) ->
    {ok, State}.        
-
+   
 %%%------------------------------------------------------------------   
 %%%
 %%% Private functions

@@ -1,9 +1,9 @@
 TESTS  = kvs_sys_tests
-#TESTS += kvs_bucket_tests
-#TESTS += kvs_cache_tests
-#TESTS += kvs_evt_tests
-#TESTS += kvs_rrd_tests
-#TESTS += kvs_evt_log_tests
+TESTS += kvs_evt_tests
+TESTS += kvs_ets_tests
+TESTS += kvs_dets_tests
+TESTS += kvs_cache_tests
+TESTS += kvs_rrd_tests
 TESTS += kvs_ht_tests
 
 

@@ -51,9 +51,9 @@
 -record(srv, {
    ttl,       % time-to-live in seconds
    timestamp, % timestamp of last item i/o activity
-   bucket,    % name of bucket where key belongs
+   cat,       % name of category where key belongs
    key,       % key
-   item       % value
+   val        % value
 }).
 
 %%
@@ -66,45 +66,31 @@
 
 %%
 %%
-start_link(Bucket, Key, Item) ->
-  gen_server:start_link(?MODULE, [Bucket, Key, Item], []).
+start_link(Cat, Key, Val) ->
+  gen_server:start_link(?MODULE, [Cat, Key, Val], []).
   
-init([Bucket, Key, Item]) ->
-   TTL = case is_list(Item) of
-      true  -> proplists:get_value(ttl, Item);
-      false -> case proplists:get_value(ttlpos, Bucket) of
-                  undefined -> undefined;
-                  Pos       -> erlang:element(Pos, Item)
-               end
-   end,
-   ttl_timer(TTL),
-   % register itself to keyspace
-   Name = proplists:get_value(name, Bucket),
-   ok   = kvs:put({keyspace, Name}, Key, self()),
+init([Cat, Key, Val]) ->
+   gen_kvs:vinit(Cat, Key),
    {ok, 
       #srv{
-         ttl=TTL,
+         ttl=ttl_timer(gen_kvs:vattr(Cat, ttl, Val)),
          timestamp=timestamp(),
-         bucket=Bucket, 
+         cat=Cat, 
          key=Key,
-         item=Item
+         val=Val
       }
    }. 
    
-handle_call({kvs_put, Key, Item}, _From, S) ->
-   TTL = case is_list(Item) of
-      true  -> proplists:get_value(ttl, Item);
-      false -> case proplists:get_value(ttlpos, S#srv.bucket) of
-                  undefined -> undefined;
-                  Pos       -> erlang:element(Pos, Item)
-               end
-   end,
-   ttl_timer(TTL),
-   {reply, ok, S#srv{ttl=TTL, timestamp=timestamp(), item=Item}};
-handle_call({kvs_has, Key}, _From, S) ->
-   {reply, true, S};
+handle_call({kvs_put, Key, Val}, _From, S) ->
+   {reply, ok, 
+      S#srv{
+         ttl=ttl_timer(gen_kvs:vattr(S#srv.cat, ttl, Val)), 
+         timestamp=timestamp(), 
+         val=Val
+      }
+   };
 handle_call({kvs_get, Key}, _From, S) ->
-   {reply, {ok, S#srv.item}, S#srv{timestamp=timestamp()}};
+   {reply, {ok, S#srv.val}, S#srv{timestamp=timestamp()}};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
 handle_cast({kvs_remove, Key}, State) ->
@@ -114,8 +100,9 @@ handle_cast(_Req, State) ->
  
 handle_info(expired, S) ->
    case S#srv.ttl of
-      undefined -> {noreply, S};
-      TTL ->
+      undefined -> 
+         {noreply, S};
+      TTL       ->
          Now      = timestamp(),
          Deadline = S#srv.timestamp + S#srv.ttl,
          ?DEBUG([
@@ -136,8 +123,7 @@ handle_info(_Msg, State) ->
    {noreply, State}.
    
 terminate(_Reason, S) ->
-   Name = proplists:get_value(name, S#srv.bucket),
-   kvs:remove({keyspace, Name}, S#srv.key),
+   gen_kvs:vterminate(S#srv.cat, S#srv.key),
    ok.
    
 code_change(_OldVsn, State, _Extra) ->
@@ -156,7 +142,8 @@ timestamp() ->
    
 % starts time-to-live timer   
 ttl_timer(undefined) ->
-   ok;
+   undefined;
 ttl_timer(TTL) ->   
    ?DEBUG([{ttl, TTL * 1000}]),
-   timer:send_after(TTL * 1000, expired).   
+   timer:send_after(TTL * 1000, expired),
+   TTL.

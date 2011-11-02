@@ -30,26 +30,34 @@
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
 -module(kvs_rrd).
+-behaviour(gen_kvs).
+-behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 
--behaviour(gen_server).
--behaviour(gen_kvs_bucket).
-
 %%
-%% RRD bucket is round-robin bucket to collect time series data
-%%    Key  is identity of data stream
-%%    Item is  value of data stream:
-%%       * if value is integer() then timestamp is calculated by erlang:now() 
-%%       * if value is tuple {timestamp, value}
-%%       * if value is list [{timestamp, ...}, {value, ...}] timestamp is optional
+%% RRD key/val is round-robin bucket to collect time series data 
+%% within rrd files, a dedicated file per key is created
+%%    Key   is identity of data stream
+%%    Value is time series stream value, in one of following format
+%%       * integer(), float() then timestamp is calculated by erlang:now() 
+%%       * tuple {timestamp, value}
+%%       * list [{timestamp, ...}, {value, ...}] timestamp is optional
 %%
-%% The bucket creates dedicates a RRD file for each data streams
+%% Storage configuration parameters
+%%    {datapath,  str} path to folder where *.rrd files are stored (default /var/lib/kvs/rrd)  
+%%    {heartbeat, int} time interval between consequent measurments
+%%    {type,      str} type of data stream (default GAUGE)
+%%    {timeout,   int} data confidence time interval (default 3x heartbeat)
+%%    
+%%    {codepath,  str} prefix path to rrd tools (default /usr)
+%%
+%%    {iocache,  bool} run RRD with disk cache mode (default false)
+%%    {sync,      int} disk sync timeout (default 120)
+%%    {iotime,    int} time used to sync data on disk (default 60)
 
 -export([
    start_link/1,
-   % gen_kvs_bucket
-   construct/1,
-   config/0,
+   % gen_kvs
    put/3,
    has/2,
    get/2,
@@ -62,6 +70,14 @@
    terminate/2, 
    code_change/3
 ]).
+
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
 
 %%%
 %%% Internal server state
@@ -79,32 +95,126 @@
    timeout
 }).
 
-start_link(Bucket) ->
+start_link(Spec) ->
    % kvs_rrd bucket is singleton - one instance per node
-   gen_server:start_link({local, ?MODULE}, ?MODULE, [Bucket], []).
+   gen_server:start_link(?MODULE, [Spec], []).
+
+init([Spec]) ->
+   % configure data stream storage
+   Data  = proplists:get_value(datapath,  Spec,  "/var/lib/kvs/rrd"), 
+   Hbeat = proplists:get_value(heartbeat, Spec, 60),
+   Type  = proplists:get_value(type,      Spec, "GAUGE"),
+   Tout  = proplists:get_value(timeout,   Spec, Hbeat * 3),
+   % configure rrdtools
+   Code  = proplists:get_value(codepath,  Spec, "/usr"),
+   Cache = case proplists:is_defined(iocache, Spec) of
+      true ->
+         {Host, Port} = proplists:get_value(daemon, Spec, {"127.0.0.1", 42217}),
+         W   = integer_to_list(proplists:get_value(sync,    Spec, 120)),
+         Z   = integer_to_list(proplists:get_value(iotime,  Spec, 60)),
+         P   = integer_to_list(Port),
+         Cmd = Code ++ "/bin/rrdcached -g -w " ++ W ++ " -z " ++ Z ++ 
+               " -l " ++ Host ++ ":" ++ P ++ " -B -b " ++ Data,
+         erlang:open_port({spawn, Cmd}, [exit_status]),
+         timer:send_after(5000, connect),
+         ?DEBUG([{daemon, Cmd}]),
+         {Host, Port};
+      false ->
+         error_logger:error_report({?MODULE, low_io_performance}),
+         % internal design assumes low performance OS IPC if proxy in not used.
+         undefined   
+   end,
+   % define in-memory bucket to keep a latest results of streams in memory
+   {ok, _} = kvs:new(kvs_rrd_cache, [{storage, kvs_sys}]),
+   % register itself
+   gen_kvs:init(Spec),
+   ?DEBUG(Spec),
+   {ok,
+      #srv{
+         code=Code,
+         stream=#stream{
+            datadir=Data, 
+            type=Type, 
+            heartbeat=Hbeat, 
+            timeout=Tout
+         },
+         sock=undefined,
+         daemon=Cache
+      }
+   }.
+   
    
 %%%------------------------------------------------------------------
 %%%
-%%% gen_kvs_entity
+%%% gen_kvs
 %%%
 %%%------------------------------------------------------------------
-construct(_) ->
+
+%%
+%% Put value into data stream
+put(Pid, Key, Val) ->
+   gen_server:cast(Pid, {kvs_put, Key, Val}).
+   
+kvs_put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = State) when is_integer(Value) ->
+   DS = key_to_stream(Key),
+   % validate that stream is present
+   ok = case filelib:is_file(S#stream.datadir ++ DS) of
+      true  -> ok;
+      false -> create_stream(S#stream.datadir ++ DS, State)
+   end,
+   ok = case Sock of
+      undefined ->
+         % socket is not defined (io proxy daemon is not enabled/running)
+         Cmd = [Code, "/bin/rrdupdate ", S#stream.datadir, DS, " ",  
+                integer_to_list(Timestamp), ":", integer_to_list(Value)],
+         rrdtool(Cmd);       
+      _         ->
+         % socket is exists, all data stream I/O handled by daemon
+         Msg = lists:flatten(
+            io_lib:format('UPDATE ~s ~b:~f~n', [DS, Timestamp, Value])
+         ),
+         gen_tcp:send(Sock, Msg)
+   end,
+   ok = kvs:put(kvs_rrd_cache, DS, {Timestamp, Value});   
+
+kvs_put(Key, Val, State) when is_integer(Val) ->
+   kvs_put(Key, {timestamp(), Val}, State);   
+
+kvs_put(Key, Val, State) when is_list(Val) ->
+   T = proplists:get_value(timestamp, Val, timestamp()),
+   V = proplists:get_value(value,     Val),
+   kvs_put(Key, {T, V}, State);
+
+kvs_put(_Key, _Val, _State) ->
    {error, not_supported}.
 
-config() ->
-   [{supervise, worker}].
-   
-put(Pid, Key, Item) ->
-   gen_server:cast(Pid, {kvs_put, Key, Item}).
-   
+
+%%
+%%
 has(Pid, Key) ->
    gen_server:call(Pid, {kvs_has, Key}).
-   
+
+kvs_has(Key, #srv{stream = S}) ->
+   DS = key_to_stream(Key),
+   filelib:is_file(S#stream.datadir ++ DS).
+
+%%
+%%   
 get(Pid, Key) ->
    gen_server:call(Pid, {kvs_get, Key}).
-   
-remove(Pid, Key) ->
-   gen_server:cast(Pid, {kvs_remove, Key}).   
+
+kvs_get(Key) ->
+   DS = key_to_stream(Key),
+   case kvs:get(kvs_rrd_cache, DS) of
+      {ok, {_, Val}} -> {ok, Val};
+      _              -> {error, not_found}
+   end.
+
+%%
+%%
+remove(_Pid, _Key) ->
+   {error, not_supported}.
+   %gen_server:cast(Pid, {kvs_remove, Key}).   
    
    
 %%%------------------------------------------------------------------
@@ -112,59 +222,22 @@ remove(Pid, Key) ->
 %%% gen_server
 %%%
 %%%------------------------------------------------------------------   
-init([Bucket]) ->
-   % configure data stream storage
-   Data  = proplists:get_value(datapath, Bucket,  "/var/lib/kvs/rrd"), 
-   Hbeat = proplists:get_value(heartbeat, Bucket, 60),
-   Type  = proplists:get_value(type,      Bucket, "GAUGE"),
-   Tout  = proplists:get_value(timeout,   Bucket, Hbeat * 3),
-   % configure rrdtools
-   Code  = proplists:get_value(codepath, Bucket, "/usr"),
-   Cache = case proplists:is_defined(iocache, Bucket) of
-      true ->
-         {Host, Port} = proplists:get_value(daemon, Bucket, {"127.0.0.1", 42217}),
-         W  = integer_to_list(proplists:get_value(flush,   Bucket, 120)),
-         Z  = integer_to_list(proplists:get_value(iotime,  Bucket, 60)),
-         P  = integer_to_list(Port),
-         Cmd = Code ++ "/bin/rrdcached -g -w " ++ W ++ " -z " ++ Z ++ 
-               " -l " ++ Host ++ ":" ++ P ++ " -B -b " ++ Data,
-         erlang:open_port({spawn, Cmd}, [exit_status]),
-         error_logger:info_report([{daemon, Cmd}]),
-         timer:send_after(5000, connect),
-         {Host, Port};
-      false ->
-         % internal design assumes low performance OS IPC if proxy in not used.
-         undefined   
-   end,
-   % define in-memory bucket to keep a latest results of streams in memory
-   ok = kvs_bucket:define(kvs_rrd_cache, [{storage, kvs_sys}]),
-   % register itself
-   Name = proplists:get_value(name, Bucket),
-   ok   = kvs:put(kvs_sys_ref, Name, self()),
-   {ok,
-      #srv{
-         code=Code,
-         stream=#stream{datadir=Data, type=Type, heartbeat=Hbeat, timeout=Tout},
-         sock=undefined,
-         daemon=Cache
-      }
-   }.
 
 %%
 %% handle_call
 handle_call({kvs_has, Key}, _From, State) ->
-   {reply, impl_has(Key, State), State};
+   {reply, kvs_has(Key, State), State};
 handle_call({kvs_get, Key}, _From, State) ->
-   {reply, impl_get(Key), State};
+   {reply, kvs_get(Key), State};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
 
 %%
 %% handle_cast
-handle_cast({kvs_put, Key, Item}, State) ->
-   impl_put(Key, Item, State),
+handle_cast({kvs_put, Key, Val}, State) ->
+   kvs_put(Key, Val, State),
    {noreply, State};
-handle_cast({kvs_remove, Key}, State) ->
+handle_cast({kvs_remove, _Key}, State) ->
    {noreply, State};
 handle_cast(_Req, State) ->
    {noreply, State}.
@@ -174,7 +247,7 @@ handle_cast(_Req, State) ->
 handle_info(connect, #srv{daemon = {Host, Port}} = State) ->
    %% connect to cache daemon
    {ok, Sock}   = gen_tcp:connect(Host, Port, [binary, {packet, 0}]),
-   error_logger:info_report([{module, ?MODULE}, {daemon, {Host, Port}}]),
+   ?DEBUG([{module, ?MODULE}, {daemon, {Host, Port}}]),
    {noreply, State#srv{sock = Sock}};
 handle_info(_Msg, State) ->
    {noreply, State}.
@@ -197,62 +270,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%%------------------------------------------------------------------   
 
 %%
-%% put value into data stream
-impl_put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = State) when is_integer(Value) ->
-   DS = key_to_stream(Key),
-   % validate that stream is present
-   ok = case filelib:is_file(S#stream.datadir ++ DS) of
-      true  -> ok;
-      false -> create_stream(S#stream.datadir ++ DS, State)
-   end,
-   ok = case Sock of
-      undefined ->
-         % socket is not defined (io proxy daemon is not enabled/running)
-         Cmd = [Code, "/bin/rrdupdate ", S#stream.datadir, DS, " ",  
-                integer_to_list(Timestamp), ":", integer_to_list(Value)],
-         rrdtool(Cmd);       
-      _         ->
-         % socket is exists, all data stream I/O handled by daemon
-         Msg = lists:flatten(
-            io_lib:format('UPDATE ~s ~b:~f~n', [DS, Timestamp, Value])
-         ),
-         gen_tcp:send(Sock, Msg)
-   end,
-   ok = kvs:put(kvs_rrd_cache, DS, {Timestamp, Value});   
-
-impl_put(Key, Item, State) when is_integer(Item) ->
-   impl_put(Key, {timestamp(), Item}, State);   
-
-impl_put(Key, Item, State) when is_list(Item) ->
-   T = proplists:get_value(timestamp, Item, timestamp()),
-   V = proplists:get_value(value, Item),
-   impl_put(Key, {T, V}, State);
-
-impl_put(Key, Item, State) ->
-   {error, not_supported}.
-
-   
-%%
-%%
-impl_has(Key, #srv{stream = S}) ->
-   DS = key_to_stream(Key),
-   filelib:is_file(S#stream.datadir ++ DS).
-   
-impl_get(Key) ->
-   DS = key_to_stream(Key),
-   case kvs:get(kvs_rrd_cache, DS) of
-      {ok, {_, Value}} -> {ok, Value};
-      _                -> {error, not_found}
-   end.
-   
-%%
 %% converts a key into file name
 key_to_stream(Key) ->
    Hash = crypto:sha(term_to_binary(Key)),
    Hex  = [ integer_to_list(X, 16) || X <- binary_to_list(Hash) ],
    File = lists:append(Hex),
    "/" ++ lists:sublist(File, 2) ++ "/" ++ File.
-   
+  
 %%
 %% retrive a time stamp
 timestamp() ->
@@ -273,9 +297,9 @@ create_stream(Stream, #srv{code = Code, stream = S}) ->
             " -s ", integer_to_list(S#stream.heartbeat)],
    DEF   = [" DS:val:", S#stream.type, ":", integer_to_list(S#stream.timeout), ":U:U "],
    RRA   = [" RRA:AVERAGE:0.9999:1:", integer_to_list(SPW),
-            " RRA:AVERAGE:0.9999:", integer_to_list(SPQ), ":", integer_to_list(QM),  %15min to 1 
-            " RRA:AVERAGE:0.9999:", integer_to_list(SPQ), ":", integer_to_list(HY)],
-   error_logger:info_report([{stream, lists:append(CMD ++ DEF ++ RRA)}]),
+            " RRA:AVERAGE:0.9999:",   integer_to_list(SPQ), ":", integer_to_list(QM),  %15min to 1 
+            " RRA:AVERAGE:0.9999:",   integer_to_list(SPH), ":", integer_to_list(HY)],
+   ?DEBUG([{stream, lists:append(CMD ++ DEF ++ RRA)}]),
    rrdtool(CMD ++ DEF ++ RRA).
       
    

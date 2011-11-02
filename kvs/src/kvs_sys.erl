@@ -34,106 +34,110 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 %%
-%% kvs_sys is a system buckets, used by kvs application to manage buckets metadata
+%% kvs_sys is a system category
 %%
 
 -export([
    start_link/1,
    % public API
-   construct/1,
-   config/0,
+   put/2,
    put/3,
    has/2,
    get/2,
    remove/2,
-   map/2
+   map/2,
+   fold/3
 ]).
 
 %%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
+
 %%
-start_link([kvs_sys_ref]) ->
+%%
+start_link(kvs_sys_ref) ->
    % system bucket maps named instances to they physical reference
-   Ref = ets:new(kvs_sys_ref, [public, named_table]),
-   ets:insert(kvs_sys_ref, {kvs_sys_ref, kvs_sys_ref}),
+   Ref = ets:new(kvs_sys_ref, [public, named_table, ordered_set]),
+   ets:insert(kvs_sys_ref, {kvs_sys_ref, {?MODULE, kvs_sys_ref}}),
    {ok, Ref};  
 
-start_link([kvs_sys_bucket]) ->
+start_link(kvs_sys_cat) ->
    % system bucket contains metadata of other buckets
-   Ref = ets:new(kvs_sys_bucket, [public, named_table]),
-   ets:insert(kvs_sys_ref, {kvs_sys_bucket, kvs_sys_bucket}),
+   Ref = ets:new(kvs_sys_cat, [public, named_table, ordered_set]),
+   ets:insert(kvs_sys_ref, {kvs_sys_cat, {?MODULE, kvs_sys_cat}}),
    % register all system buckets (enables access via kvs interface)
    SysRef = [
       {name,    kvs_sys_ref},
-      {storage, ?MODULE},
-      {feature, [map]}
+      {storage, ?MODULE}
    ],
-   SysBkt = [
-      {name,    kvs_sys_bucket},
-      {storage, ?MODULE},
-      {feature, [map]}
+   SysCat = [
+      {name,    kvs_sys_cat},
+      {storage, ?MODULE}
    ],
-   ets:insert(kvs_sys_bucket, {kvs_sys_ref,    SysRef}),
-   ets:insert(kvs_sys_bucket, {kvs_sys_bucket, SysBkt}),
-   error_logger:info_report(SysRef),
-   error_logger:info_report(SysBkt),
+   ets:insert(kvs_sys_cat, {kvs_sys_ref, SysRef}),
+   ets:insert(kvs_sys_cat, {kvs_sys_cat, SysCat}),
+   ?DEBUG(SysRef),
+   ?DEBUG(SysCat),
    {ok, Ref};
       
-start_link([Bucket | _]) ->
-   Name   = proplists:get_value(name,   Bucket),
-   Type   = proplists:get_value(type,   Bucket, set),
-   Access = proplists:get_value(access, Bucket, public),
-   % TODO: options
-   Ref  = ets:new(kvs_bucket, [Access, Type]),
-   ok   = kvs:put(kvs_sys_ref, Name, Ref),
+start_link(Cat) ->
+   Name   = proplists:get_value(name,   Cat),
+   Type   = proplists:get_value(type,   Cat, ordered_set),
+   Access = proplists:get_value(access, Cat, public),
+   % % TODO: options
+   Ref  = ets:new(kvs_category, [Access, Type]),
+   ok   = kvs:put(kvs_sys_ref,  Name, {?MODULE, Ref}),
+   ok   = kvs:put(kvs_sys_cat,  Name, Cat),
    {ok, Ref}.   
 
 %%
 %%
-construct(_) ->   
-   {error, not_supported}.
-   
-%%
-%%
-config() ->
-   [
-      % optional supported features
-      {feature, [map]}
-   ].
+put(Cat, Val) ->
+   ets:insert(Cat, Val),
+   ok.
+
+put(Cat, Key, Item) ->    
+   kvs_sys:put(Cat, {Key, Item}).   
 
 %%
 %%
-put(Name, Key, Item) ->                                             
-   case ets:insert(Name, {Key, Item}) of
-      true -> ok;
-      _    -> {error, fatal} 
-   end.   
-
-%%
-%%
-has(Name, Key) ->
-   case kvs_sys:get(Name, Key) of
+has(Cat, Key) ->
+   case kvs_sys:get(Cat, Key) of
       {ok, _} -> true;
       _       -> false
    end.
 
 %%
 %%
-get(Name, Key) ->
-   case ets:lookup(Name, Key) of
-      [{Key, Item}] -> {ok, Item};
-      []            -> {error, not_found}
+get(Cat, Key) ->
+   case ets:lookup(Cat, Key) of
+      [{Key, Val}] -> {ok, Val};
+      [Val]        -> {ok, Val};
+      []           -> {error, not_found}
    end.
 
 %%
 %%
-remove(Name, Key) ->
-   ets:delete(Name, Key),
+remove(Cat, Key) ->
+   ets:delete(Cat, Key),
    ok.
 
+   
 %%
 %%
-map(Name, Fun) ->
-   F = fun({K, V}) -> Fun(K, V) end,
-   Q = qlc:q([ F(X) || X <- ets:table(Name)]),
+map(Cat, Fun)  ->
+   Map = fun({K, V}) -> Fun(K, V) end,
+   Q = qlc:q([ Map(X) || X <- ets:table(Cat)]),
    qlc:e(Q).
+
+%%   
+%%
+fold(Cat, Acc, Fun) ->
+   Fold = fun({K, V}, A) -> Fun(K, V, A) end,
+   Q = qlc:q([ X || X <- ets:table(Cat)]),
+   qlc:fold(Fold, Acc, Q).
    
