@@ -92,19 +92,7 @@ node() ->
 %%
 %% Retrive list of connected nodes
 nodes() ->
-   SF = fun(X) ->
-      {ok, Info} = ek_prot:node_info(X#ek_node.pid),
-      case proplists:get_value(state, Info) of
-         'CONNECTED' -> true;
-         _           -> false
-      end
-   end,
-   [
-      N#ek_node.uri || N <- ets:match_object(ek_nodes, '_'), 
-                       N#ek_node.pid =/= self, 
-                       is_process_alive(N#ek_node.pid), 
-                       SF(N) =:= true
-   ].  
+   [ N#ek_node.uri || N <- alive_nodes() ].  
    
 %%
 %% Initiates a connection with remote node
@@ -140,7 +128,7 @@ send(Uri, Msg) ->
    Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
           binary_to_list(proplists:get_value(host, U)) ++ ":" ++
           integer_to_list(proplists:get_value(port, U)),
-   case lists:keyfind(Node, 2, ek:nodes()) of
+   case lists:keyfind(Node, 2, alive_nodes()) of
       false -> {error, no_connection};
       N     -> ek_prot:send(N#ek_node.pid, Uri, Msg)
    end.
@@ -171,6 +159,26 @@ listen({drop, Path}) ->
 listen(Path) ->
    ets:insert(ek_dispatch, {list_to_binary(Path), self()}).
 
+%%%------------------------------------------------------------------
+%%%
+%%% Private
+%%%
+%%%------------------------------------------------------------------
 
-   
+%%
+%% list of alive nodes and they pids
+alive_nodes() ->
+   SF = fun(X) ->
+      {ok, Info} = ek_prot:node_info(X#ek_node.pid),
+      case proplists:get_value(state, Info) of
+         'CONNECTED' -> true;
+         _           -> false
+      end
+   end,
+   [
+      N || N <- ets:match_object(ek_nodes, '_'), 
+           N#ek_node.pid =/= self, 
+           is_process_alive(N#ek_node.pid), 
+           SF(N) =:= true
+   ].
    
