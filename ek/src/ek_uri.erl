@@ -37,7 +37,9 @@
 %% 
 
 -export([
-   new/1
+   new/1,
+   host/1,
+   path/1
 ]).
 
 %%
@@ -90,6 +92,31 @@ uri(<<>>, port, Acc, U) ->
 uri(<<>>, Tag, Acc, U) ->
    [{Tag, Acc} | U].
     
+
+%%
+%% return schema://host:port
+host(U) when is_list(U) ->
+   case proplists:is_defined(schema, U) of
+      true  ->   
+         atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
+         binary_to_list(proplists:get_value(host, U)) ++ ":" ++
+         integer_to_list(proplists:get_value(port, U));
+      false ->
+         N = new(U),
+         atom_to_list(proplists:get_value(schema, N)) ++ "://" ++ 
+         binary_to_list(proplists:get_value(host, N)) ++ ":" ++
+         integer_to_list(proplists:get_value(port, N))
+   end.
+
+%% return /path
+path(U) ->
+   case proplists:is_defined(schema, U) of
+      true  ->
+         binary_to_list(proplists:get_value(path, U));
+      false ->
+         N = new(U),
+         binary_to_list(proplists:get_value(path, N))
+   end.
    
    
    
