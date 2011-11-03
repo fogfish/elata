@@ -56,10 +56,6 @@
    handle_info/3, 
    terminate/3, 
    code_change/4                                         
-   %% api
-   %send/2,
-   %multicast/2,
-   %recv/1
 ]).
 
 -record(fsm, {
@@ -98,7 +94,7 @@ send(Pid, Uri, Msg) ->
    
 %%%------------------------------------------------------------------   
 %%%
-%%% gen_server
+%%% gen_fsm
 %%%
 %%%------------------------------------------------------------------
 start_link(Config, Node) ->

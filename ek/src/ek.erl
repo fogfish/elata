@@ -101,7 +101,9 @@ nodes() ->
    end,
    [
       N#ek_node.uri || N <- ets:match_object(ek_nodes, '_'), 
-                       N#ek_node.pid =/= self, SF(N) =:= true
+                       N#ek_node.pid =/= self, 
+                       is_process_alive(N#ek_node.pid), 
+                       SF(N) =:= true
    ].  
    
 %%
@@ -110,8 +112,8 @@ nodes() ->
 %%    Node - list(), remote node identity
 connect(Node) ->
    case ets:lookup(ek_nodes, Node) of
-      [Node] -> {ok, Node#ek_node.pid};
-      _      -> ek_prot_sup:create(Node)
+      [N] -> {ok, N#ek_node.pid};
+      _   -> ek_prot_sup:create(Node)
    end.
 
 %%
@@ -138,11 +140,9 @@ send(Uri, Msg) ->
    Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
           binary_to_list(proplists:get_value(host, U)) ++ ":" ++
           integer_to_list(proplists:get_value(port, U)),
-   case ets:lookup(ek_nodes, Node) of
-      [N] ->
-         ek_prot:send(N#ek_node.pid, Uri, Msg);
-       _             ->
-         {error, node_not_found}
+   case lists:keyfind(Node, 2, ek:nodes()) of
+      false -> {error, no_connection};
+      N     -> ek_prot:send(N#ek_node.pid, Uri, Msg)
    end.
 
 %%
