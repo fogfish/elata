@@ -51,7 +51,7 @@ init([Config]) ->
    {ok,
       {
          {one_for_one, 4, 1800},
-         prot(Config) ++ event(Config) ++ listener(Config)
+         prot(Config) ++ event(Config) ++ listener(Config) ++ q(Config)
       }
    }.
 
@@ -133,3 +133,13 @@ event(Config) ->
    }
    ].   
    
+q(Config) ->
+   [{
+      ek_q_sup,
+      {
+         ek_q_sup,
+         start_link,
+         [Config]
+      },
+      permanent, 2000, supervisor, dynamic
+   }].

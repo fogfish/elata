@@ -26,6 +26,7 @@ ESRC = \
    src/ek_echo.erl \
    src/ek_evt.erl \
    src/ek_evt_srv.erl \
+   src/ek_service.erl \
    src/ek_app.erl
 
 EINC = \

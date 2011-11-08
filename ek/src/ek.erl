@@ -52,6 +52,8 @@
    demonitor/0,
    demonitor/1,
    % messaging
+   q/2,
+   q/3,
    send/2,
    multicast/2,
    broadcast/2,
@@ -65,14 +67,20 @@
 start(Node) ->
    start(Node, []).
 start(Node, Config) ->
-   {ok, _} = case erlang:whereis(ek_sup) of
-      undefined -> ek_app:start(permanent, Config);
-      Pid       -> {ok, Pid}
-   end,
-   case ek:node() of
-      undefined -> {ok, _} = ek_sup:listen([{node, Node}]);
-      Uri       -> {error, {already_exists, Uri}}
-   end.
+   lists:foreach(
+      fun({K, V}) -> application:set_env(ek, K, V) end,
+      [{node, Node} | Config]
+   ),
+   {file, Module} = code:is_loaded(?MODULE),
+   AppFile = filename:dirname(Module) ++ "/" ++ atom_to_list(?MODULE) ++ ".app",
+   {ok, [{application, _, List}]} = file:consult(AppFile), 
+   Apps = proplists:get_value(applications, List, []),
+   lists:foreach(
+      fun(X) -> application:start(X) end,
+      Apps
+   ),
+   application:start(?MODULE).
+
            
 %%-------------------------------------------------------------------
 %%
@@ -92,7 +100,7 @@ node() ->
 %%
 %% Retrive list of connected nodes
 nodes() ->
-   [ N#ek_node.uri || N <- alive_nodes() ].  
+   [ N#ek_node.uri || N <- connected_nodes() ].  
    
 %%
 %% Initiates a connection with remote node
@@ -120,17 +128,33 @@ demonitor() ->
    ek_evt_srv:unsubscribe(self()).
 demonitor(EvtHandler) ->
    ek_evt:unsubscribe(EvtHandler).
+
+%%%------------------------------------------------------------------
+%%%
+%%% Messaging
+%%%
+%%%------------------------------------------------------------------
+q(Uri, Fun) ->
+   U    = ek_uri:new(Uri),
+   case check_node(U) of
+      false -> {error, no_node};
+      _     -> ek_q_sup:create(Uri, Fun)
+   end.
+   
+q(Name, Uri, Fun) ->
+   U    = ek_uri:new(Uri),
+   case check_node(U) of
+      false -> {error, no_node};
+      _     -> ek_q_sup:create(Name, Uri, Fun)
+   end.
    
 %%
 %% send a message to uri (node + ep)
 send(Uri, Msg) ->
    U    = ek_uri:new(Uri),
-   Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
-          binary_to_list(proplists:get_value(host, U)) ++ ":" ++
-          integer_to_list(proplists:get_value(port, U)),
-   case lists:keyfind(Node, 2, alive_nodes()) of
-      false -> {error, no_connection};
-      N     -> ek_prot:send(N#ek_node.pid, Uri, Msg)
+   case check_node(U) of
+      false -> {error, no_node};
+      N     -> ek_prot:send(N#ek_node.pid, proplists:get_value(path, U), Msg)
    end.
 
 %%
@@ -146,18 +170,18 @@ broadcast(EP, Msg) ->
          Uri = N ++ EP,
          send(Uri, Msg)
       end,
-      ek:nodes()
+      alive_nodes()
    ).
-   
-   
+      
    
 %%
 %% subscribe
 listen({drop, Path}) ->
    ets:delete_object(ek_dispatch, {list_to_binary(Path), self()});
-   
-listen(Path) ->
-   ets:insert(ek_dispatch, {list_to_binary(Path), self()}).
+
+listen(Uri) ->
+   U = ek_uri:new(Uri),
+   ets:insert(ek_dispatch, {proplists:get_value(path, U), self()}).
 
 %%%------------------------------------------------------------------
 %%%
@@ -166,8 +190,8 @@ listen(Path) ->
 %%%------------------------------------------------------------------
 
 %%
-%% list of alive nodes and they pids
-alive_nodes() ->
+%% list of connected nodes and they pids
+connected_nodes() ->
    SF = fun(X) ->
       {ok, Info} = ek_prot:node_info(X#ek_node.pid),
       case proplists:get_value(state, Info) of
@@ -181,4 +205,26 @@ alive_nodes() ->
            is_process_alive(N#ek_node.pid), 
            SF(N) =:= true
    ].
+   
+%%
+%% list of alive nodes and they pids   
+alive_nodes() ->
+   [
+      N || N <- ets:match_object(ek_nodes, '_'), 
+           N#ek_node.pid =/= self, 
+           is_process_alive(N#ek_node.pid)
+   ].
+
+%%
+%% check node from Uri
+check_node(U) ->
+   case proplists:get_value(host, U) of
+      undefined -> true;
+      _         ->
+         Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
+                binary_to_list(proplists:get_value(host, U)) ++ ":" ++
+                integer_to_list(proplists:get_value(port, U)),
+         lists:keyfind(Node, 2, alive_nodes())
+   end.
+   
    

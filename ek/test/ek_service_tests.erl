@@ -29,67 +29,48 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(ek_tests).
+-module(ek_service_tests).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("eunit/include/eunit.hrl").
 
+-export([input/1, output/1]).
 
-custer_connect_test_() ->
+%%%------------------------------------------------------------------
+%%%
+%%% 
+%%%
+%%%------------------------------------------------------------------
+input({msg, X}) ->
+   ek_service:send("http://localhost:8900/test", {msg, X + X}).
+   
+output({msg, X}) ->
+   {msg, X + X}.
+
+   
+cluster_service_test_() ->
    {
       setup,
       fun() ->
+         ets:new(test, [named_table, public]),
          spawn_node(dev1),
-         spawn_node(dev2),
-         spawn_node(dev3),
          spawn(
             'dev1@localhost', 
             fun() -> 
-               ek:start("http://localhost:8881"), 
+               ek:start("http://localhost:8901"),
+               ek_service:start_link("/test", ?MODULE),
                timer:sleep(60000)
-            end
-         ),
-         spawn(
-            'dev2@localhost', 
-            fun() -> 
-               ek:start("http://localhost:8882"), 
-               timer:sleep(60000) 
-            end
-         ),
-         spawn(
-            'dev3@localhost', 
-            fun() -> 
-               ek:start("http://localhost:8883"), 
-               timer:sleep(60000) 
             end
          )
       end,
       fun(_) ->
-         slave:stop('dev1@localhost'),
-         slave:stop('dev2@localhost'),
-         slave:stop('dev3@localhost')
+         slave:stop('dev1@localhost')
       end,
       [
-         {"Node start",        fun node_start/0},
-         {"Node join cluster", fun node_join/0},
-         {"Node re-join cluster", fun node_rejoin/0}
+         {"Service start",  fun node_start/0},
+         {"Service msg",    fun node_msg/0}
       ]
    }.
    
-%%
-%%
-set_node_path()  ->
-   {file, Module} = code:is_loaded(?MODULE),
-   Path = filename:dirname(Module) ++ "/../ebin",
-   code:add_path(Path).
-   
-assert_nodes([H|T]) ->   
-   ?assert(
-      lists:member(H, ek:nodes())
-   ),
-   assert_nodes(T);
-assert_nodes([]) ->
-   ok.
-
 %%-------------------------------------------------------------------
 %%
 %% Utility functions to run distributed test
@@ -100,33 +81,37 @@ spawn_node(Node) ->
    {file, Module} = code:is_loaded(?MODULE),
    % include all sub-projects
    Path = filename:dirname(Module) ++ "/../../*/ebin",
-   {ok, _} = slave:start(localhost, Node, " -pa " ++ Path).
+   {ok, _} = slave:start(localhost, Node, " -pa " ++ Path).   
 
-   
 %%-------------------------------------------------------------------
 %%
-%% Cluster connect
+%% Cluster msg test
 %%
 %%-------------------------------------------------------------------
 node_start() ->
-   ok = ek:start("ws://localhost:8880").
+   ek:start("http://localhost:8900"),
+   ek:connect("http://localhost:8901"),
+   spawn(
+      fun() -> 
+         ek:listen("/test"),
+         Loop = fun(X) ->
+            receive
+               Msg ->
+                  ets:insert(test, Msg),
+                  X(X)
+            end
+         end,
+         Loop(Loop)
+      end
+   ),
+   timer:sleep(2000).   
    
-node_join()  ->   
-   {ok, _} = ek:connect("http://localhost:8881"),
-   {ok, _} = ek:connect("http://localhost:8882"),
-   {ok, _} = ek:connect("http://localhost:8883"),
-   timer:sleep(2000),
-   ?assert( lists:member("http://localhost:8881", ek:nodes()) ),
-   ?assert( lists:member("http://localhost:8882", ek:nodes()) ),
-   ?assert( lists:member("http://localhost:8883", ek:nodes()) ).
    
-node_rejoin() ->
-   {ok, Pid} = ek:connect("http://localhost:8881"),
-   erlang:exit(Pid, error),
-   ?assert( not lists:member("http://localhost:8881", ek:nodes()) ),
-   ?assert( lists:member("http://localhost:8882", ek:nodes()) ),
-   ?assert( lists:member("http://localhost:8883", ek:nodes()) ),
-   timer:sleep(2000),
-   ?assert( lists:member("http://localhost:8881", ek:nodes()) ),
-   ?assert( lists:member("http://localhost:8882", ek:nodes()) ),
-   ?assert( lists:member("http://localhost:8883", ek:nodes()) ).
+node_msg()  ->   
+   ek:send("http://localhost:8901/test", {msg, 1}),
+   timer:sleep(500),
+   %R = ets:lookup(test, msg),
+   %error_logger:info_report([{r, R}]),
+   ?assert(
+      [{msg, 4}] =:= ets:lookup(test, msg)
+   ).   

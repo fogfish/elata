@@ -62,7 +62,9 @@ uri(<<":", Str/binary>>, host, Acc, U) ->
 uri(<<"//", Str/binary>>, _Tag, _Acc, U) ->
    uri(Str, host, <<>>, U);
 
-%% end of port or host, start path
+%% end of port or host, start path or schema is ommited
+uri(<<"/", Str/binary>>, schema, Acc, U) ->
+   uri(Str, path, <<"/">>, U);
 uri(<<"/", Str/binary>>, host, Acc, U) ->
    uri(Str, path, <<"/">>, [{host, Acc} | U]);
 

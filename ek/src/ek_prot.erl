@@ -38,7 +38,7 @@
 %% ek node management protocol
 %%
 %% TODO:
-%%   - message queue
+%%   - node alive timeout
 %%   - packet transmission over stream
 %%   - disable code injection (trusted nodes only)
 
@@ -59,13 +59,15 @@
 ]).
 
 -record(fsm, {
-   node,      % node name
-   sock,      % node transport
-   attempt,   % number of connection attempts
-   q          % message queue
+   node,    % node name
+   sock,    % node transport
+   attempt, % number of connection attempts
+   p,       % inbound fragmented packet
+   q        % outbound message queue
 }).
 
 -define(T_NODE_HEARTBEAT, 30000). %% heartbeat timer for node
+-define(T_MSG_SEND,           5). %% message send tick (change one packet delimiter is implemented)
 
 
 %%
@@ -113,7 +115,8 @@ init([Config, Node]) ->
             #fsm{
                node    = Node,
                sock    = undefined,
-               attempt = 0
+               attempt = 0,
+               q       = queue:new()
             }
          }
    end.
@@ -137,52 +140,82 @@ init([Config, Node]) ->
    ),
    {next_state, 'IDLE', State#fsm{attempt = State#fsm.attempt + 1}};
    
-'IDLE'({socket, Sock}, State) ->
-   join_node(State#fsm.node),
-   %lists:foreach(
-   %   fun(X) -> sock_send(Sock, X) end,
-   %   State#fsm.q
-   %),
-   {next_state, 'CONNECTED', State#fsm{q= [], sock = Sock, attempt = 0}};
-   
-'IDLE'({send, Uri, Msg}, State) ->
-   {next_state, 'IDLE', State#fsm{q = State#fsm.q ++ [{msg, Uri, Msg}]}};
+'IDLE'({send, Uri, Msg}, S) ->   
+   {next_state, 'IDLE', S#fsm{q = q_in(Uri, Msg, S#fsm.q)}};   
+
+'IDLE'({socket, Sock}, S) ->
+   join_node(S#fsm.node),
+   {next_state, 
+      'CONNECTED', 
+      S#fsm{
+         sock = Sock,
+         attempt = 0
+      },
+      0   %% timeout at connected state is used to schedule q-flush 
+   };
    
 'IDLE'(_Evt, State)  ->
    {next_state, 'IDLE', State}.  
   
 
 %%
-%%   
+%%
 'CONNECTED'(heartbeat, State) ->
    % heartbeat timer is expired
    gen_fsm:send_event_after(?T_NODE_HEARTBEAT, heartbeat),
-   sock_send(State#fsm.sock, {node, ek:node()}),
-   {next_state, 'CONNECTED', State};
+   %sock_send(State#fsm.sock, {node, ek:node()}),
+   {next_state, 'CONNECTED', State, ?T_MSG_SEND};
 'CONNECTED'({node, _Node}, State) ->
    % heartbeat message is recieved
-   {next_state, 'CONNECTED', State};
+   {next_state, 'CONNECTED', State, ?T_MSG_SEND};
+
+%%
+%% flush message queue   
+'CONNECTED'(timeout, S) ->
+   ek_prot:'CONNECTED'(qflush, S);
+
+'CONNECTED'({send, Uri, Msg}, S) ->   
+   ek_prot:'CONNECTED'(qflush, S#fsm{q = q_in(Uri, Msg, S#fsm.q)});   
    
-'CONNECTED'({send, Uri, Msg}, State) ->
-   % transmit message
-   sock_send(State#fsm.sock, {msg, Uri, Msg}),
-   {next_state, 'CONNECTED', State};
-'CONNECTED'({msg, Uri, Msg}, State) ->
-   % receive message % dispath it 
-   U = ek_uri:new(Uri),
-   case ets:lookup(ek_dispatch, proplists:get_value(path, U)) of
-      []    -> ok;
-      List  ->
-         [ Pid ! Msg || {_, Pid} <- List],
-         ok
-   end,   
-   {next_state, 'CONNECTED', State};
+'CONNECTED'(qflush, S) ->
+   NQ = q_out(S#fsm.sock, S#fsm.q), 
+   case queue:is_empty(NQ) of
+      true  -> ok;
+      false -> gen_fsm:send_event_after(0, qflush)
+   end,
+   {next_state, 'CONNECTED', S#fsm{q = NQ}};
    
-'CONNECTED'({tcp, _Sock, Pckt}, State) ->
-   %% TODO: prevent code injection
-   Msg = binary_to_term(Pckt), 
-   ek_prot:'CONNECTED'(Msg, State);
-   
+%%
+%% receive message
+'CONNECTED'({tcp, Sock, <<131, 109, Len:32/big, Data/binary>>}, S) ->   
+   % head of message
+   % ?DEBUG([{len, Len}, {size, size(Data)}, {data, Data}]),
+   if 
+      Len =:= size(Data) -> 
+         dispatch(Data),
+         {next_state, 'CONNECTED', S};
+      Len <   size(Data) ->
+         <<Pckt:Len/binary, Rest/binary>> = Data,
+         dispatch(Pckt),
+         ek_prot:'CONNECTED'({tcp, Sock, Rest}, S);
+      Len >   size(Data) ->
+         {next_state, 'CONNECTED', S#fsm{p = {Len, Data}}}
+   end;
+'CONNECTED'({tcp, Sock, Tail}, #fsm{p = {Len, Head}} = S) ->
+   % message continuation 
+   Data = <<Head/binary, Tail/binary>>,
+   % ?DEBUG([{len, Len}, {size, size(Data)}, {data, Data}]),
+   if
+      Len =:= size(Data) -> 
+         dispatch(Data),
+         {next_state, 'CONNECTED', S};
+      Len <   size(Data) ->
+         <<Pckt:Len/binary, Rest/binary>> = Data,
+         dispatch(Pckt),
+         ek_prot:'CONNECTED'({tcp, Sock, Rest}, S);
+      Len >   size(Data) ->
+         {next_state, 'CONNECTED', S#fsm{p = {Len, Data}}}
+   end;
 'CONNECTED'({tcp_closed, _Sock}, State) ->
    leave_node(State#fsm.node),
    {next_state, 'IDLE', State};
@@ -196,6 +229,8 @@ init([Config, Node]) ->
    {next_state, 'CONNECTED', State}.
 
    
+%%
+%%
 handle_event(Msg, Name, State) ->
    erlang:apply(?MODULE, Name, [Msg, State]).
    
@@ -269,21 +304,42 @@ leave_node(Node) ->
    gen_fsm:send_event_after(?T_NODE_HEARTBEAT, node_connect),
    ek_evt:leave(Node),
    ?DEBUG([{leave, Node}]).
-   %case ets:match_object(ek_nodes, {ek_node, Node, '_'}) of
-   %   []  ->
-   %      ok;
-   %   [N] ->
-   %      ets:delete(ek_nodes, Node),
-   %      ek_evt:leave(Node),
-   %      ?DEBUG([{leave, Node}, {pid, N#ek_node.pid}])
-   %end.   
-   
-   
-sock_send(Sock, Msg) ->
-   Pckt = term_to_binary(Msg),
-   ok = gen_tcp:send(Sock, Pckt),
-   ?DEBUG([{send, Msg}]).   
    
 
+%%
+%% queue message(s)
+%% q(Uri, Msg, Q) -> Q 
+%%   Uri - binary() destination end-point
+%%   Msg - tuple()  message
+q_in(Uri, Msg, Q) when is_list(Msg) ->
+   lists:foldl(fun(M, A) -> q_in(Uri, M, A) end, Q, Msg);
+
+q_in(Uri, Msg, Q) ->
+   ?DEBUG([{send, Msg}]),
+   Pckt = term_to_binary({ek_msg, Uri, Msg}),
+   %% double encoding is used to packetize   
+   queue:in(term_to_binary(Pckt), Q).
+
+%%
+%% transmit first message from queue
+q_out(Sock, Q) ->
+   case queue:out(Q) of
+      {{value, Pckt}, NQ} ->
+         ok = gen_tcp:send(Sock, Pckt),
+         NQ;
+      {empty,         NQ} ->
+         NQ
+   end.
    
+%%
+%% dispatch received packet
+dispatch(Pckt) ->
+   {ek_msg, Uri, Msg} = binary_to_term(Pckt),
+   ?DEBUG([{uri, Uri}, {recv, Msg}]),
+   case ets:lookup(ek_dispatch, Uri) of
+      []    -> ok;
+      List  ->
+         [ Pid ! Msg || {_, Pid} <- List],
+         ok
+   end.      
    

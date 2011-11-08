@@ -43,22 +43,15 @@
 
 -define(APPNAME,  ek).
 
-start(_Type, Args) -> 
+start(_Type, _Args) -> 
    % Config
-   DefNodeSup = proplists:get_value(node_sup, Args, ek_node_sup),
-   DefNode    = proplists:get_value(node,     Args, undefined),
-   Config = config(?APPNAME, [{node, DefNode}, nodes, proxy, {node_sup, DefNodeSup}]),
+   Config  = config(?APPNAME, [node, nodes, proxy]),
    % create a node registry
    ets:new(ek_nodes, [public, named_table, {keypos, 2}]),
    % create a message dispatch table
    ets:new(ek_dispatch, [public, named_table, bag]),
    case ek_sup:start_link(Config) of
       {ok, Pid} ->
-         % start node supervisor
-         % case proplists:get_value(node_sup, Config) of
-         %   false   -> ok;
-         %   NodeSup -> ek_evt:subscribe(NodeSup)
-         % end,
          % initiate connections to nodes defined in config
          lists:foreach(
             fun ek:connect/1, 
