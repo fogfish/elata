@@ -37,7 +37,8 @@
 %% Erlang Cluster (ek) is an overlay to build a geo distributed clusters
 %% (alternative method to Erlang build in facilities)
 %%
-
+%% The module is a facade to various sub-processes
+%%
 
 -export([
    start/1,
@@ -52,8 +53,6 @@
    demonitor/0,
    demonitor/1,
    % messaging
-   q/2,
-   q/3,
    send/2,
    multicast/2,
    broadcast/2,
@@ -134,20 +133,7 @@ demonitor(EvtHandler) ->
 %%% Messaging
 %%%
 %%%------------------------------------------------------------------
-q(Uri, Fun) ->
-   U    = ek_uri:new(Uri),
-   case check_node(U) of
-      false -> {error, no_node};
-      _     -> ek_q_sup:create(Uri, Fun)
-   end.
-   
-q(Name, Uri, Fun) ->
-   U    = ek_uri:new(Uri),
-   case check_node(U) of
-      false -> {error, no_node};
-      _     -> ek_q_sup:create(Name, Uri, Fun)
-   end.
-   
+
 %%
 %% send a message to uri (node + ep)
 send(Uri, Msg) ->
