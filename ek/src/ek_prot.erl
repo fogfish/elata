@@ -103,12 +103,10 @@ start_link(Config, Node) ->
    gen_fsm:start_link(?MODULE, [Config, Node], []).
    
 init([Config, Node]) ->
-   case is_node(Node) of
-      true  ->
-         % node process exists 
-         {stop, normal};
-      false ->
+   case ek:whereis({node, Node}) of
+      undefined ->
          ?DEBUG([{node, Node}, {pid, self()}]),
+         ek:register({node, Node}, self()),
          gen_fsm:send_event_after(1000, node_connect),
          {ok,
             'IDLE',
@@ -118,8 +116,11 @@ init([Config, Node]) ->
                attempt = 0,
                q       = queue:new()
             }
-         }
-   end.
+         };
+      _         ->
+         % process exists
+         {stop, normal}
+   end.      
    
 %%
 %%   
@@ -336,10 +337,5 @@ q_out(Sock, Q) ->
 dispatch(Pckt) ->
    {ek_msg, Uri, Msg} = binary_to_term(Pckt),
    ?DEBUG([{uri, Uri}, {recv, Msg}]),
-   case ets:lookup(ek_dispatch, Uri) of
-      []    -> ok;
-      List  ->
-         [ Pid ! Msg || {_, Pid} <- List],
-         ok
-   end.      
+   ek:send(Uri, Msg).      
    

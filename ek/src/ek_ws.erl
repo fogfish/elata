@@ -89,8 +89,8 @@ init([Config, {listen, Uri}]) ->
       proplists:get_value(port, ek_uri:new(Uri)), 
       ?SOCK_OPTS
    ),
-   % register itself as an active node
-   ets:insert(ek_nodes, #ek_node{uri=Uri, pid=self}),
+   % register process as local listener
+   ek:register({listen, Uri}, self()),
    {ok, 
       'LISTEN', 
        #fsm{
@@ -191,19 +191,16 @@ handle_info({tcp, _Sock, Data}, 'HANDSHAKE', #fsm{peer = undefined} = State) ->
             ws_con_rsp()
          ),
          Peer = x_node(Req),
-         case ek_prot_sup:create(Peer) of
-            {ok, Pid}  ->
-               ok = gen_tcp:controlling_process(State#fsm.sock, Pid),
-               gen_fsm:send_event(Pid, {socket, State#fsm.sock});
-            {error, normal} ->
-               %% process is already exists
-               [Node] =  ets:match_object(ek_nodes, {ek_node, Peer, '_'}),
-               ok = gen_tcp:controlling_process(State#fsm.sock, Node#ek_node.pid),
-               gen_fsm:send_event(Node#ek_node.pid, {socket, State#fsm.sock});
-            {error, _} ->
-               %% protocol process cannot be started
-               ok
+         Pid = case ek:whereis({node, Peer}) of
+            undefined ->
+               {ok, Proc} = ek_prot_sup:create(Peer),
+               Proc;
+            Proc       ->
+               Proc
          end,
+         ok = gen_tcp:controlling_process(State#fsm.sock, Pid),
+         gen_fsm:send_event(Pid, {socket, State#fsm.sock}),
+         timer:sleep(1000),
          {stop, normal, State};
       _ ->
          {next_state, 'HANDSHAKE', State}

@@ -121,8 +121,7 @@ node_join()  ->
    ?assert( lists:member("http://localhost:8883", ek:nodes()) ).
    
 node_rejoin() ->
-   {ok, Pid} = ek:connect("http://localhost:8881"),
-   erlang:exit(Pid, error),
+   erlang:exit(ek:whereis({node, "http://localhost:8881"}), error),
    ?assert( not lists:member("http://localhost:8881", ek:nodes()) ),
    ?assert( lists:member("http://localhost:8882", ek:nodes()) ),
    ?assert( lists:member("http://localhost:8883", ek:nodes()) ),

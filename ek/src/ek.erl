@@ -43,6 +43,13 @@
 -export([
    start/1,
    start/2,
+   % local process management
+   register/1,
+   register/2,
+   unregister/1,
+   whereis/1,
+   registered/0,
+   registered/1,
    % node management
    node/0,
    nodes/0,
@@ -55,8 +62,8 @@
    % messaging
    send/2,
    multicast/2,
-   broadcast/2,
-   listen/1
+   multicast/3,
+   broadcast/2
 ]).
 
 
@@ -80,6 +87,28 @@ start(Node, Config) ->
    ),
    application:start(?MODULE).
 
+%%-------------------------------------------------------------------
+%%
+%% local Process Management (see src/ek_reg.erl)
+%%
+%%-------------------------------------------------------------------
+register(Uid) ->
+   ek_reg:register(Uid, self()).
+
+register(Uid, Pid) -> 
+   ek_reg:register(Uid, Pid).
+
+unregister(Uid) ->
+   ek_reg:unregister(Uid).
+   
+whereis(Uid) ->
+   ek_reg:whereis(Uid).
+   
+registered() ->
+   ek_reg:registered().
+   
+registered(Grp) ->
+   ek_reg:registered(Grp).
            
 %%-------------------------------------------------------------------
 %%
@@ -88,33 +117,32 @@ start(Node, Config) ->
 %%-------------------------------------------------------------------
    
 %%
-%% Name of itself
+%% node() -> []
 node() ->
-    case ets:match_object(ek_nodes, {ek_node, '_', self}) of
-       []     -> undefined;
-       [Node] -> Node#ek_node.uri;
-       List   -> lists:map(fun(N) -> N#ek_node.uri end, List)
-    end.
+   case ek:registered(listen) of
+      []   -> throw(no_ek);
+      List -> lists:map(fun({listen, Uri}) -> Uri end, List)
+   end.
    
 %%
 %% Retrive list of connected nodes
 nodes() ->
-   [ N#ek_node.uri || N <- connected_nodes() ].  
+   lists:map(
+      fun({node, Uri}) -> Uri end,
+      ek:registered(node)
+   ).
    
 %%
 %% Initiates a connection with remote node
 %% connect(Node) -> {ok, Pid} | {error, ...}
 %%    Node - list(), remote node identity
 connect(Node) ->
-   case ets:lookup(ek_nodes, Node) of
-      [N] -> {ok, N#ek_node.pid};
-      _   -> ek_prot_sup:create(Node)
-   end.
+   ek_prot_sup:create(Node).
 
 %%
 %% Forces to disconnect node
-disconnect(Node) ->
-   {error, not_implemented}.
+disconnect(_Node) ->
+   throw(not_implemented).
 
 %%
 %% monitor/demonitor cluster events
@@ -135,82 +163,106 @@ demonitor(EvtHandler) ->
 %%%------------------------------------------------------------------
 
 %%
-%% send a message to uri (node + ep)
+%% send(Uid, Msg) -> ok
+%%   Uid = list() | tuple()
+%%
+%% sends message to registered process, 
+%% if process do not exists locally and Uid is Uri then Msg is routed to remote node
+%% Failure: {badarg, {Uid, Msg}} if process and/or node cannot be found
+send(Uid, Msg) when is_tuple(Uid) -> 
+   case ek:whereis(Uid) of
+      undefined -> throw({badarg, {Uid, Msg}});
+      Pid       -> Pid ! Msg
+   end,
+   ok;
+
 send(Uri, Msg) ->
-   U    = ek_uri:new(Uri),
-   case check_node(U) of
-      false -> {error, no_node};
-      N     -> ek_prot:send(N#ek_node.pid, proplists:get_value(path, U), Msg)
-   end.
+   case ek:whereis(Uri) of
+      undefined ->
+         Host = ek_uri:host(Uri),
+         case ek:whereis({node, Host}) of
+            undefined -> throw({badarg, {Uri, Msg}});
+            Pid       -> ek_prot:send(Pid, Uri, Msg)
+         end;   
+      Pid       -> Pid ! Msg
+   end,
+   ok.
+
 
 %%
-%% send a message to multiple uri
+%% multicast(Uids, Msg) -> ok
+%%   Uids = list()
+%%
+%% Multicast mesage to multiple processes
+%% Failure: {badarg, {Uid, Msg}} if one of process cannot be found
 multicast(Uris, Msg) ->
    lists:foreach(fun(U) -> send(U, Msg) end, Uris).
 
-%%
-%% send a message to ep of connected nodes
-broadcast(EP, Msg) ->
+multicast(Nodes, Path, Msg) ->
    lists:foreach(
-      fun(N) ->
-         Uri = N ++ EP,
-         send(Uri, Msg)
+      fun(Node) ->
+         Uri = Node ++ Path,
+         ek:send(Uri, Msg)
       end,
-      alive_nodes()
+      Nodes
+   ).   
+   
+%%
+%% broadcast(Path, Msg) -> ok
+%%
+%% Broadcast message to all connected remote nodes
+broadcast(Path, Msg) ->
+   lists:foreach(
+      fun({node, Node}) ->
+         Uri = Node ++ Path,
+         ek:send(Uri, Msg)
+      end,
+      ek:registered(node)
    ).
       
    
-%%
-%% subscribe
-listen({drop, Path}) ->
-   ets:delete_object(ek_dispatch, {list_to_binary(Path), self()});
-
-listen(Uri) ->
-   U = ek_uri:new(Uri),
-   ets:insert(ek_dispatch, {proplists:get_value(path, U), self()}).
-
-%%%------------------------------------------------------------------
-%%%
-%%% Private
-%%%
-%%%------------------------------------------------------------------
-
-%%
-%% list of connected nodes and they pids
-connected_nodes() ->
-   SF = fun(X) ->
-      {ok, Info} = ek_prot:node_info(X#ek_node.pid),
-      case proplists:get_value(state, Info) of
-         'CONNECTED' -> true;
-         _           -> false
-      end
-   end,
-   [
-      N || N <- ets:match_object(ek_nodes, '_'), 
-           N#ek_node.pid =/= self, 
-           is_process_alive(N#ek_node.pid), 
-           SF(N) =:= true
-   ].
-   
-%%
-%% list of alive nodes and they pids   
-alive_nodes() ->
-   [
-      N || N <- ets:match_object(ek_nodes, '_'), 
-           N#ek_node.pid =/= self, 
-           is_process_alive(N#ek_node.pid)
-   ].
-
-%%
-%% check node from Uri
-check_node(U) ->
-   case proplists:get_value(host, U) of
-      undefined -> true;
-      _         ->
-         Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
-                binary_to_list(proplists:get_value(host, U)) ++ ":" ++
-                integer_to_list(proplists:get_value(port, U)),
-         lists:keyfind(Node, 2, alive_nodes())
-   end.
-   
-   
+% %%%------------------------------------------------------------------
+% %%%
+% %%% Private
+% %%%
+% %%%------------------------------------------------------------------
+% 
+% %%
+% %% list of connected nodes and they pids
+% connected_nodes() ->
+   % SF = fun(X) ->
+      % {ok, Info} = ek_prot:node_info(X#ek_node.pid),
+      % case proplists:get_value(state, Info) of
+         % 'CONNECTED' -> true;
+         % _           -> false
+      % end
+   % end,
+   % [
+      % N || N <- ets:match_object(ek_nodes, '_'), 
+           % N#ek_node.pid =/= self, 
+           % is_process_alive(N#ek_node.pid), 
+           % SF(N) =:= true
+   % ].
+   % 
+% %%
+% %% list of alive nodes and they pids   
+% alive_nodes() ->
+   % [
+      % N || N <- ets:match_object(ek_nodes, '_'), 
+           % N#ek_node.pid =/= self, 
+           % is_process_alive(N#ek_node.pid)
+   % ].
+% 
+% %%
+% %% check node from Uri
+% check_node(U) ->
+   % case proplists:get_value(host, U) of
+      % undefined -> true;
+      % _         ->
+         % Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
+                % binary_to_list(proplists:get_value(host, U)) ++ ":" ++
+                % integer_to_list(proplists:get_value(port, U)),
+         % lists:keyfind(Node, 2, alive_nodes())
+   % end.
+   % 
+   % 

@@ -46,10 +46,8 @@
 start(_Type, _Args) -> 
    % Config
    Config  = config(?APPNAME, [node, nodes, proxy]),
-   % create a node registry
-   ets:new(ek_nodes, [public, named_table, {keypos, 2}]),
-   % create a message dispatch table
-   ets:new(ek_dispatch, [public, named_table, bag]),
+   % create process registry
+   ek_reg:start_link(),
    case ek_sup:start_link(Config) of
       {ok, Pid} ->
          % initiate connections to nodes defined in config

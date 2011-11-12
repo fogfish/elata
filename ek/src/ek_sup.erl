@@ -36,9 +36,7 @@
 -export([
    % supervisor
    start_link/1,
-   init/1,
-   % api
-   listen/1
+   init/1
 ]).
 
 %%%
@@ -51,15 +49,9 @@ init([Config]) ->
    {ok,
       {
          {one_for_one, 4, 1800},
-         prot(Config) ++ event(Config) ++ listener(Config) ++ q(Config)
+         prot(Config) ++ event(Config) ++ listener(Config)
       }
    }.
-
-%% used from ek:start   
-listen(Config) ->
-   [P|_] = listener(Config),
-   supervisor:start_child(ek_sup, P).   
-   
 
 %%-------------------------------------------------------------------
 %%
@@ -132,14 +124,3 @@ event(Config) ->
       permanent, 2000, worker, dynamic
    }
    ].   
-   
-q(Config) ->
-   [{
-      ek_q_sup,
-      {
-         ek_q_sup,
-         start_link,
-         [Config]
-      },
-      permanent, 2000, supervisor, dynamic
-   }].

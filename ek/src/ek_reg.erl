@@ -43,7 +43,8 @@
    register/2,
    unregister/1,
    whereis/1,
-   registered/0
+   registered/0,
+   registered/1
 ]).
 
 
@@ -56,7 +57,7 @@ start_link() ->
 
 %%
 %% register(Uri, Pid) -> true
-%%   Uri = list()
+%%   Uri = list() | tuple()
 %%   Pid = pid()
 %%
 %% Associates the name URI with a pid. Updates an assotiation if Uri is 
@@ -71,12 +72,11 @@ register(Uid, Pid) when is_tuple(Uid) ->
       _         -> throw(badarg)
    end;
 register(Uri, Pid) ->
-   assert_uri(Uri),
-   ek_reg:register({uri, Uri}, Pid).
+   ek_reg:register({uri, assert_uri(Uri)}, Pid).
 
 %%
 %% unredister(Uri) -> true
-%%   Uri = list()
+%%   Uri = list() | tuple()
 %%
 %% Removes the registered name Uri, associated with a pid.
 %% Failure: badarg if Uri is not a registered name, Uri is assotiated 
@@ -87,11 +87,11 @@ unregister(Uid) when is_tuple(Uid) ->
       _         -> ets:delete(?MODULE, Uid)
    end;
 unregister(Uri) ->   
-   assert_uri(Uri),
-   ek_reg:unregister({uri, Uri}).
+   ek_reg:unregister({uri, assert_uri(Uri)}).
    
 %%
 %% whereis(Uri) -> pid() | undefined
+%%    Uri = list() | tuple()
 %%
 %% Returns the pid or port identifier with the registered name Uri. 
 %% Returns undefined if the name is not registered. 
@@ -106,8 +106,7 @@ whereis(Uid) when is_tuple(Uid) ->
          undefined
    end;
 whereis(Uri) ->
-   assert_uri(Uri),  
-   ek_reg:whereis({uri, Uri}).
+   ek_reg:whereis({uri, assert_uri(Uri)}).
    
    
 %%
@@ -115,12 +114,44 @@ whereis(Uri) ->
 %%
 %% Returns a list of names which have been registered using register/2.
 registered() ->
-   [ 
-      Uri || {Uri, Pid} <- ets:match_object(?MODULE, '_'), 
-                           is_process_alive(Pid) 
-   ].
+   lists:foldl(
+      fun
+         ({{uri, Uri}, Pid}, Acc) ->
+            case is_process_alive(Pid) of
+               true  -> [Uri | Acc];
+               false -> ets:delete(?MODULE, {uri, Uri}), Acc
+            end;
+         ({Uid, Pid}, Acc) ->
+            case is_process_alive(Pid) of
+               true  -> [Uid | Acc];
+               false -> ets:delete(?MODULE, Uid), Acc
+            end
+      end,
+      [],
+      ets:match_object(?MODULE, '_')
+   ).
 
+%%
+%% registered(Grp) -> []
+%%
+%% Return a list of names which have been regsitered  using register/2
+%% with tuple
+registered(Grp) ->
+    lists:foldl(
+       fun({{_, Name}, Pid}, Acc) ->
+          case is_process_alive(Pid) of
+             true  -> 
+                [{Grp, Name} | Acc];
+             false ->
+                ets:delete(?MODULE, {Grp, Name}), Acc
+          end
+       end,
+       [],
+       ets:match_object(?MODULE, {{Grp, '_'}, '_'})
+    ).
 
+    
+   
 %%%------------------------------------------------------------------
 %%%
 %%% Private
@@ -144,7 +175,9 @@ assert_uri(Uri) ->
          % then path is mandatory
          case proplists:is_defined(path, U) of
             false -> throw(badarg);
-            true  -> true
+            true  -> 
+              [N | _] = ek:node(),
+              N ++ Uri
          end;
       true ->
          % then host & port are mandatory
@@ -153,7 +186,7 @@ assert_uri(Uri) ->
             true  ->
                case proplists:is_defined(port, U) of
                   false -> throw(badarg);
-                  true  -> true
+                  true  -> Uri
                end
          end
    end.

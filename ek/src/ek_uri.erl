@@ -95,32 +95,46 @@ uri(<<>>, Tag, Acc, U) ->
    [{Tag, Acc} | U].
     
 
+   
 %%
 %% return schema://host:port
 host(U) when is_list(U) ->
    case proplists:is_defined(schema, U) of
-      true  ->   
-         atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
-         binary_to_list(proplists:get_value(host, U)) ++ ":" ++
-         integer_to_list(proplists:get_value(port, U));
-      false ->
-         N = new(U),
-         atom_to_list(proplists:get_value(schema, N)) ++ "://" ++ 
-         binary_to_list(proplists:get_value(host, N)) ++ ":" ++
-         integer_to_list(proplists:get_value(port, N))
+      true  -> get_host(U);
+      false -> get_host(new(U))
    end.
 
+get_host(U) ->
+   %% U is parsed URI
+   case proplists:get_value(schema, U) of
+      undefined -> throw(badarg);
+      Schema    ->
+         case proplists:get_value(host, U) of
+            undefined -> throw(badarg);
+            Host      ->
+               case proplists:get_value(port, U) of
+                  false -> throw(badarg);
+                  Port  ->
+                     atom_to_list(Schema) ++ "://" ++ 
+                     binary_to_list(Host) ++ ":" ++
+                     integer_to_list(Port)
+               end
+         end
+   end. 
+
+%%   
 %% return /path
 path(U) ->
    case proplists:is_defined(schema, U) of
-      true  ->
-         binary_to_list(proplists:get_value(path, U));
-      false ->
-         N = new(U),
-         binary_to_list(proplists:get_value(path, N))
+      true  -> get_path(U);
+      false -> get_path(new(U))
    end.
-   
-   
+
+get_path(U) ->
+   case proplists:get_value(path, U) of
+      undefined -> throw(badarg);
+      Path      -> binary_to_list(Path)
+   end.
    
 %to_binary(#uri{schema = Schema, host = Host, port = Port, 
 %               path = Path, q = Query, fragment = Frag}) ->
