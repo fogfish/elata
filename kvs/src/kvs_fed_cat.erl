@@ -29,67 +29,87 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_app).
--behaviour(application).
+-module(kvs_fed_cat).
+-behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 
+%%
+%% Handles kvs federate events 
+%%
+
 -export([
-   start/2,
-   stop/1
+   start_link/2,
+   %% gen_server
+   init/1, 
+   handle_call/3,
+   handle_cast/2, 
+   handle_info/2, 
+   terminate/2, 
+   code_change/3
 ]).
 
--define(APPNAME,  kvs).
+-record(srv, {
+   cat,
+   uri
+}).
 
-start(_Type, _Args) -> 
-   Config = config(?APPNAME, [
-       cluster
-   %   sync,
-   %   evt_log, 
-   %   {evt_log_ttl, 7 * 24 * 3600}, 
-   %   {evt_log_chunk, 128}
-   ]),
-   % start system buckets
-   {ok, _} = kvs_sys:start_link(kvs_sys_ref),
-   {ok, _} = kvs_sys:start_link(kvs_sys_cat),
-   case kvs_sup:start_link(Config) of
-      {ok, Pid} ->
-         % start evt_log with default config
-         %case proplists:is_defined(evt_log, Config) of
-         %   true  ->
-         %      kvs_evt_sup:subscribe({kvs_evt_log, [[
-         %         {ttl,  proplists:get_value(evt_log_ttl,   Config)}, 
-         %         {chunk,proplists:get_value(evt_log_chunk, Config)}
-         %      ]]}),
-         %      kvs_bucket:define(kvs_evt_log, [{storage, kvs_cache_sup}]);
-         %   false ->
-         %      ok
-         %end,
-         {ok, Pid};
-      Other     -> {error, Other}
-   end. 
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
 
-stop(_State) ->
-        ok.
+%%
+%%
+start_link(Uri, Cat) ->
+   gen_server:start_link(?MODULE, [Uri, Cat], []).
 
-%%%------------------------------------------------------------------
-%%%
-%%%  Private 
-%%%
-%%%------------------------------------------------------------------   
-config(App, List) ->
-   config(App, List, []).
-config(App, [{Key, Default} | T], Acc) ->        
-   Val = case application:get_env(App, Key) of 
-      undefined   -> Default;
-      {ok, Value} -> Value
-   end,
-   config(App, T, [{Key, Val} | Acc]);
-config(App, [Key | T], Acc) ->
-   case application:get_env(App, Key) of 
-      undefined -> config(App, T, Acc);
-      {ok, Val} -> config(App, T, [{Key, Val} | Acc])
-   end;   
-config(_, [], Acc) ->
-   Acc.
+init([Uri, Cat]) ->
+   ek:register(Uri),
+   ?DEBUG([{fed, listen}, {uri, Uri}, {cat, Cat}]),
+   {ok,
+      #srv{
+         cat   = Cat,
+         uri   = Uri
+      }
+   }.
    
+%%%------------------------------------------------------------------   
+%%%
+%%% gen_server
+%%%
+%%%------------------------------------------------------------------
+
+%%
+%%
+handle_call(_Req, _From, S) ->
+   {reply, undefined, S}.   
+  
+%%
+%%
+handle_cast(_Req, S) ->
+   {noreply, S}.
+
+%%
+%%
+handle_info({kvs_fed_put, Key, Val}, S) ->
+   kvs:put(S#srv.cat, Key, Val),
+   {noreply, S};
+handle_info({kvs_fed_remove, Key}, S) ->
+   kvs:remove(S#srv.cat, Key),
+   {noreply, S};
+handle_info(_Msg, S) ->
+   {noreply, S}.
+   
+%%
+%% terminate
+terminate(_Reason, _State) ->
+   ok.
+   
+%%
+%%
+code_change(_OldVsn, State, _Extra) ->
+   {ok, State}.   
    

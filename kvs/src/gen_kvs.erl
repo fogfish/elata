@@ -97,8 +97,20 @@ init(Spec) ->
 init(Pid, Spec) ->
    Name   = proplists:get_value(name,    Spec),
    Mod    = proplists:get_value(storage, Spec),
+   % enable data federation for the category
+   NSpec = case proplists:get_value(fed, Spec) of
+      undefined ->
+         Spec;
+      true      ->
+         Uri = "/kvs/fed/" ++ bin_to_hex(crypto:sha(term_to_binary(Name))),
+         create_fed(Uri, Name),
+         [{fed, Uri} | proplists:delete(fed, Spec)];
+      Uri       ->
+         create_fed(Uri, Name),
+         Spec
+   end,
    ok     = kvs:put(kvs_sys_ref, Name, {Mod, Pid}),
-   ok     = kvs:put(kvs_sys_cat, Name, Spec).
+   ok     = kvs:put(kvs_sys_cat, Name, NSpec).
 
 %%
 %%
@@ -161,112 +173,94 @@ key_fold(Cat, Acc, Get, Fun) ->
 %%%
 %%%------------------------------------------------------------------
 
-
-handle_has(Bucket, Key) ->
-   Bid = proplists:get_value(name,    Bucket),
-   Mod = proplists:get_value(storage, Bucket),
-   case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
-      {error, not_found} ->
-         case kvs_sys:get(kvs_sys_ref, Bid) of
-            {error, not_found} -> false;
-            {ok, Pid}          -> Mod:has(Pid, Key)
-         end;
-      {ok, Keyspace}     ->
-         % (keyspace partitioned) entity storage is resolved via bucket specific keyspace
-         case kvs_sys:get(Keyspace, Key) of
-            {error, not_found} -> false;
-            {ok, Pid}          -> Mod:has(Pid, Key)
-         end
-   end.
-   
-handle_get(Bucket, Key) ->
-   Bid = proplists:get_value(name,    Bucket),
-   Mod = proplists:get_value(storage, Bucket),
-   case resolve(Bid, Key) of
-      undefined -> {error, not_found};
-      Pid       -> Mod:get(Pid, Key)
-   end.
-
-handle_remove(Bucket, Key) ->
-   Bid = proplists:get_value(name,    Bucket),
-   Mod = proplists:get_value(storage, Bucket),
-   case resolve(Bid, Key) of
-      undefined -> ok;
-      Pid       -> Mod:remove(Pid, Key)
-   end,
-   notify(remove, Bucket, Key, undefined),
-   ok.
-   
-handle_map(Bucket, Fun) ->
-   case lists:member(map, proplists:get_value(feature, Bucket, [])) of
-      false ->
-         {error, not_supported};
-      true  ->
-         Bid = proplists:get_value(name,    Bucket),
-         Mod = proplists:get_value(storage, Bucket),
-         % resolve keyspace management
-         case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
-            {error, not_found}  ->
-               % no key space management
-               {ok, Pid} = kvs_sys:get(kvs_sys_ref, Bid),
-               Mod:map(Pid, Fun);
-            {ok, Keyspace}      ->
-               % there is a key space management process
-               kvs_sys:map(Keyspace, 
-                  fun(Key, Pid) ->
-                     {ok, Item} = Mod:get(Pid, Key),
-                     Fun(Key, Item)
-                  end
-               )
-         end
-   end.
-   
-handle_fold(Bucket, Acc, Fun) ->
-   case lists:member(map, proplists:get_value(feature, Bucket, [])) of
-      false ->
-         {error, not_supported};
-      true  ->
-         Bid = proplists:get_value(name,    Bucket),
-         Mod = proplists:get_value(storage, Bucket),
-         % resolve keyspace management
-         case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
-            {error, not_found}  ->
-               % no key space management
-               {ok, Pid} = kvs_sys:get(kvs_sys_ref, Bid),
-               Mod:fold(Pid, Acc, Fun);
-            {ok, Keyspace}      ->
-               % there is a key space management process
-               kvs_sys:fold(Keyspace, Acc,
-                  fun(Key, Pid, AccIn) ->
-                     {ok, Item} = Mod:get(Pid, Key),
-                     case Fun(Key, Item) of
-                        undefined -> AccIn;
-                        AccOut    -> AccOut
-                     end
-                  end
-               )
-         end
-   end.
-   
-%%%------------------------------------------------------------------
-%%%
-%%% Bucket helper methods
-%%%
-%%%------------------------------------------------------------------   
-%%%
-%%% Items identity function
-%%%
-
-%
-%identity(sha1, Item) ->
-%   crypto:sha(erlang:term_to_binary(Item));
 % 
-%identity({attr, Key}, Item) when is_tuple(Item) ->
-%   erlang:element(Key, Item);
-%
-%identity({attr, Key}, Item) when is_list(Item) ->
-%   proplists:get_value(Key, Item). 
-%   
+% handle_has(Bucket, Key) ->
+   % Bid = proplists:get_value(name,    Bucket),
+   % Mod = proplists:get_value(storage, Bucket),
+   % case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
+      % {error, not_found} ->
+         % case kvs_sys:get(kvs_sys_ref, Bid) of
+            % {error, not_found} -> false;
+            % {ok, Pid}          -> Mod:has(Pid, Key)
+         % end;
+      % {ok, Keyspace}     ->
+         % % (keyspace partitioned) entity storage is resolved via bucket specific keyspace
+         % case kvs_sys:get(Keyspace, Key) of
+            % {error, not_found} -> false;
+            % {ok, Pid}          -> Mod:has(Pid, Key)
+         % end
+   % end.
+   % 
+% handle_get(Bucket, Key) ->
+   % Bid = proplists:get_value(name,    Bucket),
+   % Mod = proplists:get_value(storage, Bucket),
+   % case resolve(Bid, Key) of
+      % undefined -> {error, not_found};
+      % Pid       -> Mod:get(Pid, Key)
+   % end.
+% 
+% handle_remove(Bucket, Key) ->
+   % Bid = proplists:get_value(name,    Bucket),
+   % Mod = proplists:get_value(storage, Bucket),
+   % case resolve(Bid, Key) of
+      % undefined -> ok;
+      % Pid       -> Mod:remove(Pid, Key)
+   % end,
+   % notify(remove, Bucket, Key, undefined),
+   % ok.
+   % 
+% handle_map(Bucket, Fun) ->
+   % case lists:member(map, proplists:get_value(feature, Bucket, [])) of
+      % false ->
+         % {error, not_supported};
+      % true  ->
+         % Bid = proplists:get_value(name,    Bucket),
+         % Mod = proplists:get_value(storage, Bucket),
+         % % resolve keyspace management
+         % case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
+            % {error, not_found}  ->
+               % % no key space management
+               % {ok, Pid} = kvs_sys:get(kvs_sys_ref, Bid),
+               % Mod:map(Pid, Fun);
+            % {ok, Keyspace}      ->
+               % % there is a key space management process
+               % kvs_sys:map(Keyspace, 
+                  % fun(Key, Pid) ->
+                     % {ok, Item} = Mod:get(Pid, Key),
+                     % Fun(Key, Item)
+                  % end
+               % )
+         % end
+   % end.
+   % 
+% handle_fold(Bucket, Acc, Fun) ->
+   % case lists:member(map, proplists:get_value(feature, Bucket, [])) of
+      % false ->
+         % {error, not_supported};
+      % true  ->
+         % Bid = proplists:get_value(name,    Bucket),
+         % Mod = proplists:get_value(storage, Bucket),
+         % % resolve keyspace management
+         % case kvs_sys:get(kvs_sys_ref, {keyspace, Bid}) of
+            % {error, not_found}  ->
+               % % no key space management
+               % {ok, Pid} = kvs_sys:get(kvs_sys_ref, Bid),
+               % Mod:fold(Pid, Acc, Fun);
+            % {ok, Keyspace}      ->
+               % % there is a key space management process
+               % kvs_sys:fold(Keyspace, Acc,
+                  % fun(Key, Pid, AccIn) ->
+                     % {ok, Item} = Mod:get(Pid, Key),
+                     % case Fun(Key, Item) of
+                        % undefined -> AccIn;
+                        % AccOut    -> AccOut
+                     % end
+                  % end
+               % )
+         % end
+   % end.
+   % 
+ 
 
 %%%------------------------------------------------------------------
 %%%
@@ -274,48 +268,73 @@ handle_fold(Bucket, Acc, Fun) ->
 %%%
 %%%------------------------------------------------------------------
 
-% resolve Pid of handler responsible for given key   
-resolve(Bucket, Key) ->
-   case kvs_sys:get(kvs_sys_ref, {keyspace, Bucket}) of
-      {error, not_found}   ->
-         case kvs_sys:get(kvs_sys_ref, Bucket) of
-            {error, not_found} -> 
-               error_logger:error_msg('KVS: access to undefined bucket ~p~n', [Bucket]),
-               undefined;
-            {ok, Pid}          -> 
-               Pid
-         end;
-      {ok, Keyspace}      ->
-         % (keyspace partitioned) entity storage is resolved via bucket specific keyspace
-         case kvs_sys:get(Keyspace, Key) of
-            {error, not_found} -> undefined;
-            {ok,    Pid}       -> Pid
-         end
-   end.
-   
-%%%
-%%%  Notify
-%%%
-notify(put, Bucket, Key, Item) ->
-   case proplists:is_defined(event, Bucket) of
-      true  -> 
-         %Bname = proplists:get_value(name, Bucket),
-         %kvs_evt:put(Bname, Key, Item);
-         kvs_evt:put(Bucket, Key, Item);
-      false -> 
+create_fed(Uri, Name) ->
+   case ek:whereis(Uri) of
+      undefined -> 
+         {ok, _} = kvs_fed_cat_sup:create(Uri, Name);
+      _         -> 
          ok
-   end;
+    end.
 
-notify(remove, Bucket, Key, Item) ->
-   case proplists:is_defined(event, Bucket) of
-      true  -> 
-         %Bname = proplists:get_value(name, Bucket),
-         %kvs_evt:remove(Bname, Key, Item);
-         kvs_evt:remove(Bucket, Key, Item);
-      false -> 
-         ok
-   end;
+
+%%   
+%%   
+bin_to_hex(Bin) ->
+   bin_to_hex(Bin, "").
    
-notify(_, _, _, _) -> 
-   ok.      
+bin_to_hex(<<>>, Acc) ->
+   Acc;
+bin_to_hex(<<X:8, T/binary>>, Acc) ->  
+   bin_to_hex(T, Acc ++ [to_hex(X div 16), to_hex(X rem 16)]).
    
+to_hex(X) when X < 10 ->
+   $0 + X;
+to_hex(X) ->
+   $a + (X - 10).
+
+
+% % resolve Pid of handler responsible for given key   
+% resolve(Bucket, Key) ->
+   % case kvs_sys:get(kvs_sys_ref, {keyspace, Bucket}) of
+      % {error, not_found}   ->
+         % case kvs_sys:get(kvs_sys_ref, Bucket) of
+            % {error, not_found} -> 
+               % error_logger:error_msg('KVS: access to undefined bucket ~p~n', [Bucket]),
+               % undefined;
+            % {ok, Pid}          -> 
+               % Pid
+         % end;
+      % {ok, Keyspace}      ->
+         % % (keyspace partitioned) entity storage is resolved via bucket specific keyspace
+         % case kvs_sys:get(Keyspace, Key) of
+            % {error, not_found} -> undefined;
+            % {ok,    Pid}       -> Pid
+         % end
+   % end.
+   % 
+% %%%
+% %%%  Notify
+% %%%
+% notify(put, Bucket, Key, Item) ->
+   % case proplists:is_defined(event, Bucket) of
+      % true  -> 
+         % %Bname = proplists:get_value(name, Bucket),
+         % %kvs_evt:put(Bname, Key, Item);
+         % kvs_evt:put(Bucket, Key, Item);
+      % false -> 
+         % ok
+   % end;
+% 
+% notify(remove, Bucket, Key, Item) ->
+   % case proplists:is_defined(event, Bucket) of
+      % true  -> 
+         % %Bname = proplists:get_value(name, Bucket),
+         % %kvs_evt:remove(Bname, Key, Item);
+         % kvs_evt:remove(Bucket, Key, Item);
+      % false -> 
+         % ok
+   % end;
+   % 
+% notify(_, _, _, _) -> 
+   % ok.      
+   % 

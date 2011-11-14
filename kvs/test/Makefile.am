@@ -5,6 +5,7 @@ TESTS += kvs_dets_tests
 TESTS += kvs_cache_tests
 TESTS += kvs_rrd_tests
 TESTS += kvs_ht_tests
+TESTS += kvs_sync_ht_tx_tests
 
 
 .SECONDARY:

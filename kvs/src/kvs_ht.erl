@@ -55,10 +55,10 @@
    new/2,
    depth/1,
    insert/3,
-   filter/3,
+   filter/2,
    keys/1,
-   signature/2,
-   reconsile/2
+   hash/2,
+   diff/2
 ]).
 
 
@@ -89,9 +89,14 @@ new([{Key, Item} | R], T) ->
    new(R, insert(Key, Item, T)).
    
 %%
-%% return tree depth
+%% return depth
 depth(#ht{depth = Depth}) ->
+   % tree
+   Depth; 
+depth({hash, Depth, _}) ->
+   % hash
    Depth.
+   
    
 %%%
 %%% Insert
@@ -136,36 +141,41 @@ ht_insert(Leaf, T) ->
    end.
 
 %%%
-%%% Removes nodes from tree
-filter(Depth, Hashes, T) ->
-   ht_filter(Depth, Hashes, T).
+%%% Removes listed nodes
+filter(undefined, T) ->
+   T;
+filter({hash, Depth, Hashes}, T) ->
+   if
+      T#ht.depth >= Depth ->
+         ht_filter(Depth, Hashes, T);
+      true ->
+         T
+   end.
 
-ht_filter(Depth, Hashes, #ht{depth = Tdepth, inner = Inner} = T) when Tdepth =:= Depth + 1 ->
+ht_filter(Depth, Hashes, #ht{depth = Tdepth, hash = Hash} = T) when Tdepth =:= Depth ->
+   case lists:member(Hash, Hashes) of
+      true  -> undefined;
+      false -> T
+   end;
+   
+ht_filter(Depth, Hashes, #ht{inner = Inner} = T) ->
    T#ht{
       inner = lists:foldl(
          fun(SubT, List) -> 
-            case lists:member(SubT#ht.hash, Hashes) of
-               true  -> [SubT | List];
-               false -> List
+            case ht_filter(Depth, Hashes, SubT) of
+               undefined -> List;
+               Node      -> [Node | List]
             end
          end,
          [],
          Inner
       )
-   };
-   
-ht_filter(Depth, Hashes, #ht{inner = Inner} = T) ->
-   T#ht{
-      inner = lists:map(
-         fun(SubT) -> 
-            ht_filter(Depth, Hashes, SubT)
-         end,
-         Inner
-      )
    }.
 
 %%%   
-%%% Return tree(s) signature at depth
+%%% Return list of keys
+keys(undefined) ->
+   [];
 keys(T) ->   
    ht_keys(T, []).
       
@@ -180,41 +190,73 @@ ht_keys(#ht{inner=Inner}, Acc) ->
       
    
 %%%   
-%%% Return tree(s) signature at depth
-signature(Depth, T) ->   
-   ht_signature(Depth, T, []).
+%%% Return hashes of tree at depth
+%%% {hash, Depth, [Hashes]}
+hash({hash, Depth, _}, T) ->
+   hash(Depth, T);
+hash(-1,    T) ->
+   {hash, -1, []};
+hash(Depth, undefined) ->
+   {hash, Depth, []};
+hash(Depth, T) ->
+   if 
+      T#ht.depth >= Depth ->
+         {hash, Depth, ht_hash(Depth, T, [])};
+      true ->
+         {hash, Depth, []}
+   end.
       
-ht_signature(Depth, #ht{depth = Tdepth, hash = Hash}, Acc) when Tdepth =:= Depth  ->  
+ht_hash(Depth, #ht{depth = Tdepth, hash = undefined}, Acc) when Tdepth =:= Depth ->
+   Acc;
+ht_hash(Depth, #ht{depth = Tdepth, hash = Hash}, Acc) when Tdepth =:= Depth  ->  
    [Hash | Acc];
-ht_signature(Depth, #ht{inner=Inner}, Acc) ->
+ht_hash(Depth, #ht{inner=Inner}, Acc) ->
    lists:foldl(
-      fun(SubT, A) -> ht_signature(Depth, SubT, A) end,
+      fun(SubT, A) -> ht_hash(Depth, SubT, A) end,
       Acc,
       Inner
    ).   
    
+%%%
+%%% Compares tree hashes, return hash tuple of intersection A and B
+%%% 
+diff({hash, DA, SA}, {hash, DB, SB}) when DA =:= DB ->
+   L = lists:foldl(
+      fun(X, Acc) -> 
+         case lists:member(X, SA) of
+            true  -> Acc ++ [X];
+            false -> Acc
+         end
+      end,
+      [],
+      SB
+   ),
+   {hash, DA, L};
+   
+diff({hash, DA, _}, {hash, DB, _}) ->
+   {hash, erlang:min(DA, DB), []};
 
    
 %%
-%% reconsile diff between trees
+%% local tree(s) reconsilation
 %% {unique at A, unique at B}
-reconsile(A, B) ->
-   ht_reconsile(
+diff(A, B) when is_record(A, ht) and is_record(B, ht) ->
+   ht_diff(
       erlang:min(kvs_ht:depth(A) - 1, kvs_ht:depth(B) - 1), 
       A, 
       B
    ).
 
-ht_reconsile(-1,     A, B) ->
+ht_diff(-1,     A, B) ->
    {kvs_ht:keys(A), kvs_ht:keys(B)};
-ht_reconsile(Depth, A, B) ->
-   {DA, DB} = ht_diff(
-      kvs_ht:signature(Depth, A), 
-      kvs_ht:signature(Depth, B)
+ht_diff(Depth, A, B) ->
+   I = kvs_ht:diff(
+      kvs_ht:hash(Depth, A), 
+      kvs_ht:hash(Depth, B)
    ),
-   ht_reconsile(Depth - 1,
-      kvs_ht:filter(Depth, DB, A),
-      kvs_ht:filter(Depth, DA, B)
+   ht_diff(Depth - 1,
+      kvs_ht:filter(I, A),
+      kvs_ht:filter(I, B)
    ).
 
    
@@ -226,7 +268,7 @@ ht_reconsile(Depth, A, B) ->
 
 %%%
 %%% hash function
-hash(X) ->
+hashf(X) ->
    crypto:sha(term_to_binary(X)).
 
 %%%
@@ -235,7 +277,7 @@ new_leaf(Key, Item) ->
    #ht{
       depth = 0,
       size  = 1,
-      hash  = hash({Key, Item}),
+      hash  = hashf({Key, Item}),
       inner = Key
    }.
 
@@ -263,7 +305,7 @@ add_node(Inner, Node) when is_list(Inner) ->
    ),
    Node#ht{
       size  = Size,
-      hash  = hash(HashList),
+      hash  = hashf(HashList),
       inner = Inner
    };
 
@@ -286,21 +328,4 @@ has_capacity(#ht{size = Size, depth = Depth}) ->
    end.
 
    
-%%%
-%%% Compares tree signatures, return tuples
-%%% {Missing at A, Missing at B}
-ht_diff(SA, SB) ->
-   lists:foldl(
-      fun(X, {MA, MB}) -> 
-         case lists:member(X, MB) of
-            true  ->
-               % element exists at A
-               {MA, lists:delete(X, MB)};
-            false ->
-               % elemen do not exists at A
-               {[X | MA], MB}
-         end
-      end,
-      {[], SA},
-      SB
-   ).   
+  

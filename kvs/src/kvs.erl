@@ -37,9 +37,14 @@
 %%% Items are allocated to buckets. 
 %%%
 
+%%% TODO:
+%%% put(Cat, List) -> bulk insert of Key/Val pairs
+
 -export([
    start/0,
+   start/1,
    new/2,
+   drop/1,
    put/3,
    get/2,
    has/2,
@@ -51,6 +56,16 @@
 %%%
 %%% Start kvs application
 start() ->
+   kvs:start([]).
+
+start(Config) ->
+   lists:foreach(
+      fun
+         ({K, V}) -> application:set_env(kvs, K, V);
+         (K)      -> application:set_env(kvs, K, true)
+      end,
+      Config
+   ),
    {file, Module} = code:is_loaded(?MODULE),
    AppFile = filename:dirname(Module) ++ "/" ++ atom_to_list(?MODULE) ++ ".app",
    {ok, [{application, _, List}]} = file:consult(AppFile), 
@@ -83,6 +98,20 @@ new(Cat, Opts) ->
             _       -> kvs_sup:start_category(Spec)
          end
    end.   
+   
+%%%
+%%% Drop a Key/Value category
+%%%
+%%% drop(Cat) -> ok
+drop(Cat) ->
+   case kvs_sys:get(kvs_sys_ref, Cat) of
+      {ok,  Pid} ->
+         % TODO: implement
+         ok;
+      {error, _} -> 
+         ok
+   end.
+   
    
 %%%
 %%% put(Cat, Key, Item) -> ok | {error, ...}

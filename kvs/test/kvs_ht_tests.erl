@@ -75,15 +75,15 @@
    {key10,"*value 10"}
 ]).
 
-recon_keyset_test() ->
-   { A, B } = kvs_ht:reconsile(kvs_ht:new(?SET1), kvs_ht:new(?SET2)),
+diff_keyset_test() ->
+   { A, B } = kvs_ht:diff(kvs_ht:new(?SET1), kvs_ht:new(?SET2)),
    ?assert(lists:member(set1,  A)),
    ?assert(lists:member(key10, A)),
    ?assert(lists:member(set2,  B)),
    ?assert(lists:member(key11, B)).
 
-recon_value_test() ->
-   { A, B } = kvs_ht:reconsile(kvs_ht:new(?SET1), kvs_ht:new(?SET3)),
+diff_value_test() ->
+   { A, B } = kvs_ht:diff(kvs_ht:new(?SET1), kvs_ht:new(?SET3)),
    ?assert(lists:member(set1,  A)),
    ?assert(lists:member(key9,  A)),
    ?assert(lists:member(key10, A)),
@@ -91,8 +91,8 @@ recon_value_test() ->
    ?assert(lists:member(key9,  B)),
    ?assert(lists:member(key10, B)).
    
-recon_cold_test() ->
-   { A, B } = kvs_ht:reconsile(kvs_ht:new(?SET1), kvs_ht:new()),
+diff_cold_test() ->
+   { A, B } = kvs_ht:diff(kvs_ht:new(?SET1), kvs_ht:new()),
    ?assert([] =:= B),
    ?assert(lists:member(set1,  A)),
    ?assert(lists:member(key1,  A)),
@@ -107,6 +107,190 @@ recon_cold_test() ->
    ?assert(lists:member(key10, A)).
    %error_logger:info_report([{'A', A}, {'B', B}]).
 
+prot_diff_empty_test() ->
+   {A, B} = prot(
+      kvs_ht:new(),
+      kvs_ht:new()
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= []),
+   ?assert(KB =:= []).
+
+prot_diff_2lev_assym_1_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}]),
+      kvs_ht:new()
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= [k3, k1]),
+   ?assert(KB =:= []).
+   
+prot_diff_2lev_assym_2_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}]),
+      kvs_ht:new([{k2, v2}])
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= [k3, k1]),
+   ?assert(KB =:= [k2]).   
+   
+prot_diff_2lev_assym_3_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}]),
+      kvs_ht:new([{k1, v1}])
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= [k3]),
+   ?assert(KB =:= []).      
+   
+prot_diff_2lev_sym_1_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}]),
+      kvs_ht:new([{k2, v2}, {k4, v4}])
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= [k3, k1]),
+   ?assert(KB =:= [k4, k2]).     
+   
+prot_diff_2lev_sym_2_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}]),
+      kvs_ht:new([{k1, v1}, {k4, v4}])
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= [k3]),
+   ?assert(KB =:= [k4]).
+
+prot_diff_2lev_sym_3_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}]),
+      kvs_ht:new([{k1, v1}, {k3, v3}])
+   ),
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KA =:= []),
+   ?assert(KB =:= []).   
+   
+prot_diff_3lev_assym_1_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}, {k5, v5}]),
+      kvs_ht:new()
+   ),
+   % NOTE: output tree change they position
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KB =:= [k3, k1, k5]),
+   ?assert(KA =:= []).   
+
+prot_diff_3lev_assym_2_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}, {k5, v5}]),
+      kvs_ht:new([{k2, v2}])
+   ),
+   % NOTE: output tree change they position
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KB =:= [k3, k1, k5]),
+   ?assert(KA =:= [k2]).   
+   
+prot_diff_3lev_assym_3_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}, {k5, v5}]),
+      kvs_ht:new([{k1, v1}])
+   ),
+   % NOTE: output tree change they position
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KB =:= [k3, k5]),
+   ?assert(KA =:= []).   
+   
+prot_diff_3lev_assym_4_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k2, v2}]),
+      kvs_ht:new([{k1, v1}, {k2, v2}, {k3, v3}])
+   ),
+   % NOTE: output tree change they position
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KB =:= [k3]),
+   ?assert(KA =:= []).    
+   
+   
+   
+prot_diff_3lev_sym_1_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}, {k5, v5}]),
+      kvs_ht:new([{k2, v2}, {k4, v4}, {k6, v6}])
+   ),
+   % NOTE: output tree change they position
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KB =:= [k3, k1, k5]),
+   ?assert(KA =:= [k4, k2, k6]).   
+   
+prot_diff_3lev_sym_2_test() ->
+   {A, B} = prot(
+      kvs_ht:new([{k1, v1}, {k3, v3}, {k5, v5}]),
+      kvs_ht:new([{k2, v2}, {k4, v4}, {k5, v5}])
+   ),
+   % NOTE: output tree change they position
+   KA = kvs_ht:keys(A),
+   KB = kvs_ht:keys(B),
+   error_logger:info_report([{'A', KA}, {'B', KB}]),
+   ?assert(KB =:= [k3, k1]),
+   ?assert(KA =:= [k4, k2]).   
+   
+   
+   
+   
+  
+prot({{hash, -1, _}, I, A}, B) ->
+   {A, kvs_ht:filter(I, B)};
+prot({H, I, A}, B) ->
+   prot(prot_diff(H, I, B), A);
+prot(A, B) ->
+   prot(prot_diff(A), B).
+
+%%
+%%
+prot_diff(HT) ->
+   Lhash = kvs_ht:hash(kvs_ht:depth(HT), HT),
+   %error_logger:info_report([{hash, Lhash}, {intersect, undefined}]),
+   {Lhash, undefined, HT}.   
+   
+%%
+%% protocol diff
+prot_diff(Phash, Pint, HT) ->
+   NHT1   = kvs_ht:filter(Pint, HT),
+   Lhash0 = kvs_ht:hash(Phash,  NHT1),
+   Lint   = kvs_ht:diff(Phash,  Lhash0),
+   NHT2   = kvs_ht:filter(Lint, NHT1),
+   Lhash  = kvs_ht:hash(kvs_ht:depth(Lhash0) - 1, NHT1),
+   %error_logger:info_report([{hash, Lhash}, {intersect, Lint}]),
+   {Lhash, Lint, NHT2}.
+   
+   
+   
+   
+   
    
 
 

@@ -29,8 +29,12 @@ ESRC = \
    src/kvs_cache_sup.erl \
    src/kvs_cache.erl \
    src/kvs_rrd.erl \
+   src/kvs_fed_cat.erl \
+   src/kvs_fed_cat_sup.erl \
+   src/kvs_fed.erl \
    src/kvs_ht.erl \
-   src/kvs_sync_ht_tx.erl
+   src/kvs_sync_ht_tx.erl \
+   src/kvs_sync_ht_tx_sup.erl
 
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))

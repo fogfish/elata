@@ -123,7 +123,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 TESTS = kvs_sys_tests kvs_evt_tests kvs_ets_tests kvs_dets_tests \
-	kvs_cache_tests kvs_rrd_tests kvs_ht_tests
+	kvs_cache_tests kvs_rrd_tests kvs_ht_tests \
+	kvs_sync_ht_tx_tests
 CLEANFILES = $(TESTS) $(TESTS:=.beam)
 all: all-am
 

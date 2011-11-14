@@ -60,14 +60,60 @@ init([Config]) ->
    {ok,
       {
          {one_for_one, 4, 1800},
-         [event(), factory()]
+         event(Config, 
+            factory(Config,
+               fed(Config, 
+                  synctx(Config, [])
+               )
+            )
+         )
       }
    }.
 
 %%
 %%
-event() ->  
-   {
+fed(Config, Acc) ->
+   case proplists:is_defined(cluster, Config) of
+      true -> Acc ++ [{
+         kvs_fed_cat_sup,
+         {
+            kvs_fed_cat_sup,
+            start_link,
+            []
+         },
+         permanent, brutal_kill, supervisor, dynamic
+      }];
+      false -> Acc
+   end.
+   
+%% Sync TX listener
+synctx(Config, Acc) ->
+   case proplists:is_defined(cluster, Config) of
+      true  -> Acc ++ [{
+         kvs_sync_tx,
+         {
+            kvs_sync_ht_tx,
+            start_link,
+            []
+         },
+         permanent, brutal_kill, worker, dynamic
+      }, {
+         kvs_sync_tx_sup,
+         {
+            kvs_sync_ht_tx_sup,
+            start_link,
+            []
+         },
+         permanent, brutal_kill, supervisor, dynamic
+      }];
+      false -> Acc
+   end.   
+   
+   
+%%
+%%
+event(Config, Acc) ->  
+   Acc ++ [{
       kvs_evt,
       {
          kvs_evt,
@@ -75,12 +121,12 @@ event() ->
          []
       },
       permanent, 2000, worker, dynamic
-   }.   
+   }].   
 
 %%   
 %%   
-factory() ->
-   {
+factory(Config, Acc) ->
+   Acc ++ [{
       kvs_evt_sup,
       {
          kvs_evt_sup,
@@ -88,7 +134,7 @@ factory() ->
          []
       },
       permanent, 2000, worker, dynamic
-   }.
+   }].
    
 %%%   
 %%% Dynamically start bucket adds a module into supervisor tree (called via kvs_define)
