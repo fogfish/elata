@@ -47,7 +47,7 @@ custer_msg_test_() ->
                ek:start("http://localhost:8891"), 
                spawn(
                   fun() -> 
-                     ek:register("/test"), 
+                     ek:register("http:/test"), 
                      Loop = fun(X) -> 
                         receive 
                            Msg -> 
@@ -99,7 +99,7 @@ node_start() ->
    ek:connect("http://localhost:8891"),
    spawn(
       fun() -> 
-         ek:register("/test"),
+         ek:register("http:/test"),
          Loop = fun(X) ->
             receive
                Msg ->

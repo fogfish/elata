@@ -92,23 +92,24 @@ start(Node, Config) ->
 %% local Process Management (see src/ek_reg.erl)
 %%
 %%-------------------------------------------------------------------
-register(Uid) ->
-   ek_reg:register(Uid, self()).
 
-register(Uid, Pid) -> 
-   ek_reg:register(Uid, Pid).
+register(Uri) ->
+   ek_reg:register(Uri, self()).
 
-unregister(Uid) ->
-   ek_reg:unregister(Uid).
+register(Uri, Pid) -> 
+   ek_reg:register(Uri, Pid).
+
+unregister(Uri) ->
+   ek_reg:unregister(Uri).
    
-whereis(Uid) ->
-   ek_reg:whereis(Uid).
+whereis(Uri) ->
+   ek_reg:whereis(Uri).
    
 registered() ->
    ek_reg:registered().
    
-registered(Grp) ->
-   ek_reg:registered(Grp).
+registered(Schema) ->
+   ek_reg:registered(Schema).
            
 %%-------------------------------------------------------------------
 %%
@@ -118,18 +119,27 @@ registered(Grp) ->
    
 %%
 %% node() -> []
+%%
+%% local node name: 'ek-listen:' process
 node() ->
-   case ek:registered(listen) of
-      []   -> throw(no_ek);
-      List -> lists:map(fun({listen, Uri}) -> Uri end, List)
+   List = ek_reg:q(
+      fun(ek) -> true;  (_) -> false end,
+      fun(undefined)  -> false; (_) -> true end,
+      fun(_) -> true end
+   ),
+   case List of
+      []         -> throw(no_ek);
+      [Node | _] -> ek_uri:authority(Node)
    end.
    
 %%
+%% nodes() ->
 %% Retrive list of connected nodes
 nodes() ->
-   lists:map(
-      fun({node, Uri}) -> Uri end,
-      ek:registered(node)
+   ek_reg:q(
+      fun(ek) -> false; (_) -> true  end,
+      fun(undefined)  -> false; (_) -> true  end,
+      fun(<<"/">>)    -> true;  (_) -> false end
    ).
    
 %%
@@ -163,30 +173,30 @@ demonitor(EvtHandler) ->
 %%%------------------------------------------------------------------
 
 %%
-%% send(Uid, Msg) -> ok
-%%   Uid = list() | tuple()
+%% send(Uri, Msg) -> ok
+%%   Uri = list() | tuple()
 %%
-%% sends message to registered process, 
-%% if process do not exists locally and Uid is Uri then Msg is routed to remote node
-%% Failure: {badarg, {Uid, Msg}} if process and/or node cannot be found
-send(Uid, Msg) when is_tuple(Uid) -> 
-   case ek:whereis(Uid) of
-      undefined -> throw({badarg, {Uid, Msg}});
-      Pid       -> Pid ! Msg
-   end,
-   ok;
-
-send(Uri, Msg) ->
+%% Sends message to process identified by URI
+%% if process do not exists locally then Msg is routed to remote node
+%% Failure: {badarg, Uri} if process or node cannot be found
+send({_Scheme, undefined, _Path} = Uri, Msg) ->
    case ek:whereis(Uri) of
-      undefined ->
-         Host = ek_uri:host(Uri),
-         case ek:whereis({node, Host}) of
-            undefined -> throw({badarg, {Uri, Msg}});
+      undefined -> throw({badarg, Uri});
+      Pid       -> Pid ! Msg, ok
+   end;
+send({Scheme, Auth, Path} = Uri, Msg) ->
+   case ek:node() of
+      Auth -> 
+         % Auth = ek:node() message for this node
+         send({Scheme, undefined, Path}, Msg);
+      _    ->
+         case ek:whereis({Scheme, Auth, <<"/">>}) of
+            undefined -> throw({badarg, Uri});
             Pid       -> ek_prot:send(Pid, Uri, Msg)
-         end;   
-      Pid       -> Pid ! Msg
-   end,
-   ok.
+         end
+   end;
+send(Uri, Msg) ->
+   send(ek_uri:new(Uri), Msg).
 
 
 %%

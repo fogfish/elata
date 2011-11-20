@@ -84,13 +84,14 @@ start_link(Config, {connect, Uri, SideA}) ->
 
    
 init([Config, {listen, Uri}]) ->
-   ?DEBUG([{socket, listen}, {port, Uri}]),
+   ?DEBUG([{socket, listen}, {node, Uri}]),
    {ok, Sock} = gen_tcp:listen(
-      proplists:get_value(port, ek_uri:new(Uri)), 
+      ek_uri:port(Uri), 
       ?SOCK_OPTS
    ),
-   % register process as local listener
-   ek:register({listen, Uri}, self()),
+   % register process as ek-local listener
+   NUri = {ek, ek_uri:authority(Uri), <<"/">>},
+   ek:register(NUri, self()),
    {ok, 
       'LISTEN', 
        #fsm{
@@ -123,12 +124,9 @@ init([Config, {connect, Uri, SideA}]) ->
    ?DEBUG([{socket, connect}, {peer, Uri}]),
    {ok, Sock} = case proplists:get_value(proxy, Config) of
       undefined    ->
-         U = ek_uri:new(Uri),
-         Host = proplists:get_value(host, U),
-         Port = proplists:get_value(port, U),
          gen_tcp:connect(
-            binary_to_list(Host),
-            Port,
+            binary_to_list( ek_uri:host(Uri) ),
+            ek_uri:port(Uri),
             ?SOCK_OPTS,
             ?T_TCP_SOCK_CON
          );
@@ -191,7 +189,7 @@ handle_info({tcp, _Sock, Data}, 'HANDSHAKE', #fsm{peer = undefined} = State) ->
             ws_con_rsp()
          ),
          Peer = x_node(Req),
-         Pid = case ek:whereis({node, Peer}) of
+         Pid = case ek:whereis(Peer) of
             undefined ->
                {ok, Proc} = ek_prot_sup:create(Peer),
                Proc;
@@ -257,12 +255,15 @@ code_change(_OldVsn, Name, State, _Extra) ->
 %% Connect request primitive
 ws_con_req(Peer, undefined) ->
    % w/o proxy
-   Uri  = ek_uri:new(Peer),
-   Host = proplists:get_value(host, Uri),
+   Host = ek_uri:host(Peer),
    Port = list_to_binary(
-      integer_to_list(proplists:get_value(port, Uri))
+      integer_to_list(ek_uri:port(Peer))
    ),
-   Node = list_to_binary(ek:node()),
+   Node = ek_uri:to_binary({
+      ek_uri:schema(Peer),
+      ek:node(),
+      ek_uri:path(Peer)
+   }),
    <<
       "GET / HTTP/1.1\r\n", 
       "Host: ", Host/binary, ":", Port/binary, "\r\n",
@@ -274,12 +275,15 @@ ws_con_req(Peer, undefined) ->
    
 ws_con_req(Peer, Proxy) ->
    % with proxy
-   Uri  = ek_uri:new(Peer),
-   Host = proplists:get_value(host, Uri),
+   Host = ek_uri:host(Peer),
    Port = list_to_binary(
-      integer_to_list(proplists:get_value(port, Uri))
+      integer_to_list(ek_uri:port(Peer))
    ),
-   Node = list_to_binary(ek:node()),
+   Node = ek_uri:to_binary({
+      ek_uri:schema(Peer),
+      ek:node(),
+      ek_uri:path(Peer)
+   }),
    Req = <<
       "CONNECT ", Host/binary, ":", Port/binary, " HTTP/1.1\r\n",
       "Host: ", Host/binary, ":", Port/binary, "\r\n",

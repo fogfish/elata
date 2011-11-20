@@ -1,4 +1,6 @@
-TESTS  = ek_tests
+TESTS  = ek_uri_tests
+TESTS += ek_reg_tests
+TESTS += ek_tests
 TESTS += ek_msg_tests
 
 .SECONDARY:

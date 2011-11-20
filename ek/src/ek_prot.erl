@@ -39,7 +39,6 @@
 %%
 %% TODO:
 %%   - node alive timeout
-%%   - packet transmission over stream
 %%   - disable code injection (trusted nodes only)
 
 -export([
@@ -99,19 +98,19 @@ send(Pid, Uri, Msg) ->
 %%% gen_fsm
 %%%
 %%%------------------------------------------------------------------
-start_link(Config, Node) ->
-   gen_fsm:start_link(?MODULE, [Config, Node], []).
+start_link(Config, Uri) ->
+   gen_fsm:start_link(?MODULE, [Config, Uri], []).
    
-init([Config, Node]) ->
-   case ek:whereis({node, Node}) of
+init([_Config, Uri]) ->
+   case ek:whereis(Uri) of
       undefined ->
-         ?DEBUG([{node, Node}, {pid, self()}]),
-         ek:register({node, Node}, self()),
+         ?DEBUG([{node, Uri}, {pid, self()}]),
+         ek:register(Uri, self()),
          gen_fsm:send_event_after(1000, node_connect),
          {ok,
             'IDLE',
             #fsm{
-               node    = Node,
+               node    = Uri,
                sock    = undefined,
                attempt = 0,
                q       = queue:new()
@@ -266,31 +265,6 @@ handle_sync_event(_Req, _From, Name, State) ->
 %%%
 %%% Node registry
 %%%
-
-%%
-%% checks if Node exists and alive
-is_node(Node) ->
-   case ets:match_object(ek_nodes, {ek_node, Node, '_'}) of
-      []  -> 
-         ets:insert(ek_nodes, #ek_node{uri=Node, pid=self()}),
-         false;
-      [N] -> 
-         if
-            N#ek_node.pid =/= self() -> 
-               case erlang:is_process_alive(N#ek_node.pid) of
-                  true  -> 
-                     true;
-                  false -> 
-                     % node exists but process is not alive
-                     % overtake it
-                     ets:insert(ek_nodes, #ek_node{uri=Node, pid=self()}),
-                     false
-               end;
-            N#ek_node.pid =:= self() -> 
-               ets:insert(ek_nodes, #ek_node{uri=Node, pid=self()}),
-               false
-         end
-   end. 
 
 %%
 %% register node

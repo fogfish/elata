@@ -33,125 +33,191 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% URI is used as node/process identity within Erlang Cluster
-%% 
+%% Implements http://tools.ietf.org/html/rfc3986
+%%
+%% The following are two example URIs and their component parts:
+%%
+%%         foo://example.com:8042/over/there?name=ferret#nose
+%%         \_/   \______________/\_________/ \_________/ \__/
+%%          |           |            |            |        |
+%%       scheme     authority       path        query   fragment
+%%          |   _____________________|__
+%%         / \ /                        \
+%%         urn:example:animal:ferret:nose
+%%
+%% URI is enforsed as an identity and represented via tuple:
+%% {schema, <<"authority">>, <<"path">>}
+%%    
+%% TODO:
+%%   - query
+%%   - fragment
 
 -export([
    new/1,
+   schema/1,
    host/1,
-   path/1
+   port/1,
+   path/1,
+   authority/1,
+   to_binary/1
 ]).
 
+-define(NIL, {undefined, undefined, undefined}).
+
 %%
-%% parses binary as URI tuples
-new(Str) when is_list(Str) ->
-   uri(list_to_binary(Str), schema, <<>>, []);
-new(Str) ->
-   uri(Str, schema, <<>>, []).
-      
+%% new(URI) -> {Schema, Authority, Path}
+%%   URI       = list() | binary()
+%%   Schema    = atom()
+%%   Authority = binary()
+%%   Path      = binary()
+%%
+%% parses URI into tuple, fails with badarg if invalid URI
+%%
+new({Schema, Authority, Path}) when is_atom(Schema), 
+                                    is_binary(Authority), 
+                                    is_binary(Path) ->
+   {Schema, Authority, Path};                                 
+new(Uri) when is_list(Uri) ->
+   p_uri(list_to_binary(Uri), schema, <<>>, ?NIL);
+new(Uri) when is_binary(Uri)->
+   p_uri(Uri, schema, <<>>, ?NIL).
+   
+%%
+%% schema(URI) -> Host
+%%   URI  = list() | binary() | tuple()
+%%   Host = binary()
+schema({undefined, _, _}) ->
+   undefined;
+schema({Schema, _, _}) ->
+   Schema;
+schema(Uri) ->
+   schema(new(Uri)).
+
+   
+   
+%%
+%% host(URI) -> Host
+%%   URI  = list() | binary() | tuple()
+%%   Host = binary()
+host({_, undefined, _}) ->
+   undefined;
+host({_, Auth, _}) ->
+   {_, Host, _} = p_auth(Auth, host, <<>>, ?NIL),
+   Host;
+host(Uri) ->
+   host(new(Uri)).
+   
+%%
+%% port(URI) -> Port
+%%   URI  = list() | binary() | tuple()
+%%   Port = integer()
+port({_, undefined, _}) ->
+   undefined;
+port({_, Auth, _}) ->
+   {_, _, Port} = p_auth(Auth, host, <<>>, ?NIL),
+   Port;
+port(Uri) ->
+   port(new(Uri)).
+   
+%%
+%% path(URI) -> Path
+%%   URI  = list() | binary() | tuple()
+%%   Path = binary()
+path({_, _, Path}) ->
+   Path;
+path(Uri) ->
+   path(new(Uri)).   
+   
+%%
+%% authority(URI) -> Auth
+%%   URI  = list() | binary() | tuple()
+%%   Auht = binary()
+authority({_, undefined, _}) ->
+   undefined;
+authority({_, Auth, _}) ->
+   Auth;
+authority(Uri) ->
+   authority(new(Uri)).
+
+   
+%%
+%% to_binary(URI) -> binary()
+%%    URI  = list() | binary() | tuple()
+to_binary({Schema, undefined, Path}) ->
+   S = atom_to_binary(Schema, utf8),
+   <<S/binary, ":", Path/binary>>;
+to_binary({Schema, Authority, Path}) ->
+   S = atom_to_binary(Schema, utf8),
+   <<S/binary, "://", Authority/binary, Path/binary>>;
+to_binary(Uri) ->
+   to_binary(new(Uri)).
+   
+   
+%%%------------------------------------------------------------------
+%%%
+%%% Private
+%%%
+%%%------------------------------------------------------------------
+
+%%      URI         = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+%%
+%%      hier-part   = "//" authority path-abempty
+%%                  / path-absolute
+%%                  / path-rootless
+%%                  / path-empty
+%%
+
 %% end of schema
-uri(<<":", Str/binary>>, schema, Acc, U) ->
-   % TODO: security threat
-   uri(Str, null, <<>>, [{schema, binary_to_atom(Acc, utf8)} | U]);
+p_uri(<<":", Str/binary>>, schema, Acc, {S,A,P}) ->
+   % TODO: binary_to_atom security OOM issue
+   % Note: end-of-schema implies path
+   p_uri(Str, path, <<>>, {binary_to_atom(Acc, utf8), A, P});
 
-%% end of host
-uri(<<":", Str/binary>>, host, Acc, U) ->
-   uri(Str, port, <<>>, [{host, Acc} | U]);
-      
-%% start of host:port
-uri(<<"//", Str/binary>>, _Tag, _Acc, U) ->
-   uri(Str, host, <<>>, U);
-
-%% end of port or host, start path or schema is ommited
-uri(<<"/", Str/binary>>, schema, Acc, U) ->
-   uri(Str, path, <<"/">>, U);
-uri(<<"/", Str/binary>>, host, Acc, U) ->
-   uri(Str, path, <<"/">>, [{host, Acc} | U]);
-
-uri(<<"/", Str/binary>>, port, Acc, U) ->
-   uri(Str, path, <<"/">>, [{port, list_to_integer(binary_to_list(Acc))} | U]);
+%% start of authority
+p_uri(<<"//", Str/binary>>, path, _, U) ->
+   p_uri(Str, auth, <<>>, U);   
    
-%% end of path, start query
-uri(<<"?", Str/binary>>, path, Acc, U) ->
-   uri(Str, q, <<>>, [{path, Acc} | U]);
-
-uri(<<"?", Str/binary>>, fragment, Acc, U) ->
-   uri(Str, q, <<>>, [{fragment,Acc} | U]);
-   
-%% end of query, start fragment
-uri(<<"#", Str/binary>>, path, Acc, U) ->
-   uri(Str, fragment, <<>>, [{path, Acc} | U]);
-   
-uri(<<"#", Str/binary>>, q, Acc, U) ->
-   uri(Str, fragment, <<>>, [{q, Acc} | U]);   
+%% start of path
+p_uri(<<"/", Str/binary>>, auth, Acc, {S,A,P}) ->
+   p_uri(Str, path, <<"/">>, {S, Acc, P});   
    
 %% accumulates token
-uri(<<H:8, T/binary>>, Tag, Acc, Uri) ->
-   uri(T, Tag, <<Acc/binary, H>>, Uri);
-
-uri(<<>>, port, Acc, U) ->
-   [{port, list_to_integer(binary_to_list(Acc))} | U];
-uri(<<>>, Tag, Acc, U) ->
-   [{Tag, Acc} | U].
-    
-
+p_uri(<<H:8, T/binary>>, Tag, Acc, U) ->
+   p_uri(T, Tag, <<Acc/binary, H>>, U);   
    
+%% eof   
+p_uri(<<>>, schema, <<>>, {S,A,_}) ->
+   {S,A,<<"/">>};
+p_uri(<<>>, schema, Acc, {S,A,P})  ->
+   {S,A,Acc};
+p_uri(<<>>, auth, Acc, {S,_,_}) ->
+   % no path, set default
+   {S, Acc, <<"/">>};
+p_uri(<<>>, path, Acc, {S,A,P}) ->
+   {S, A, Acc}.
+   
+
 %%
-%% return schema://host:port
-host(U) when is_list(U) ->
-   case proplists:is_defined(schema, U) of
-      true  -> get_host(U);
-      false -> get_host(new(U))
-   end.
+%% authority   = [ userinfo "@" ] host [ ":" port ]
+%%
 
-get_host(U) ->
-   %% U is parsed URI
-   case proplists:get_value(schema, U) of
-      undefined -> throw(badarg);
-      Schema    ->
-         case proplists:get_value(host, U) of
-            undefined -> throw(badarg);
-            Host      ->
-               case proplists:get_value(port, U) of
-                  false -> throw(badarg);
-                  Port  ->
-                     atom_to_list(Schema) ++ "://" ++ 
-                     binary_to_list(Host) ++ ":" ++
-                     integer_to_list(Port)
-               end
-         end
-   end. 
-
-%%   
-%% return /path
-path(U) ->
-   case proplists:is_defined(schema, U) of
-      true  -> get_path(U);
-      false -> get_path(new(U))
-   end.
-
-get_path(U) ->
-   case proplists:get_value(path, U) of
-      undefined -> throw(badarg);
-      Path      -> binary_to_list(Path)
-   end.
+%% end of userinfo
+p_auth(<<"@", Str/binary>>, host, Acc, {_, H, P}) ->
+   p_auth(Str, host, <<>>, {Acc, H, P});
    
-%to_binary(#uri{schema = Schema, host = Host, port = Port, 
-%               path = Path, q = Query, fragment = Frag}) ->
-%   Bschema = atom_to_binary(Schema, utf8),
-%   Bport   = list_to_binary(integer_to_list(Port)),
-%   Bfrag   = case erlang:byte_size(Frag) of
-%      0 -> <<>>;
-%      _ -> <<"#", Frag/binary>>
-%   end,
-%   Bq      = case erlang:byte_size(Query) of
-%     0 -> <<>>;
-%     _ -> <<"?", Query/binary>>
-%   end,
-%   <<Bschema/binary, "://", Host/binary, ":", Bport/binary, 
-%     Path/binary, Bfrag/binary, Bq/binary>>.
+%% end of host
+p_auth(<<":", Str/binary>>, host, Acc, {U, _, P}) ->
+   p_auth(Str, port, <<>>, {U, Acc, P});
    
+%% accumulates token
+p_auth(<<H:8, T/binary>>, Tag, Acc, A) ->
+   p_auth(T, Tag, <<Acc/binary, H>>, A);
+
+%% eof
+p_auth(<<>>, host, Acc, {U, _, P}) ->
+   {U, Acc, P};
+p_auth(<<>>, port, Acc, {U, H, _}) ->
+   {U, H, list_to_integer(binary_to_list(Acc))}.
    
 
-
-
+   

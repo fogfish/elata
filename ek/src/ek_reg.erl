@@ -33,9 +33,8 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Process registry, 
-%% incontrast to erlang BIF register/2, unregister/1, whereis/1 where only atom is used
-%% The registry allows uri and tuples to be used as process identity
+%% Resource registry binds URI with resource id (e.g. Pid, Port, etc)
+%% Implements Erlang BIF register/2, unregister/1, whereis/1 
 %%
 
 -export([
@@ -44,19 +43,36 @@
    unregister/1,
    whereis/1,
    registered/0,
-   registered/1
+   registered/1,
+   remote/0,
+   remote/1,
+   q/3
+   
+   %registered/0,
+   %registered/1
 ]).
 
 
 %%
 %%
 start_link() ->
-   ets:new(?MODULE, [public, named_table]),
-   ok.
+   %% isolate table ownership
+   Pid = spawn_link(
+      fun() ->
+         ets:new(?MODULE, [public, named_table, ordered_set]),
+         Loop = fun(X) ->
+            receive
+               _ -> X(X)
+            end
+         end,
+         Loop(Loop)
+      end
+   ),
+   {ok, Pid}.
 
 
 %%
-%% register(Uri, Pid) -> true
+%% register(URI, Pid) -> ok
 %%   Uri = list() | tuple()
 %%   Pid = pid()
 %%
@@ -65,29 +81,29 @@ start_link() ->
 %% Failure: badarg if Pid is not an existing, if Uri is already in use,
 %% or if Uri is not complient http://tools.ietf.org/html/rfc3986.
 %%
-register(Uid, Pid) when is_tuple(Uid) ->
+register({_Scheme, _Node, _Path} = Uri, Pid) ->
    assert_pid(Pid),
-   case ek_reg:whereis(Uid) of
-      undefined -> ets:insert(?MODULE, {Uid, Pid});
+   case ek_reg:whereis(Uri) of
+      undefined -> ets:insert(?MODULE, {Uri, Pid}), ok;
       _         -> throw(badarg)
    end;
 register(Uri, Pid) ->
-   ek_reg:register({uri, assert_uri(Uri)}, Pid).
+   ek_reg:register(ek_uri:new(Uri), Pid).
 
 %%
-%% unredister(Uri) -> true
+%% unredister(Uri) -> ok
 %%   Uri = list() | tuple()
 %%
 %% Removes the registered name Uri, associated with a pid.
 %% Failure: badarg if Uri is not a registered name, Uri is assotiated 
 %% with invalid pid or if Uri is not complient http://tools.ietf.org/html/rfc3986.
-unregister(Uid) when is_tuple(Uid) ->
-   case ek_reg:whereis(Uid) of
+unregister({_Scheme, _Node, _Path} = Uri) ->
+   case ek_reg:whereis(Uri) of
       undefined -> throw(badarg);
-      _         -> ets:delete(?MODULE, Uid)
+      _         -> ets:delete(?MODULE, Uri), ok
    end;
 unregister(Uri) ->   
-   ek_reg:unregister({uri, assert_uri(Uri)}).
+   ek_reg:unregister(ek_uri:new(Uri)).
    
 %%
 %% whereis(Uri) -> pid() | undefined
@@ -95,9 +111,9 @@ unregister(Uri) ->
 %%
 %% Returns the pid or port identifier with the registered name Uri. 
 %% Returns undefined if the name is not registered. 
-whereis(Uid) when is_tuple(Uid) ->
-   case ets:lookup(?MODULE, Uid) of
-      [{Uid, Pid}] ->
+whereis({_Scheme, _Node, _Path} = Uri) ->
+   case ets:lookup(?MODULE, Uri) of
+      [{Uri, Pid}] ->
          case is_process_alive(Pid) of
             true  -> Pid;
             false -> undefined
@@ -106,51 +122,76 @@ whereis(Uid) when is_tuple(Uid) ->
          undefined
    end;
 whereis(Uri) ->
-   ek_reg:whereis({uri, assert_uri(Uri)}).
-   
+   ek_reg:whereis(ek_uri:new(Uri)).
    
 %%
-%% registered() -> [] 
+%% q(Schema, Authority, Path) -> [Uri]
+%%   Uri = {Schema, Authority, Path}
 %%
-%% Returns a list of names which have been registered using register/2.
-registered() ->
+%% query identities
+q(Scheme, Authority, Path) ->
    lists:foldl(
-      fun
-         ({{uri, Uri}, Pid}, Acc) ->
-            case is_process_alive(Pid) of
-               true  -> [Uri | Acc];
-               false -> ets:delete(?MODULE, {uri, Uri}), Acc
-            end;
-         ({Uid, Pid}, Acc) ->
-            case is_process_alive(Pid) of
-               true  -> [Uid | Acc];
-               false -> ets:delete(?MODULE, Uid), Acc
-            end
+      fun({{S,A,P}, Pid}, Acc) ->
+         case is_process_alive(Pid) of
+            true  -> 
+               SB = Scheme(S),
+               AB = Authority(A),
+               PB = Path(P),
+               if 
+                  SB, AB, PB -> [{S,A,P} | Acc];
+                  true       -> Acc
+               end;
+            false -> 
+               ets:delete(?MODULE, {S,A,P}), Acc
+         end
       end,
       [],
       ets:match_object(?MODULE, '_')
    ).
-
+   
 %%
-%% registered(Grp) -> []
+%% registered() -> [Uri]
 %%
-%% Return a list of names which have been regsitered  using register/2
-%% with tuple
-registered(Grp) ->
-    lists:foldl(
-       fun({{_, Name}, Pid}, Acc) ->
-          case is_process_alive(Pid) of
-             true  -> 
-                [{Grp, Name} | Acc];
-             false ->
-                ets:delete(?MODULE, {Grp, Name}), Acc
-          end
-       end,
-       [],
-       ets:match_object(?MODULE, {{Grp, '_'}, '_'})
-    ).
-
-    
+%% Localy registered identifiers
+registered() ->
+   ek_reg:q(
+      fun(_) -> true end,
+      fun(undefined) -> true; (_) -> false end,
+      fun(_) -> true end
+   ).
+   
+%%
+%% registered(Scheme) -> [Uri]
+%%
+%% Localy registered identifiers with schema restriction
+registered(Schema) ->
+   ek_reg:q(
+      fun(X) -> if X =:= Schema -> true; true -> false end end,
+      fun(undefined) -> true; (_) -> false end,
+      fun(_) -> true end
+   ). 
+   
+%%
+%% remote() -> [Uri]
+%%
+%% Remotely registered identifiers
+remote() ->
+   ek_reg:q(
+      fun(_) -> true end,
+      fun(undefined) -> false; (_) -> true end,
+      fun(_) -> true end
+   ).
+   
+%%
+%% remote(Scheme) -> [Uri]
+%%
+%% Remotely registered identifiers with schema restriction
+remote(Schema) ->
+   ek_reg:q(
+      fun(X) -> if X =:= Schema -> true; true -> false end end,
+      fun(undefined) -> false; (_) -> true end,
+      fun(_) -> true end
+   ).    
    
 %%%------------------------------------------------------------------
 %%%
@@ -166,29 +207,4 @@ assert_pid(Pid) ->
       true  -> true
    end.
 
-%%
-%%
-assert_uri(Uri) ->
-   U = ek_uri:new(Uri),
-   case proplists:is_defined(schema, U) of
-      false ->
-         % then path is mandatory
-         case proplists:is_defined(path, U) of
-            false -> throw(badarg);
-            true  -> 
-              [N | _] = ek:node(),
-              N ++ Uri
-         end;
-      true ->
-         % then host & port are mandatory
-         case proplists:is_defined(host, U) of
-            false -> throw(badarg);
-            true  ->
-               case proplists:is_defined(port, U) of
-                  false -> throw(badarg);
-                  true  -> Uri
-               end
-         end
-   end.
-   
 
