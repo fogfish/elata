@@ -44,21 +44,21 @@ custer_connect_test_() ->
          spawn(
             'dev1@localhost', 
             fun() -> 
-               ek:start("http://localhost:8881"), 
+               ek:start("node://localhost:8881"), 
                timer:sleep(60000)
             end
          ),
          spawn(
             'dev2@localhost', 
             fun() -> 
-               ek:start("http://localhost:8882"), 
+               ek:start("node://localhost:8882"), 
                timer:sleep(60000) 
             end
          ),
          spawn(
             'dev3@localhost', 
             fun() -> 
-               ek:start("http://localhost:8883"), 
+               ek:start("node://localhost:8883"), 
                timer:sleep(60000) 
             end
          )
@@ -109,23 +109,23 @@ spawn_node(Node) ->
 %%
 %%-------------------------------------------------------------------
 node_start() ->
-   ok = ek:start("ws://localhost:8880").
+   ok = ek:start("node://localhost:8880").
    
 node_join()  ->   
-   {ok, _} = ek:connect("http://localhost:8881"),
-   {ok, _} = ek:connect("http://localhost:8882"),
-   {ok, _} = ek:connect("http://localhost:8883"),
+   {ok, _} = ek:connect("node://localhost:8881"),
+   {ok, _} = ek:connect("node://localhost:8882"),
+   {ok, _} = ek:connect("node://localhost:8883"),
    timer:sleep(2000),
-   ?assert( lists:member(ek_uri:new("http://localhost:8881"), ek:nodes()) ),
-   ?assert( lists:member(ek_uri:new("http://localhost:8882"), ek:nodes()) ),
-   ?assert( lists:member(ek_uri:new("http://localhost:8883"), ek:nodes()) ).
+   ?assert( lists:member(ek_uri:new("node://localhost:8881"), ek:nodes()) ),
+   ?assert( lists:member(ek_uri:new("node://localhost:8882"), ek:nodes()) ),
+   ?assert( lists:member(ek_uri:new("node://localhost:8883"), ek:nodes()) ).
    
 node_rejoin() ->
-   erlang:exit(ek:whereis("http://localhost:8881"), error),
-   ?assert( not lists:member(ek_uri:new("http://localhost:8881"), ek:nodes()) ),
-   ?assert( lists:member(ek_uri:new("http://localhost:8882"), ek:nodes()) ),
-   ?assert( lists:member(ek_uri:new("http://localhost:8883"), ek:nodes()) ),
+   erlang:exit(ek:whereis("node://localhost:8881"), error),
+   ?assert( not lists:member(ek_uri:new("node://localhost:8881"), ek:nodes()) ),
+   ?assert( lists:member(ek_uri:new("node://localhost:8882"), ek:nodes()) ),
+   ?assert( lists:member(ek_uri:new("node://localhost:8883"), ek:nodes()) ),
    timer:sleep(2000),
-   ?assert( lists:member(ek_uri:new("http://localhost:8881"), ek:nodes()) ),
-   ?assert( lists:member(ek_uri:new("http://localhost:8882"), ek:nodes()) ),
-   ?assert( lists:member(ek_uri:new("http://localhost:8883"), ek:nodes()) ).
+   ?assert( lists:member(ek_uri:new("node://localhost:8881"), ek:nodes()) ),
+   ?assert( lists:member(ek_uri:new("node://localhost:8882"), ek:nodes()) ),
+   ?assert( lists:member(ek_uri:new("node://localhost:8883"), ek:nodes()) ).

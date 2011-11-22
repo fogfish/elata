@@ -148,6 +148,8 @@ nodes() ->
 %%    Node - list(), remote node identity
 connect({node, Node, <<"/">>} = Uri) ->
    ek_prot_sup:create(Uri);
+connect({_, _, _} = Uri) ->
+   throw({badarg, Uri});
 connect(Uri) ->
    connect(ek_uri:new(Uri)).
    

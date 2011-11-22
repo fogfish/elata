@@ -44,14 +44,14 @@ custer_msg_test_() ->
          spawn(
             'dev1@localhost', 
             fun() -> 
-               ek:start("http://localhost:8891"), 
+               ek:start("node://localhost:8891"), 
                spawn(
                   fun() -> 
-                     ek:register("http:/test"), 
+                     ek:register("urn:/test"), 
                      Loop = fun(X) -> 
                         receive 
                            Msg -> 
-                              ek:send("http://localhost:8890/test", Msg), 
+                              ek:send("urn://localhost:8890/test", Msg), 
                               X(X)
                         end
                      end,
@@ -95,11 +95,11 @@ spawn_node(Node) ->
 %%
 %%-------------------------------------------------------------------
 node_start() ->
-   ek:start("http://localhost:8890"),
-   ek:connect("http://localhost:8891"),
+   ek:start("node://localhost:8890"),
+   ek:connect("node://localhost:8891"),
    spawn(
       fun() -> 
-         ek:register("http:/test"),
+         ek:register("urn:/test"),
          Loop = fun(X) ->
             receive
                Msg ->
@@ -114,7 +114,7 @@ node_start() ->
    
 node_short_msg()  ->   
    Msg = {1, "value"},
-   ek:send("http://localhost:8891/test", Msg),
+   ek:send("urn://localhost:8891/test", Msg),
    timer:sleep(500),
    ?assert(
       [Msg] =:= ets:lookup(test, 1)
@@ -123,7 +123,7 @@ node_short_msg()  ->
 node_short_lst() ->
    Seq = lists:seq(1,10),
    Msg = lists:map(fun(X) -> {X, "value"} end, Seq),
-   ek:send("http://localhost:8891/test", Msg),
+   ek:send("urn://localhost:8891/test", Msg),
    timer:sleep(500),
    lists:foreach(
       fun(X) ->
@@ -136,7 +136,7 @@ node_short_lst() ->
    
 node_mid_msg() ->
    Msg = {1, rnd_string(1024, ?CHARS)},
-   ek:send("http://localhost:8891/test", Msg),
+   ek:send("urn://localhost:8891/test", Msg),
    timer:sleep(500),
    R = ets:lookup(test, key1),
    %error_logger:info_report([{r, R}]).
@@ -148,7 +148,7 @@ node_mid_lst() ->
    Val = rnd_string(1024, ?CHARS),
    Seq = lists:seq(1,100),
    Msg = lists:map(fun(X) -> {X, Val} end, Seq),
-   ek:send("http://localhost:8891/test", Msg),
+   ek:send("urn://localhost:8891/test", Msg),
    timer:sleep(500),
    lists:foreach(
       fun(X) ->
@@ -162,7 +162,7 @@ node_mid_lst() ->
    
 node_large_msg() ->
    Msg = {1, rnd_string(102400, ?CHARS)},
-   ek:send("http://localhost:8891/test", Msg),
+   ek:send("urn://localhost:8891/test", Msg),
    timer:sleep(500),
    R = ets:lookup(test, key1),
    %error_logger:info_report([{r, R}]).
@@ -174,7 +174,7 @@ node_large_lst() ->
    Val = rnd_string(102400, ?CHARS),
    Seq = lists:seq(1,100),
    Msg = lists:map(fun(X) -> {X, Val} end, Seq),
-   ek:send("http://localhost:8891/test", Msg),
+   ek:send("urn://localhost:8891/test", Msg),
    timer:sleep(9000),
    lists:foreach(
       fun(X) ->
