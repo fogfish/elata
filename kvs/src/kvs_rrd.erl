@@ -58,17 +58,12 @@
 -export([
    start_link/1,
    % gen_kvs
+   new/1,
    put/3,
    has/2,
    get/2,
    remove/2,
-   % gen_server
-   init/1, 
-   handle_call/3, 
-   handle_cast/2, 
-   handle_info/2, 
-   terminate/2, 
-   code_change/3
+   handle/2
 ]).
 
 %%
@@ -85,7 +80,8 @@
    code,   % path to RRD executables
    stream, % data stream parameters
    daemon, % {Host, Port} of RRD IO cache
-   sock    % open TCP/IP socket to cache  
+   sock,   % open TCP/IP socket to cache 
+   cache   % internal storage to keep interim key state
 }).
 
 -record(stream, {
@@ -96,10 +92,9 @@
 }).
 
 start_link(Spec) ->
-   % kvs_rrd bucket is singleton - one instance per node
-   gen_server:start_link(?MODULE, [Spec], []).
+   gen_kvs:start_link(Spec).
 
-init([Spec]) ->
+new(Spec) ->
    % configure data stream storage
    Data  = proplists:get_value(datapath,  Spec,  "/var/lib/kvs/rrd"), 
    Hbeat = proplists:get_value(heartbeat, Spec, 60),
@@ -125,9 +120,9 @@ init([Spec]) ->
          undefined   
    end,
    % define in-memory bucket to keep a latest results of streams in memory
-   {ok, _} = kvs:new(kvs_rrd_cache, [{storage, kvs_sys}]),
-   % register itself
-   gen_kvs:init(Spec),
+   {kvs, undefined, Path} = proplists:get_value(uri, Spec),
+   Uri = {kvs, undefined, <<Path/binary, "#cache">>},
+   {ok, _} = kvs:new(Uri, [{storage, kvs_ets}, direct]),
    ?DEBUG(Spec),
    {ok,
       #srv{
@@ -139,7 +134,8 @@ init([Spec]) ->
             timeout=Tout
          },
          sock=undefined,
-         daemon=Cache
+         daemon=Cache,
+         cache=Uri
       }
    }.
    
@@ -152,10 +148,7 @@ init([Spec]) ->
 
 %%
 %% Put value into data stream
-put(Pid, Key, Val) ->
-   gen_server:cast(Pid, {kvs_put, Key, Val}).
-   
-kvs_put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = State) when is_integer(Value) ->
+put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = State) when is_integer(Value) ->
    DS = key_to_stream(Key),
    % validate that stream is present
    ok = case filelib:is_file(S#stream.datadir ++ DS) of
@@ -170,98 +163,56 @@ kvs_put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = St
          rrdtool(Cmd);       
       _         ->
          % socket is exists, all data stream I/O handled by daemon
+         % TODO: UPDATE ~s ~b:~f~n for float values is required
          Msg = lists:flatten(
-            io_lib:format('UPDATE ~s ~b:~f~n', [DS, Timestamp, Value])
+            io_lib:format('UPDATE ~s ~b:~b~n', [DS, Timestamp, Value])
          ),
          gen_tcp:send(Sock, Msg)
    end,
-   ok = kvs:put(kvs_rrd_cache, DS, {Timestamp, Value});   
+   kvs:put(State#srv.cache, DS, {Timestamp, Value});   
 
-kvs_put(Key, Val, State) when is_integer(Val) ->
-   kvs_put(Key, {timestamp(), Val}, State);   
+put(Key, Val, State) when is_integer(Val) ->
+   put(Key, {timestamp(), Val}, State);   
 
-kvs_put(Key, Val, State) when is_list(Val) ->
+put(Key, Val, State) when is_list(Val) ->
    T = proplists:get_value(timestamp, Val, timestamp()),
    V = proplists:get_value(value,     Val),
-   kvs_put(Key, {T, V}, State);
+   put(Key, {T, V}, State);
 
-kvs_put(_Key, _Val, _State) ->
+put(_Key, _Val, _State) ->
    {error, not_supported}.
 
 
 %%
 %%
-has(Pid, Key) ->
-   gen_server:call(Pid, {kvs_has, Key}).
-
-kvs_has(Key, #srv{stream = S}) ->
+has(Key, #srv{stream = S}) ->
    DS = key_to_stream(Key),
    filelib:is_file(S#stream.datadir ++ DS).
 
 %%
 %%   
-get(Pid, Key) ->
-   gen_server:call(Pid, {kvs_get, Key}).
-
-kvs_get(Key) ->
+get(Key, #srv{cache = Cache}) ->
    DS = key_to_stream(Key),
-   case kvs:get(kvs_rrd_cache, DS) of
+   case kvs:get(Cache, DS) of
       {ok, {_, Val}} -> {ok, Val};
       _              -> {error, not_found}
    end.
 
 %%
 %%
-remove(_Pid, _Key) ->
+remove(_Pid, _S) ->
    {error, not_supported}.
-   %gen_server:cast(Pid, {kvs_remove, Key}).   
    
-   
-%%%------------------------------------------------------------------
-%%%
-%%% gen_server
-%%%
-%%%------------------------------------------------------------------   
-
-%%
-%% handle_call
-handle_call({kvs_has, Key}, _From, State) ->
-   {reply, kvs_has(Key, State), State};
-handle_call({kvs_get, Key}, _From, State) ->
-   {reply, kvs_get(Key), State};
-handle_call(_Req, _From, State) ->
-   {reply, undefined, State}.
-
-%%
-%% handle_cast
-handle_cast({kvs_put, Key, Val}, State) ->
-   kvs_put(Key, Val, State),
-   {noreply, State};
-handle_cast({kvs_remove, _Key}, State) ->
-   {noreply, State};
-handle_cast(_Req, State) ->
-   {noreply, State}.
-
 %%
 %% handle_info
-handle_info(connect, #srv{daemon = {Host, Port}} = State) ->
+handle(connect, #srv{daemon = {Host, Port}} = State) ->
    %% connect to cache daemon
    {ok, Sock}   = gen_tcp:connect(Host, Port, [binary, {packet, 0}]),
    ?DEBUG([{module, ?MODULE}, {daemon, {Host, Port}}]),
-   {noreply, State#srv{sock = Sock}};
-handle_info(_Msg, State) ->
-   {noreply, State}.
+   State#srv{sock = Sock};
+handle(_Msg, State) ->
+   State.
 
-%%
-%% terminate
-terminate(_Reason, _State) ->
-   ok.
-   
-%%
-%%
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.
-   
    
 %%%------------------------------------------------------------------
 %%%

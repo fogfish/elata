@@ -42,7 +42,7 @@ kvs_dets_test_() ->
       setup,
       fun() ->
          kvs:start(),
-         {ok, _} = kvs:new(test, [{storage, kvs_dets}, {file, "/tmp/test.dets"}]),
+         {ok, _} = kvs:new("kvs:test", [{storage, kvs_dets}, {file, "/tmp/test.dets"}]),
          true = filelib:is_file("/tmp/test.dets")
       end,
       fun(_) ->
@@ -64,55 +64,56 @@ kvs_dets_test_() ->
 %%% 
 %%%
 put() ->
+   R = kvs:put("kvs:test", key, ?VAL),
    ?assert(
-      ok =:= kvs:put(test, key, ?VAL)
+      ok =:= R
    ).
    
 has() ->
    ?assert(
-      true  =:= kvs:has(test, key)
+      true  =:= kvs:has("kvs:test", key)
    ),
    ?assert(
-      false =:= kvs:has(test, nokey)
+      false =:= kvs:has("kvs:test", nokey)
    ).
    
 get() ->
    ?assert(
-      {ok, ?VAL} =:= kvs:get(test, key)
+      {ok, ?VAL} =:= kvs:get("kvs:test", key)
    ),
    ?assert(
-      {error, not_found} =:= kvs:get(test, nokey)
+      {error, not_found} =:= kvs:get("kvs:test", nokey)
    ).
    
 remove() ->
    ?assert(
-      ok =:= kvs:remove(test, key)
+      ok =:= kvs:remove("kvs:test", key)
    ),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= kvs:get(test, key)
+      {error, not_found} =:= kvs:get("kvs:test", key)
    ).
 
 map() ->
    lists:foreach(
-      fun(X) -> kvs:put(test, X, X) end,
+      fun(X) -> kvs:put("kvs:test", X, X) end,
       lists:seq(1, 5)
    ),
-   R1 = kvs:map(test, fun(_, V) -> V * V end),
+   R1 = kvs:map("kvs:test", fun(_, V) -> V * V end),
    lists:foreach(
-      fun(X) -> kvs:remove(test, X) end,
+      fun(X) -> kvs:remove("kvs:test", X) end,
       lists:seq(1, 5)
    ),
    ?assert( [1, 4, 9, 16, 25] =:= R1).
    
 fold() ->
    lists:foreach(
-      fun(X) -> kvs:put(test, X, X) end,
+      fun(X) -> kvs:put("kvs:test", X, X) end,
       lists:seq(1, 5)
    ),
-   R1 = kvs:fold(test, 0, fun(_, V, Acc) -> Acc + V end),
+   R1 = kvs:fold("kvs:test", 0, fun(_, V, Acc) -> Acc + V end),
    lists:foreach(
-      fun(X) -> kvs:remove(test, X) end,
+      fun(X) -> kvs:remove("kvs:test", X) end,
       lists:seq(1, 5)
    ),
    ?assert( R1 =:= 15 ).

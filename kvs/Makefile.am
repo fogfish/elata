@@ -19,19 +19,17 @@ ESRC = \
    src/kvs.erl \
    src/kvs_app.erl \
    src/kvs_sup.erl \
-   src/kvs_sys.erl \
    src/kvs_evt.erl \
    src/kvs_evt_sup.erl \
    src/kvs_evt_handler_sup.erl \
    src/gen_kvs.erl \
    src/kvs_ets.erl \
    src/kvs_dets.erl \
+   src/kvs_act.erl \
+   src/kvs_val_sup.erl \
    src/kvs_cache_sup.erl \
    src/kvs_cache.erl \
    src/kvs_rrd.erl \
-   src/kvs_fed_cat.erl \
-   src/kvs_fed_cat_sup.erl \
-   src/kvs_fed.erl \
    src/kvs_ht.erl \
    src/kvs_sync_ht_tx.erl \
    src/kvs_sync_ht_tx_sup.erl

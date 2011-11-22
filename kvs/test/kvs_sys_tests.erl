@@ -37,12 +37,7 @@ kvs_sys_test_() ->
    {
       setup,
       fun() ->
-         {ok, _} = kvs_sys:start_link(kvs_sys_ref),
-         {ok, _} = kvs_sys:start_link(kvs_sys_cat)
-      end,
-      fun(X) ->
-         ets:delete(kvs_sys_ref),
-         ets:delete(kvs_sys_cat)
+         ok = kvs:start()
       end,
       [
          {"New sys", fun new/0},
@@ -53,26 +48,25 @@ kvs_sys_test_() ->
    }.
   
 new() ->
-   {ok, _} = kvs:new(test, [{storage, kvs_sys}]),
-   {ok, _} = kvs:get(kvs_sys_ref, test),
-   {ok, _} = kvs:get(kvs_sys_cat, test).
+   {ok, _}      = kvs:new("kvs:test", [{storage, kvs_ets}, direct]),
+   {kvs_ets, _} = ek:whereis("kvs:test").
    
 put() ->
    ?assert(
-      ok =:= kvs:put(test, key, self())
+      ok =:= kvs:put("kvs:test", key, self())
    ).
 
 get() ->
    ?assert(
-      {ok, self()} =:= kvs:get(test, key)
+      {ok, self()} =:= kvs:get("kvs:test", key)
    ).
    
 remove() ->
    ?assert(
-      ok =:= kvs:remove(test, key)
+      ok =:= kvs:remove("kvs:test", key)
    ),
    ?assert(
-      {error, not_found} =:= kvs:get(test, key)
+      {error, not_found} =:= kvs:get("kvs:test", key)
    ).
 
 

@@ -42,25 +42,25 @@ kvs_sync_test_() ->
          spawn(
             'dev1@localhost', 
             fun() -> 
-               ok = ek:start("http://localhost:8081"),
+               ok = ek:start("node://localhost:8081"),
                ok = kvs:start([cluster]),
-               {ok, _} = kvs:new(test, [{storage, kvs_ets}, fed]),
+               {ok, _} = kvs:new("kvs:/test", [{storage, kvs_ets}]),
                % control loop
-               ek:register("/test"),
+               ek:register("urn:/test"),
                Loop = fun(X) ->
                   receive
                      {populate, B, E, S} -> 
-                        lists:foreach(fun(X) -> kvs:put(test, X, X*X) end, lists:seq(B,E,S)),
+                        lists:foreach(fun(X) -> kvs:put("kvs:/test", X, X*X) end, lists:seq(B,E,S)),
                         X(X)
                   end
                end,
                Loop(Loop)
             end
          ),
-         ok = ek:start("http://localhost:8080"),
+         ok = ek:start("node://localhost:8080"),
          ok = kvs:start([cluster]),
-         {ok, _} = kvs:new(test, [{storage, kvs_ets}, fed]),
-         ek:connect("http://localhost:8081"),
+         {ok, _} = kvs:new("kvs:/test", [{storage, kvs_ets}]),
+         ek:connect("node://localhost:8081"),
          timer:sleep(2000)
       end,
       fun(_) ->
@@ -94,36 +94,36 @@ spawn_node(Node) ->
 %%-------------------------------------------------------------------
    
 p2p_init_sync() ->
-   ek:send("http://localhost:8081/test", {populate, 101, 110, 2}),
+   ek:send("urn://localhost:8081/test", {populate, 101, 110, 2}),
    timer:sleep(500),
-   kvs_sync_ht_tx:start_link(p2p, test, "http://localhost:8081"),
+   kvs_sync_ht_tx:start_link(p2p, "kvs://localhost:8081/test"),
    timer:sleep(2000),
    lists:foreach(
       fun(X) ->
-         ?assert( {ok, X*X} =:= kvs:get(test, X) ),
-         kvs:remove(test, X)
+         ?assert( {ok, X*X} =:= kvs:get("kvs:/test", X) ),
+         kvs:remove("kvs:/test", X)
       end,
       lists:seq(101,110,2)
    ).
 
 p2p_sync() ->
    lists:foreach(
-      fun(X) -> kvs:put(test, X, X*X) end,
+      fun(X) -> kvs:put("kvs:/test", X, X*X) end,
       lists:seq(111, 120, 1)
    ),
-   kvs_sync_ht_tx:start_link(p2p, test, "http://localhost:8081"),
+   kvs_sync_ht_tx:start_link(p2p, "kvs://localhost:8081/test"),
    timer:sleep(2000),
    lists:foreach(
       fun(X) ->
-         ?assert( {ok, X*X} =:= kvs:get(test, X) ),
-         kvs:remove(test, X)
+         ?assert( {ok, X*X} =:= kvs:get("kvs:/test", X) ),
+         kvs:remove("kvs:/test", X)
       end,
       lists:seq(101,110,2)
    ),
    lists:foreach(
       fun(X) ->
-         ?assert( {ok, X*X} =:= kvs:get(test, X) ),
-         kvs:remove(test, X)
+         ?assert( {ok, X*X} =:= kvs:get("kvs:/test", X) ),
+         kvs:remove("kvs:/test", X)
       end,
       lists:seq(111,120,1)
    ).
@@ -131,39 +131,37 @@ p2p_sync() ->
 ms_sync() ->
    %% local test has not key
    %% sync with master mode drops remote items
-   kvs_sync_ht_tx:start_link(master, test, "http://localhost:8081"),
+   kvs_sync_ht_tx:start_link(master, "kvs://localhost:8081/test"),
    timer:sleep(2000),
-   %%kvs_sync_ht_tx:start_link(p2p, test, "http://localhost:8081"),
-   %%timer:sleep(1000),
    lists:foreach(
       fun(X) ->
-         ?assert( {error, not_found} =:= kvs:get(test, X) )
+         ?assert( {error, not_found} =:= kvs:get("kvs:/test", X) )
       end,
       lists:seq(101,110,2)
    ),
    lists:foreach(
       fun(X) ->
-         ?assert( {error, not_found} =:= kvs:get(test, X) )
+         ?assert( {error, not_found} =:= kvs:get("kvs:/test", X) )
       end,
       lists:seq(111,120,1)
    ).
    
 sm_sync() ->
    lists:foreach(
-      fun(X) -> kvs:put(test, X, X*X) end,
+      fun(X) -> kvs:put("kvs:/test", X, X*X) end,
       lists:seq(111, 120, 1)
    ),
-   kvs_sync_ht_tx:start_link(slave, test, "http://localhost:8081"),
+   kvs_sync_ht_tx:start_link(slave, "kvs://localhost:8081/test"),
    timer:sleep(2000),
    lists:foreach(
       fun(X) ->
-         ?assert( {error, not_found} =:= kvs:get(test, X) )
+         ?assert( {error, not_found} =:= kvs:get("kvs:/test", X) )
       end,
       lists:seq(101,110,2)
    ),
    lists:foreach(
       fun(X) ->
-         ?assert( {error, not_found} =:= kvs:get(test, X) )
+         ?assert( {error, not_found} =:= kvs:get("kvs:/test", X) )
       end,
       lists:seq(111,120,1)
    ).

@@ -53,8 +53,8 @@ kvs_evt_test_() ->
       fun() ->
          kvs:start(),
          kvs_evt_sup:subscribe(kvs_evt_tests),
-         kvs:new(test_src, [{storage, kvs_sys}, event]),
-         kvs:new(test_dst, [{storage, kvs_sys}])
+         kvs:new("kvs:test:src", [{storage, kvs_ets}, event]),
+         kvs:new("kvs:test:dst", [{storage, kvs_ets}])
       end,
       [
       { "Put    event", fun put/0},
@@ -64,20 +64,20 @@ kvs_evt_test_() ->
    
 put() ->   
    ?assert(
-      ok =:= kvs:put(test_src, a, {a, b, c})
+      ok =:= kvs:put("kvs:test:src", a, {a, b, c})
    ),
    timer:sleep(100),
    ?assert(
-      {ok, {a, b, c}} =:= kvs:get(test_dst, a)
+      {ok, {a, b, c}} =:= kvs:get("kvs:test:dst", a)
    ).   
    
 remove() ->
    ?assert(
-      ok =:= kvs:remove(test_src, a)
+      ok =:= kvs:remove("kvs:test:src", a)
    ),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= kvs:get(test_dst, a)
+      {error, not_found} =:= kvs:get("kvs:test:dst", a)
    ).
 
    
@@ -89,11 +89,11 @@ remove() ->
 init([]) -> 
    {ok, []}.
    
-handle_event({put, Bucket, Key, Item}, State) ->
-   ok = kvs:put(test_dst, Key, Item),
+handle_event({put, Cat, Key, Item}, State) ->
+   ok = kvs:put("kvs:test:dst", Key, Item),
    {ok, State};
 handle_event({remove, Bucket, Key, Item}, State) ->
-   kvs:remove(test_dst, Key),
+   kvs:remove("kvs:test:dst", Key),
    {ok, State};
 handle_event(Evt, State) ->
    {ok, State}.

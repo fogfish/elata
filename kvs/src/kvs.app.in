@@ -23,7 +23,8 @@
       {applications, 
          [
             kernel,
-            stdlib
+            stdlib,
+            ek
          ]
       },
       {mod, {kvs_app, []}}

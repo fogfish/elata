@@ -42,15 +42,12 @@
 
 start(_Type, _Args) -> 
    Config = config(?APPNAME, [
-       cluster
-   %   sync,
-   %   evt_log, 
-   %   {evt_log_ttl, 7 * 24 * 3600}, 
-   %   {evt_log_chunk, 128}
+       cluster,
+       api
    ]),
    % start system buckets
-   {ok, _} = kvs_sys:start_link(kvs_sys_ref),
-   {ok, _} = kvs_sys:start_link(kvs_sys_cat),
+   % {ok, _} = kvs_sys:start_link(kvs_sys_ref),
+   % {ok, _} = kvs_sys:start_link(kvs_sys_cat),
    case kvs_sup:start_link(Config) of
       {ok, Pid} ->
          % start evt_log with default config

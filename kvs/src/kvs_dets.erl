@@ -31,30 +31,23 @@
 %%
 -module(kvs_dets).
 -behaviour(gen_kvs).
--behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("stdlib/include/qlc.hrl").
 
 %%
-%%  Wrapper of Key/Value Interface to ETS
+%%  On-disk category (uses DETS internally)
 %%
 
 -export([
    start_link/1,
+   new/1,
    % gen_kvs
    put/3,
    has/2,
    get/2,
    remove/2,
    map/2,
-   fold/3,
-   %% gen_server
-   init/1, 
-   handle_call/3,
-   handle_cast/2, 
-   handle_info/2, 
-   terminate/2, 
-   code_change/3 
+   fold/3 
 ]).
 
 %%
@@ -65,30 +58,26 @@
 -define(DEBUG(M), true).
 -endif.
 
--record(srv, {
-   ref,  % ref to table instance
-   cat   % category
-}).
 
 %%
 %% On-disk key/val storage
 %%    Storage specific options
 %%       {file, ...}
 start_link(Spec) ->
-  gen_server:start_link(?MODULE, [Spec], []).
+  gen_kvs:start_link(Spec).
   
-init([Spec]) ->
-   Cat       = proplists:get_value(name,  Spec),
-   File      = proplists:get_value(file,  Spec),
-   {ok, Ref} = dets:open_file(Cat, [{file, File}]),
-   gen_kvs:init(Spec),
-   ?DEBUG(Spec),
-   {ok, 
-      #srv{
-         ref = Ref,
-         cat = Spec
-      }
-   }.
+new(Spec) ->
+   File = proplists:get_value(file,  Spec),
+   Cat  = proplists:get_value(uri,   Spec),
+   case filelib:is_file(File) of
+      true  -> 
+         ok;
+      false ->
+         % create dets tables
+         dets:open_file(noname, [{file, File}]),
+         dets:close(noname)
+   end,
+   dets:open_file(File).
 
 %%%------------------------------------------------------------------   
 %%%
@@ -98,30 +87,21 @@ init([Spec]) ->
 
 %%
 %%
-put(Pid, Key, Val) ->
-   gen_server:call(Pid, {kvs_put, Key, Val}).
-
-kvs_put(Key, Val, S) ->
-   dets:insert(S#srv.ref, {Key, Val}).
+put(Key, Val, Ref) ->
+   dets:insert(Ref, {Key, Val}).
 
 %%
 %%
-has(Pid, Key) ->
-   gen_server:call(Pid, {kvs_has, Key}).
-
-kvs_has(Key, S) ->
-   case dets:lookup(S#srv.ref, Key) of
+has(Key, Ref) ->
+   case dets:lookup(Ref, Key) of
       [Val] -> true;
       _     -> false
    end.   
    
 %%
 %%
-get(Pid, Key) ->   
-   gen_server:call(Pid, {kvs_get, Key}).
-  
-kvs_get(Key, S) ->
-   case dets:lookup(S#srv.ref, Key) of
+get(Key, Ref) ->
+   case dets:lookup(Ref, Key) of
       [{Key, Val}] -> {ok, Val};
       []           -> {error, not_found};
       Err          -> Err
@@ -129,65 +109,22 @@ kvs_get(Key, S) ->
    
 %%
 %%
-remove(Pid, Key) ->
-   gen_server:call(Pid, {kvs_remove, Key}).
-  
-kvs_remove(Key, S) ->  
-   dets:delete(S#srv.ref, Key).
+remove(Key, Ref) ->  
+   dets:delete(Ref, Key).
 
 %%
 %%
-map(Pid, Fun)  ->
-   gen_server:call(Pid, {kvs_map, Fun}).
-
-kvs_map(Fun, S) ->
+map(Fun, Ref) ->
    Map = fun({K, V}) -> Fun(K, V) end,
-   Q = qlc:q([ Map(X) || X <- dets:table(S#srv.ref)]),
+   Q = qlc:q([ Map(X) || X <- dets:table(Ref)]),
    qlc:e(Q). 
 
 %%   
 %%
-fold(Pid, Acc, Fun) ->
-   gen_server:call(Pid, {kvs_fold, Acc, Fun}).
-   
-kvs_fold(Acc, Fun, S) ->
+fold(Acc, Fun, Ref) ->
    Fold = fun({K, V}, A) -> Fun(K, V, A) end,
-   Q = qlc:q([ X || X <- dets:table(S#srv.ref)]),
+   Q = qlc:q([ X || X <- dets:table(Ref)]),
    qlc:fold(Fold, Acc, Q).   
-   
-   
-%%%------------------------------------------------------------------   
-%%%
-%%% gen_server
-%%%
-%%%------------------------------------------------------------------
-
-handle_call({kvs_put, Key, Val}, _, S) ->
-   {reply, catch(kvs_put(Key, Val, S)), S};
-handle_call({kvs_has, Key}, _, S) ->
-   {reply, kvs_has(Key, S), S};
-handle_call({kvs_get, Key}, _, S) ->
-   {reply, kvs_get(Key, S), S}; 
-handle_call({kvs_remove, Key}, _, S) ->
-   {reply, kvs_remove(Key, S), S};
-handle_call({kvs_map, Fun}, _, S) ->
-   {reply, kvs_map(Fun, S), S};
-handle_call({kvs_fold, Acc, Fun}, _, S) ->
-   {reply, kvs_fold(Acc, Fun, S), S};
-handle_call(_Req, _From, State) ->
-   {reply, undefined, State}.
-
-handle_cast(_Req, State) ->
-   {noreply, State}.   
-
-handle_info(_Msg, State) ->
-   {noreply, State}.   
-   
-terminate(_Reason, S) ->
-   gen_kvs:terminate(S#srv.cat).
-   
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.        
 
 %%%------------------------------------------------------------------   
 %%%

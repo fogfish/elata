@@ -29,29 +29,20 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_fed_cat).
--behaviour(gen_server).
+-module(kvs_act).
+-behaviour(gen_kvs).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Handles kvs federate events 
+%% Active process category
 %%
 
 -export([
-   start_link/2,
-   %% gen_server
-   init/1, 
-   handle_call/3,
-   handle_cast/2, 
-   handle_info/2, 
-   terminate/2, 
-   code_change/3
+   start_link/1,
+   new/1,
+   % gen_kvs
+   put/3
 ]).
-
--record(srv, {
-   cat,
-   uri
-}).
 
 %%
 %% debug macro
@@ -62,54 +53,31 @@
 -endif.
 
 %%
-%%
-start_link(Uri, Cat) ->
-   gen_server:start_link(?MODULE, [Uri, Cat], []).
+%% Active key/val category
+%%    Storage specific options
+%%       {type,   ...} type, (default set)
+%%       {scope,  ...} scope (default private)
+start_link(Spec) ->
+   gen_kvs:start_link(Spec).
 
-init([Uri, Cat]) ->
-   ek:register(Uri),
-   ?DEBUG([{fed, listen}, {uri, Uri}, {cat, Cat}]),
-   {ok,
-      #srv{
-         cat   = Cat,
-         uri   = Uri
-      }
-   }.
+new(Spec) ->
+   % create a keyspace category
+   Uri = proplists:get_value(uri, Spec),
+   {act, undefined, Path} = ek_uri:new(Uri),
+   {ok, _} = kvs:new({kvs, undefined, <<Path/binary, "#key">>}, [{storage, kvs_ets}, direct]),
+   % register an element factory
+   kvs_sup:start_factory(Spec).
    
+
 %%%------------------------------------------------------------------   
 %%%
-%%% gen_server
+%%% gen_kvs
 %%%
 %%%------------------------------------------------------------------
 
 %%
 %%
-handle_call(_Req, _From, S) ->
-   {reply, undefined, S}.   
-  
-%%
-%%
-handle_cast(_Req, S) ->
-   {noreply, S}.
-
-%%
-%%
-handle_info({kvs_fed_put, Key, Val}, S) ->
-   kvs:put(S#srv.cat, Key, Val),
-   {noreply, S};
-handle_info({kvs_fed_remove, Key}, S) ->
-   kvs:remove(S#srv.cat, Key),
-   {noreply, S};
-handle_info(_Msg, S) ->
-   {noreply, S}.
-   
-%%
-%% terminate
-terminate(_Reason, _State) ->
+put(Key, Val, Ref) ->
+   {ok, _} = supervisor:start_child(Ref, [Key, Val]),
    ok.
-   
-%%
-%%
-code_change(_OldVsn, State, _Extra) ->
-   {ok, State}.   
-   
+

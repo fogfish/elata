@@ -66,14 +66,15 @@
 
 %%
 %%
-start_link(Cat, Key, Val) ->
-  gen_server:start_link(?MODULE, [Cat, Key, Val], []).
+start_link(Spec, Key, Val) ->
+  gen_server:start_link(?MODULE, [Spec, Key, Val], []).
   
-init([Cat, Key, Val]) ->
-   gen_kvs:vinit(Cat, Key),
+init([Spec, Key, Val]) ->
+   Cat = proplists:get_value(uri, Spec),
+   gen_kvs:val_init(Cat, Key),
    {ok, 
       #srv{
-         ttl=ttl_timer(gen_kvs:vattr(Cat, ttl, Val)),
+         ttl=ttl_timer(gen_kvs:get_val_prop(Cat, ttl, Val)),
          timestamp=timestamp(),
          cat=Cat, 
          key=Key,
@@ -84,7 +85,7 @@ init([Cat, Key, Val]) ->
 handle_call({kvs_put, Key, Val}, _From, S) ->
    {reply, ok, 
       S#srv{
-         ttl=ttl_timer(gen_kvs:vattr(S#srv.cat, ttl, Val)), 
+         ttl=ttl_timer(gen_kvs:get_val_proc(S#srv.cat, ttl, Val)), 
          timestamp=timestamp(), 
          val=Val
       }
@@ -93,6 +94,7 @@ handle_call({kvs_get, Key}, _From, S) ->
    {reply, {ok, S#srv.val}, S#srv{timestamp=timestamp()}};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
+   
 handle_cast({kvs_remove, Key}, State) ->
    {stop, normal, State};
 handle_cast(_Req, State) ->
@@ -123,7 +125,7 @@ handle_info(_Msg, State) ->
    {noreply, State}.
    
 terminate(_Reason, S) ->
-   gen_kvs:vterminate(S#srv.cat, S#srv.key),
+   gen_kvs:val_terminate(S#srv.cat, S#srv.key),
    ok.
    
 code_change(_OldVsn, State, _Extra) ->

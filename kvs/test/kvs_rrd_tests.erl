@@ -58,16 +58,18 @@ kvs_rrd_cache_test_() ->
    }.
    
 setup_rrd_ipc() ->
+   application:start(ek),
    application:start(kvs),
-   {ok, _} = kvs:new(test, [
+   {ok, _} = kvs:new("kvs:test", [
       {storage, kvs_rrd},
       {codepath, "/usr/local/macports"},
       {datapath, "/private/tmp/kvs"}
    ]).
 
 setup_rrd_cache() ->
+   application:start(ek),
    application:start(kvs),
-   {ok, _} = kvs:new(test, [
+   {ok, _} = kvs:new("kvs:test", [
       {storage, kvs_rrd},
       {codepath, "/usr/local/macports"},
       {datapath, "/private/tmp/kvs"},
@@ -79,6 +81,7 @@ setup_rrd_cache() ->
 
 cleanup(Pid) ->
    application:stop(kvs),
+   application:stop(ek),
    timer:sleep(100),  %% switch a context to kill supervisor
    os:cmd("rm -R /private/tmp/kvs"),
    os:cmd("killall rrdcached").
@@ -86,11 +89,11 @@ cleanup(Pid) ->
 put() ->
    Key = {<<"eu">>, <<"http://localhost">>, tcp},
    ?assert(
-      ok =:= kvs:put(test, Key, 1000)
+      ok =:= kvs:put("kvs:test", Key, 1000)
    ),
    timer:sleep(500), %% RRD put is async, we have to wait before file is created
    ?assert(
-      kvs:has(kvs_rrd_cache, key_to_stream(Key))
+      kvs:has("kvs:test#cache", key_to_stream(Key))
    ),
    ?assert(
       filelib:is_file("/private/tmp/kvs" ++ key_to_stream(Key))
@@ -100,20 +103,20 @@ has() ->
    Key1 = {<<"eu">>, <<"http://localhost">>, tcp},
    Key2 = {<<"us">>, <<"http://localhost">>, tcp},  
    ?assert(
-      true =:= kvs:has(test, Key1)
+      true =:= kvs:has("kvs:test", Key1)
    ),
    ?assert(
-      false =:= kvs:has(test, Key2)
+      false =:= kvs:has("kvs:test", Key2)
    ).
    
 get() ->
    Key1 = {<<"eu">>, <<"http://localhost">>, tcp},
    Key2 = {<<"us">>, <<"http://localhost">>, tcp},  
    ?assert(
-      {ok, 1000} =:= kvs:get(test, Key1)
+      {ok, 1000} =:= kvs:get("kvs:test", Key1)
    ),
    ?assert(
-      {error, not_found} =:= kvs:get(test, Key2)
+      {error, not_found} =:= kvs:get("kvs:test", Key2)
    ).
    
 key_to_stream(Key) ->

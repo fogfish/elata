@@ -39,7 +39,7 @@
    % supervisor
    start_link/1,
    init/1,                    
-   % gen_kvs_bucket
+   % gen_kvs
    put/3,
    has/2,
    get/2,
@@ -57,6 +57,7 @@ start_link(Spec) ->
    supervisor:start_link({local, ?MODULE}, ?MODULE, [Spec]).
    
 init([Spec]) ->
+   % register a category & start keyspace meta-category
    Cat     = proplists:get_value(name, Spec), 
    {ok, _} = kvs:new({key, Cat}, [{storage, kvs_sys}]),
    gen_kvs:init(Cat, Spec),
@@ -80,7 +81,7 @@ element(Cat) ->
    
 %%%------------------------------------------------------------------
 %%%
-%%% gen_kvs_entity
+%%% gen_kvs
 %%%
 %%%------------------------------------------------------------------
 put(Cat, Key, Val) ->

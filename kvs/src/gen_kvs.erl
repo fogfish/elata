@@ -30,40 +30,55 @@
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
 -module(gen_kvs).
+-behaviour(gen_server).
+
 -author(dmitry.kolesnikov@nokia.com).
 -include_lib("stdlib/include/qlc.hrl").
 
 %%
-%% Bucket is a hashtable, composed of
-%%  - metadata defines bucket operational parameters
-%%  - keyspace assotiation table that maps logical key to entity addresses (active bucket)
-%%  - storage  persists key/values
+%% TODO: refactor plugin interface
 
-%% Generic bucket controller own bucket meta-data and keyspace
-%%
-%%  - static bucket: single bucket process manages whole keyspace (e.g. proxy)
-%%  - active bucket: each item is managed by dedicated process (e.g. worker) 
-%%
-
-
-%%
-%% Static key/value bucket, 
-%% (Used as a proxy to exised persistent/in-memory storage)
-%%
 -export([
+   start_link/1,
+   % api
+   new/1,
+   put/3,
+   has/2,
+   get/2,
+   remove/2,
+   map/2,
+   fold/3,
+   % gen_server
+   init/1, 
+   handle_call/3,
+   handle_cast/2, 
+   handle_info/2, 
+   terminate/2, 
+   code_change/3,   
+   % value process     
+   val_init/2,
+   val_terminate/2,
+   get_val_prop/3,
+
    % plugin utility api
-   init/1,
-   init/2,
-   terminate/1,
-   key_to_pid/2,
-   vinit/2,
-   vterminate/2,
-   vattr/3,
-   key_map/3,
-   key_fold/4,
+   %init/1,
+   %init/2,
+   %terminate/1,
+   %key_to_pid/2,
+   
+   %key_map/3,
+   %key_fold/4,
    % custom behaviour
    behaviour_info/1
 ]).
+
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
 
 
 %%%------------------------------------------------------------------
@@ -73,98 +88,318 @@
 %%%------------------------------------------------------------------
 behaviour_info(callbacks) ->
    [
+      % plugin api 
       {put,  3},      %% put(Pid, Key, Item) -> ok | {error, ...}
       {has,  2},      %% has(Pid, Key)  -> true | false                     
       {get,  2},      %% get(Pid, Key)  -> {ok, Item} | {error, ...}
       {remove, 2},    %% remove(Pid, Key) -> ok | {error, ...}
       {map,    2},    %% map(Pid, Fun) -> Result | {error, ...}
       {fold,   3}     %% fold(Pid, Acc, Fun) -> Result | {error, ...}
+      % server callback
    ];
 
 behaviour_info(_) -> 
    undefined.
+   
+%%
+-record(srv, {
+   spec,   % category spec
+   mod,    % module
+   cat     % category state
+}).   
+   
+%%%------------------------------------------------------------------
+%%%
+%%% gen_server
+%%%
+%%%------------------------------------------------------------------
+
+%%
+%% Start new category
+start_link(Spec) ->
+   gen_server:start_link(?MODULE, [Spec], []).
+   
+init([Spec]) ->
+   Uri = proplists:get_value(uri, Spec),
+   Mod = case Uri of
+      {kvs, undefined, _} -> proplists:get_value(storage, Spec);
+      {act, undefined, _} -> kvs_act
+   end,
+   ?DEBUG([Spec]),
+   {ok,
+      #srv{
+         spec = Spec,
+         mod  = Mod,
+         cat  = undefined
+      }
+   }.
+
+%%
+%% second phase constructor
+handle_call(kvs_new, _, #srv{spec = Spec, mod = Mod} = S) ->
+   Uri = proplists:get_value(uri, Spec),
+   {ok, Cat} = Mod:new(Spec),
+   case proplists:is_defined(direct, Spec) of
+      true  -> ek:register(Uri, {Mod, Cat});
+      false -> ek:register(Uri)
+   end,
+   {reply, ok, S#srv{cat = Cat}};
+   
+%%
+%% Synchronous interface   
+handle_call({kvs_put, Key, Val}, _, S) ->
+   {reply, srv_put(Key, Val, S), S};   
+handle_call({kvs_has, Key}, _, S) ->
+   {reply, srv_has(Key, S), S};
+handle_call({kvs_get, Key}, _, S) ->
+   {reply, srv_get(Key, S), S};
+handle_call({kvs_remove, Key}, _, S) ->
+   {reply, srv_remove(Key, S), S};
+handle_call({kvs_map, Fun}, _, S) ->
+   {reply, srv_map(Fun, S), S};
+handle_call({kvs_fold, Acc, Fun}, _, S) ->
+   {reply, srv_fold(Acc, Fun, S), S};   
+handle_call(_Req, _From, S) ->
+   {reply, undefined, S}.
+
+%%
+%% Asynchronous interface
+handle_cast({kvs_put, Key, Val}, S) ->
+   srv_put(Key, Val, S),
+   {noreply, S};
+handle_cast({kvs_remove, Key}, S) ->  
+   srv_remove(Key, S),
+   {noreply, S};
+handle_cast(_Req, State) ->
+   {noreply, State}.   
+   
+%%
+%% Asynchronous protocol
+handle_info({kvs_put, Key, Val}, S) ->
+   srv_put(Key, Val, S),
+   {noreply, S};
+handle_info({kvs_remove, Key}, S) ->  
+   srv_remove(Key, S),
+   {noreply, S};
+handle_info(Msg, #srv{mod = Mod, cat=Cat} = S) ->
+   {noreply, S#srv{cat = Mod:handle(Msg, Cat)}}.   
+   
+terminate(_Reason, S) ->
+   Uri = proplists:get_value(uri, S#srv.spec),   
+   ek:unregister(Uri),
+   ok.
+   
+code_change(_OldVsn, State, _Extra) ->
+   {ok, State}.    
+
+
+
+%%%------------------------------------------------------------------
+%%%
+%%% api
+%%%
+%%%------------------------------------------------------------------
+
+%%
+%%
+new(Pid) when is_pid(Pid) ->
+   gen_server:call(Pid, kvs_new).
+
+%%
+%% put value into local passive category
+put(Pid, Key, Val) when is_pid(Pid) -> 
+   gen_server:call(Pid, {kvs_put, Key, Val});   
+
+%%
+%% put value into local passive category (direct call)
+put({Mod, Cat}, Key, Val) ->
+   Mod:put(Key, Val, Cat);
+   
+%%
+%% put value into local active category
+put({act,_,_}=Cat, Key, Val) ->
+   NPid = case key_to_pid(Cat, Key) of
+      {error, not_found} -> ek:whereis(Cat);
+      {ok, Pid}          -> Pid
+   end,
+   % either perform update at owner process or trigger element process creation 
+   gen_server:call(NPid, {kvs_put, Key, Val});
+   
+%%
+%% put value into remote category
+put({_,_,_}=Cat, Key, Val) ->
+   ek:send(Cat, {kvs_put, Key, Val}).
+
+   
+   
+   
+%%
+%% check key from local passive category
+has(Pid, Key) when is_pid(Pid) ->
+   gen_server:call(Pid, {kvs_has, Key});
+  
+%%
+%% check key form local passive category (direct call)
+has({Mod, Cat}, Key) ->
+   Mod:has(Key, Cat);   
+   
+%%
+%% check key from local active category
+has({act,_,_}=Cat, Key) ->   
+   case key_to_pid(Cat, Key) of
+      {error, not_found} -> false;
+      {ok, _}            -> true
+   end;
+   
+%%
+%% check key from remote category
+has({_,_,_}=Cat, Key) ->
+   throw(not_supported).
+   
+
+
+   
+%%
+%% get key from local passive category
+get(Pid, Key) when is_pid(Pid) ->
+   gen_server:call(Pid, {kvs_get, Key});
+
+%%
+%% get key form local passive category (direct call)
+get({Mod, Cat}, Key) ->
+   Mod:get(Key, Cat);   
+   
+%%
+%% get key from local active
+get({act,_,_}=Cat, Key) ->   
+   case key_to_pid(Cat, Key) of
+      {ok, Pid}   -> gen_server:call(Pid, {kvs_get, Key});
+      Err         -> Err
+   end;
+
+%%
+%% get key from remote category
+get({_,_,_}=Cat, Key) ->
+   throw(not_supported).
+   
+   
+   
+%%
+%% remove key from local passive category
+remove(Pid, Key) when is_pid(Pid) ->
+   gen_server:call(Pid, {kvs_remove, Key});
+
+%%
+%% check key form local passive category (direct call)
+remove({Mod, Cat}, Key) ->
+   Mod:remove(Key, Cat);   
+   
+%%
+%% remove key from local active category
+remove({act,_,_}=Cat, Key) ->
+   case key_to_pid(Cat, Key) of
+      {ok, Pid} -> gen_server:cast(Pid, {kvs_remove, Key});
+      Err       -> Err
+   end;
+
+%%
+%% remove key from remote category
+remove({kvs,_,_}=Cat, Key) ->
+   ek:send(Cat, {kvs_remove, Key}).   
+   
+   
+   
+   
+%%
+%% map keys from local passive category
+map(Pid, Fun) when is_pid(Pid) ->
+   gen_server:call(Pid, {kvs_map, Fun});
+   
+%%
+%% map keys form local passive category (direct call)
+map({Mod, Cat}, Fun) ->
+   Mod:map(Fun, Cat);
+   
+%%
+%% map keys from local active category
+map({act,_,Path}=Cat, Fun) ->
+   kvs:map(
+      {kvs, undefined, <<Path/binary, "#key">>}, 
+      fun(Key, Pid) ->
+         {ok, Val} = gen_kvs:get(Pid, Key),
+         Fun(Key, Val)
+      end
+   );   
+
+%%
+%% map keys from remote category
+map({kvs,_,_}=Cat, Fun) ->
+   throw(not_supported).
+
+
+
+%%
+%% fold keys from local passive category
+fold(Pid, Acc, Fun) when is_pid(Pid) ->
+   gen_server:call(Pid, {kvs_fold, Acc, Fun});
+
+%%
+%% check key form local passive category (direct call)
+fold({Mod, Cat}, Acc, Fun) ->
+   Mod:fold(Acc, Fun, Cat);
+   
+%%
+%% fold keys from local active category
+fold({act,_,Path}=Cat, Acc, Fun) ->
+   kvs:fold(
+      {kvs, undefined, <<Path/binary, "#key">>},
+      Acc,
+      fun(Key, Pid, Acc1) ->
+         {ok, Val} = gen_kvs:get(Pid, Key),
+         Fun(Key, Val, Acc1)
+      end
+   );   
+
+%%
+%% fold keys from remote category
+fold({kvs,_,_}, Acc, Fun) ->
+   throw(not_supported).
+   
+   
    
 %%%------------------------------------------------------------------
 %%%
 %%% Utility interface
 %%%
 %%%------------------------------------------------------------------
-   
-%%
-%%
-init(Spec) ->
-   init(self(), Spec).
-init(Pid, Spec) ->
-   Name   = proplists:get_value(name,    Spec),
-   Mod    = proplists:get_value(storage, Spec),
-   % enable data federation for the category
-   NSpec = case proplists:get_value(fed, Spec) of
-      undefined ->
-         Spec;
-      true      ->
-         Uri = "/kvs/fed/" ++ bin_to_hex(crypto:sha(term_to_binary(Name))),
-         create_fed(Uri, Name),
-         [{fed, Uri} | proplists:delete(fed, Spec)];
-      Uri       ->
-         create_fed(Uri, Name),
-         Spec
-   end,
-   ok     = kvs:put(kvs_sys_ref, Name, {Mod, Pid}),
-   ok     = kvs:put(kvs_sys_cat, Name, NSpec).
 
 %%
-%%
-terminate(Spec) ->   
-   Name = proplists:get_value(name, Spec),
-   kvs:remove(kvs_sys_ref, Name),
-   ok.
+%% register value key
+val_init({act, undefined, Path}, Key) ->
+   Cat = {kvs, undefined, <<Path/binary, "#key">>},
+   ok = kvs:put(Cat, Key, self()).
    
-%%   
-%% key_to_pid(Cat, Key) -> {ok, Pid} | {error, ...} 
-%%
-key_to_pid(Cat, Key) ->
-   {ok, {Mod, Ref}} = kvs:get(kvs_sys_ref, {key, Cat}),
-   Mod:get(Ref, Key).
-
-%%
-%% register key
-vinit(Cat, Key) ->
-   ok = kvs:put({key, Cat}, Key, self()).
-   
-vterminate(Cat, Key) ->
-   ok = kvs:remove({key, Cat}, Key).
+val_terminate({act, undefined, Path}, Key) ->
+   Cat = {kvs, undefined, <<Path/binary, "#key">>},
+   ok = kvs:remove(Cat, Key).
 
 %%
 %%
 %%
-vattr(Cat, Attr, Val) ->
-   {ok, Spec} = kvs:get(kvs_sys_cat, Cat),
-   case proplists:get_value(getter, Spec) of
-      undefined -> undefined;
-      Get       -> Get(Attr, Val)
-   end.
-   
-%%
-%%
-%%
-key_map(Cat, Get, Fun) ->
-   kvs:map(
-      {key, Cat}, 
-      fun(Key, Pid) ->
-         {ok, Val} = Get(Pid, Key),
-         Fun(Key, Val)
-      end
-   ).
+get_val_prop(Cat, Attr, Val) ->
+   undefined.
+   %{ok, Spec} = kvs:get(kvs_sys_cat, Cat),
+   %case proplists:get_value(getter, Spec) of
+   %   undefined -> undefined;
+   %   Get       -> Get(Attr, Val)
+   %end.   
 
-key_fold(Cat, Acc, Get, Fun) ->
-   kvs:fold(
-      {key, Cat},
-      Acc,
-      fun(Key, Pid, Acc1) ->
-         {ok, Val} = Get(Pid, Key),
-         Fun(Key, Val, Acc1)
-      end
-   ).
+
+
+
+
+
+
 
    
 %%%------------------------------------------------------------------
@@ -267,15 +502,76 @@ key_fold(Cat, Acc, Get, Fun) ->
 %%% Private Functions
 %%%
 %%%------------------------------------------------------------------
+   
+%%
+%%
+srv_put(Key, Val, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
+   case (catch Mod:put(Key, Val, Cat)) of
+      ok  -> 
+         case proplists:is_defined(event, Spec) of
+            true  -> kvs_evt:notify(put, proplists:get_value(uri, Spec), Key, Val), ok;
+            false -> ok
+         end;
+      Err ->
+         Err
+   end.
 
-create_fed(Uri, Name) ->
-   case ek:whereis(Uri) of
-      undefined -> 
-         {ok, _} = kvs_fed_cat_sup:create(Uri, Name);
-      _         -> 
-         ok
-    end.
+%%   
+%%   
+srv_has(Key, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
+   catch Mod:has(Key, Cat).
 
+%%   
+%%   
+srv_get(Key, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
+   catch Mod:get(Key, Cat).
+
+%%   
+%%   
+srv_remove(Key, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
+   case (catch Mod:remove(Key, Cat)) of
+      ok ->
+         case proplists:is_defined(event, Spec) of
+            true  -> kvs_evt:notify(remove, proplists:get_value(uri, Spec), Key, undefined), ok;
+            false -> ok
+         end;
+      Err ->
+         Err
+   end.
+
+%%
+%%
+srv_map(Fun, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
+   catch Mod:map(Fun, Cat).
+   
+%%
+%%
+srv_fold(Acc, Fun, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
+   catch Mod:fold(Acc, Fun, Cat).   
+   
+   
+%%   
+%% key_to_pid(Cat, Key) -> {ok, Pid} | {error, ...} 
+%%
+%% lookup local process that holds a key
+key_to_pid({act, undefined, Path}, Key) ->
+   Cat = {kvs, undefined, <<Path/binary, "#key">>},
+   case kvs:get(Cat, Key) of
+      {ok, Pid} ->
+         case is_process_alive(Pid) of
+            true  -> 
+               {ok, Pid};
+            false -> 
+               kvs:remove(Cat, Key),
+               {error, not_found}
+         end;
+      Err       -> 
+         Err
+   end.
+   
+   
+   
+   
 
 %%   
 %%   

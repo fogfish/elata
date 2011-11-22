@@ -37,12 +37,15 @@
 %% Unit test of KVS proxy to ETS via keyval_store interface 
 %%
 
+-define(KVS, "kvs:test").
+-define(VAL, "value").
+
 kvs_ets_test_() ->
    {
       setup,
       fun() ->
          kvs:start(),
-         {ok, _} = kvs:new(test, [{storage, kvs_ets}])
+         {ok, _} = kvs:new(?KVS, [{storage, kvs_ets}])
       end,
       [                                      
       { "Put item", fun put/0},
@@ -54,61 +57,61 @@ kvs_ets_test_() ->
       ]
    }.
    
--define(VAL, "value").   
+   
    
 %%%
 %%% 
 %%%
 put() ->
    ?assert(
-      ok =:= kvs:put(test, key, ?VAL)
+      ok =:= kvs:put(?KVS, key, ?VAL)
    ).
    
 has() ->
    ?assert(
-      true  =:= kvs:has(test, key)
+      true  =:= kvs:has(?KVS, key)
    ),
    ?assert(
-      false =:= kvs:has(test, nokey)
+      false =:= kvs:has(?KVS, nokey)
    ).
    
 get() ->
    ?assert(
-      {ok, ?VAL} =:= kvs:get(test, key)
+      {ok, ?VAL} =:= kvs:get(?KVS, key)
    ),
    ?assert(
-      {error, not_found} =:= kvs:get(test, nokey)
+      {error, not_found} =:= kvs:get(?KVS, nokey)
    ).
    
 remove() ->
    ?assert(
-      ok =:= kvs:remove(test, key)
+      ok =:= kvs:remove(?KVS, key)
    ),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= kvs:get(test, key)
+      {error, not_found} =:= kvs:get(?KVS, key)
    ).
 
 map() ->
    lists:foreach(
-      fun(X) -> kvs:put(test, X, X) end,
+      fun(X) -> kvs:put(?KVS, X, X) end,
       lists:seq(1, 5)
    ),
-   R1 = kvs:map(test, fun(_, V) -> V * V end),
+   R1 = kvs:map(?KVS, fun(_, V) -> V * V end),
    lists:foreach(
-      fun(X) -> kvs:remove(test, X) end,
+      fun(X) -> kvs:remove(?KVS, X) end,
       lists:seq(1, 5)
    ),
    ?assert( [1, 4, 9, 16, 25] =:= R1).
    
 fold() ->
    lists:foreach(
-      fun(X) -> kvs:put(test, X, X) end,
+      fun(X) -> kvs:put(?KVS, X, X) end,
       lists:seq(1, 5)
    ),
-   R1 = kvs:fold(test, 0, fun(_, V, Acc) -> Acc + V end),
+   R1 = kvs:fold(?KVS, 0, fun(_, V, Acc) -> Acc + V end),
    lists:foreach(
-      fun(X) -> kvs:remove(test, X) end,
+      fun(X) -> kvs:remove(?KVS, X) end,
       lists:seq(1, 5)
    ),
    ?assert( R1 =:= 15 ).

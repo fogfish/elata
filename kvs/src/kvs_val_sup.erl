@@ -29,17 +29,14 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(kvs_fed_cat_sup).
+-module(kvs_val_sup).
 -author(dmitry.kolesnikov@nokia.com).
-
 -behaviour(supervisor).
 
 -export([
    % supervisor
-   start_link/0,
-   init/1,       
-   % create
-   create/2
+   start_link/1,
+   init/1                    
 ]).
 
 %%%------------------------------------------------------------------
@@ -47,25 +44,27 @@
 %%% Supervisor
 %%%
 %%%------------------------------------------------------------------
-start_link() ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+start_link(Spec) ->
+   supervisor:start_link(?MODULE, [Spec]).
    
-init([]) ->
+init([Spec]) ->
    {ok,
       {
          {simple_one_for_one, 2, 1},   % 2 faults per second
-         [{
-            kvs_fed_cat,       % child id
-            {
-               kvs_fed_cat,  % Mod
-               start_link, % Fun
-               []       % Args
-            },
-            transient, 2000, worker, dynamic 
-         }]
+         [el(Spec)]
       }
    }.
 
-create(Uri, Cat) ->
-   supervisor:start_child(?MODULE, [Uri, Cat]).   
-
+el(Spec) ->
+   Mod = proplists:get_value(storage, Spec),
+   {
+      kvs_element,       % child id
+      {
+         Mod,  % Mod
+         start_link, % Fun
+         [Spec]       % Args
+      },
+      transient, 2000, worker, dynamic 
+   }.   
+   
+   
