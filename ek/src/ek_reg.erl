@@ -114,7 +114,7 @@ unregister(Uri) ->
 whereis({_Scheme, _Node, _Path} = Uri) ->
    case ets:lookup(?MODULE, Uri) of
       [{Uri, Pid}] ->
-         case is_process_alive(Pid) of
+         case is_alive(Pid) of
             true  -> Pid;
             false -> undefined
          end;
@@ -132,7 +132,7 @@ whereis(Uri) ->
 q(Scheme, Authority, Path) ->
    lists:foldl(
       fun({{S,A,P}, Pid}, Acc) ->
-         case is_process_alive(Pid) of
+         case is_alive(Pid) of
             true  -> 
                SB = Scheme(S),
                AB = Authority(A),
@@ -201,10 +201,20 @@ remote(Schema) ->
 
 %%
 %%
-assert_pid(Pid) ->
+assert_pid(Pid) when is_pid(Pid) ->
    case is_process_alive(Pid) of
       false -> throw(badarg);
       true  -> true
-   end.
+   end;
+   
+assert_pid(Pid) ->
+   true.
 
+%%
+%%
+is_alive(Pid) when is_pid(Pid) ->
+   is_process_alive(Pid);
+is_alive(Pid) ->
+   true.
+   
 

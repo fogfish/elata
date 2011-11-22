@@ -137,7 +137,7 @@ node() ->
 %% Retrive list of connected nodes
 nodes() ->
    ek_reg:q(
-      fun(ek) -> false; (_) -> true  end,
+      fun(ek)         -> false; (_) -> true  end,
       fun(undefined)  -> false; (_) -> true  end,
       fun(<<"/">>)    -> true;  (_) -> false end
    ).
@@ -146,9 +146,11 @@ nodes() ->
 %% Initiates a connection with remote node
 %% connect(Node) -> {ok, Pid} | {error, ...}
 %%    Node - list(), remote node identity
-connect(Node) ->
-   ek_prot_sup:create(Node).
-
+connect({node, Node, <<"/">>} = Uri) ->
+   ek_prot_sup:create(Uri);
+connect(Uri) ->
+   connect(ek_uri:new(Uri)).
+   
 %%
 %% Forces to disconnect node
 disconnect(_Node) ->
@@ -190,7 +192,7 @@ send({Scheme, Auth, Path} = Uri, Msg) ->
          % Auth = ek:node() message for this node
          send({Scheme, undefined, Path}, Msg);
       _    ->
-         case ek:whereis({Scheme, Auth, <<"/">>}) of
+         case ek:whereis({node, Auth, <<"/">>}) of
             undefined -> throw({badarg, Uri});
             Pid       -> ek_prot:send(Pid, Uri, Msg)
          end
@@ -231,48 +233,8 @@ broadcast(Path, Msg) ->
    ).
       
    
-% %%%------------------------------------------------------------------
-% %%%
-% %%% Private
-% %%%
-% %%%------------------------------------------------------------------
-% 
-% %%
-% %% list of connected nodes and they pids
-% connected_nodes() ->
-   % SF = fun(X) ->
-      % {ok, Info} = ek_prot:node_info(X#ek_node.pid),
-      % case proplists:get_value(state, Info) of
-         % 'CONNECTED' -> true;
-         % _           -> false
-      % end
-   % end,
-   % [
-      % N || N <- ets:match_object(ek_nodes, '_'), 
-           % N#ek_node.pid =/= self, 
-           % is_process_alive(N#ek_node.pid), 
-           % SF(N) =:= true
-   % ].
-   % 
-% %%
-% %% list of alive nodes and they pids   
-% alive_nodes() ->
-   % [
-      % N || N <- ets:match_object(ek_nodes, '_'), 
-           % N#ek_node.pid =/= self, 
-           % is_process_alive(N#ek_node.pid)
-   % ].
-% 
-% %%
-% %% check node from Uri
-% check_node(U) ->
-   % case proplists:get_value(host, U) of
-      % undefined -> true;
-      % _         ->
-         % Node = atom_to_list(proplists:get_value(schema, U)) ++ "://" ++ 
-                % binary_to_list(proplists:get_value(host, U)) ++ ":" ++
-                % integer_to_list(proplists:get_value(port, U)),
-         % lists:keyfind(Node, 2, alive_nodes())
-   % end.
-   % 
-   % 
+%%%------------------------------------------------------------------
+%%%
+%%% Private
+%%%
+%%%------------------------------------------------------------------

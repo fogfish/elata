@@ -74,7 +74,6 @@
 %% parses URI into tuple, fails with badarg if invalid URI
 %%
 new({Schema, Authority, Path}) when is_atom(Schema), 
-                                    is_binary(Authority), 
                                     is_binary(Path) ->
    {Schema, Authority, Path};                                 
 new(Uri) when is_list(Uri) ->
