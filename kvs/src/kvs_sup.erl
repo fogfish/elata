@@ -142,9 +142,17 @@ factory(Config, Acc) ->
 %%% Dynamically start bucket adds a module into supervisor tree (called via kvs_define)
 %%%
 start_category(Spec) ->
-   Mod   = case proplists:get_value(uri, Spec) of
-      {kvs, undefined, _} -> proplists:get_value(storage, Spec);
-      {act, undefined, _} -> kvs_act
+   %% check if storage module is passive (behaviour = gen_kvs) or active 
+   Check = fun(X) ->
+     lists:member(gen_kvs,
+        proplists:get_value(behaviour, 
+           X:module_info(attributes)
+        )
+     )
+   end,
+   Mod = case Check(proplists:get_value(storage, Spec)) of
+      true  -> proplists:get_value(storage, Spec);
+      false -> kvs_act
    end,
    Child = {  % child spec
       erlang:make_ref(),

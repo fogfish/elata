@@ -42,7 +42,7 @@ kvs_cache_test_() ->
       setup,
       fun() ->
          kvs:start(),
-         {ok, _} = kvs:new("act:test", [
+         {ok, _} = kvs:new("kvs:test", [
             {storage, kvs_cache}, 
             {getter, 
                fun
@@ -70,54 +70,54 @@ kvs_cache_test_() ->
 %%%
 put() ->
    ?assert(
-      ok =:= kvs:put("act:test", key, ?VAL)
+      ok =:= kvs:put("kvs:test", key, ?VAL)
    ).
    
 has() ->
    ?assert(
-      true  =:= kvs:has("act:test", key)
+      true  =:= kvs:has("kvs:test", key)
    ),
    ?assert(
-      false =:= kvs:has("act:test", nokey)
+      false =:= kvs:has("kvs:test", nokey)
    ).
    
 get() ->
    ?assert(
-      {ok, ?VAL} =:= kvs:get("act:test", key)
+      {ok, ?VAL} =:= kvs:get("kvs:test", key)
    ),
    ?assert(
-      {error, not_found} =:= kvs:get("act:test", nokey)
+      {error, not_found} =:= kvs:get("kvs:test", nokey)
    ).
    
 remove() ->
    ?assert(
-      ok =:= kvs:remove("act:test", key)
+      ok =:= kvs:remove("kvs:test", key)
    ),
    timer:sleep(100),
    ?assert(
-      {error, not_found} =:= kvs:get("act:test", key)
+      {error, not_found} =:= kvs:get("kvs:test", key)
    ).
 
 map() ->
    lists:foreach(
-      fun(X) -> kvs:put("act:test", X, X) end,
+      fun(X) -> kvs:put("kvs:test", X, X) end,
       lists:seq(1, 5)
    ),
-   R1 = kvs:map("act:test", fun(_, V) -> V * V end),
+   R1 = kvs:map("kvs:test", fun(_, V) -> V * V end),
    lists:foreach(
-      fun(X) -> kvs:remove("act:test", X) end,
+      fun(X) -> kvs:remove("kvs:test", X) end,
       lists:seq(1, 5)
    ),
    ?assert( [1, 4, 9, 16, 25] =:= R1).
    
 fold() ->
    lists:foreach(
-      fun(X) -> kvs:put("act:test", X, X) end,
+      fun(X) -> kvs:put("kvs:test", X, X) end,
       lists:seq(1, 5)
    ),
-   R1 = kvs:fold("act:test", 0, fun(_, V, Acc) -> Acc + V end),
+   R1 = kvs:fold("kvs:test", 0, fun(_, V, Acc) -> Acc + V end),
    lists:foreach(
-      fun(X) -> kvs:remove("act:test", X) end,
+      fun(X) -> kvs:remove("kvs:test", X) end,
       lists:seq(1, 5)
    ),
    ?assert( R1 =:= 15 ).   

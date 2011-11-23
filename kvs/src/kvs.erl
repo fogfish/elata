@@ -86,7 +86,7 @@ start(Config) ->
 %%%       {storage, Module} plugin implementation of gen_kvs_bucket
 %%%       {getter,     Fun} Item getter function   Fun(Attr, Item) -> value 
 %%%       event             events are fired when bucket is changed
-new({_, undefined, _} = Cat, Opts) ->
+new({kvs, undefined, _} = Cat, Opts) ->
    case ek:whereis(Cat) of
       undefined ->
          Spec = [{uri, Cat} | Opts],
@@ -110,7 +110,7 @@ new(Cat, Opts) when is_list(Cat) orelse is_binary(Cat) ->
 drop({kvs, undefined, _} = Cat) ->
    case ek:whereis(Cat) of
       undefined -> ok;
-      Pid       -> ok % TODO: implement drop
+      Pid       -> {error, not_implemented} % TODO: implement drop
    end;
 drop(Cat) when is_list(Cat) orelse is_binary(Cat) ->
    drop(ek_uri:new(Cat)).
@@ -130,23 +130,13 @@ put({kvs, undefined, _} = Cat, Key, Val) when Key =/= undefined,
       undefined -> 
          {error, no_category};
       Pid       ->
-         gen_kvs:put(Pid, Key, Val)
-   end;
-
-put({act, undefined, _} = Cat, Key, Val) when Key =/= undefined, 
-                                           Val =/= undefined ->  
-   % stores into local active category
-   case ek:whereis(Cat) of
-      undefined -> 
-         {error, no_category};
-      Pid       ->
-         gen_kvs:put(Cat, Key, Val)
+         gen_kvs:put(type(Cat), Pid, Cat, Key, Val)
    end;
    
 put({_, _, _} = Cat, Key, Val) when Key =/= undefined, 
                                     Val =/= undefined ->
    % stores into remote category
-   gen_kvs:put(Cat, Key, Val);
+   gen_kvs:put(remote, undefined, Cat, Key, Val);
    
 put(Cat, Key, Val) when Cat =/= undefined, 
                         Key =/= undefined, 
@@ -166,21 +156,12 @@ has({kvs, undefined, _} = Cat, Key) when Key =/= undefined ->
       undefined -> 
          {error, no_category};
       Pid       ->
-         gen_kvs:has(Pid, Key)
-   end;
-   
-has({act, undefined, _} = Cat, Key) when Key =/= undefined ->  
-   % check local active category
-   case ek:whereis(Cat) of
-      undefined -> 
-         {error, no_category};
-      Pid       ->
-         gen_kvs:has(Cat, Key)
+         gen_kvs:has(type(Cat), Pid, Cat, Key)
    end;
 
 has({_, _, _} = Cat, Key) when Key =/= undefined ->
    % check remote category
-   gen_kvs:has(Cat, Key);
+   gen_kvs:has(remote, undefined, Cat, Key);
    
 has(Cat, Key) when Cat =/= undefined, 
                    Key =/= undefined ->
@@ -200,21 +181,12 @@ get({kvs, undefined, _} = Cat, Key) when Key =/= undefined ->
       undefined -> 
          {error, no_category};
       Pid       ->
-         gen_kvs:get(Pid, Key)
+         gen_kvs:get(type(Cat), Pid, Cat, Key)
    end;
    
-get({act, undefined, _} = Cat, Key) when Key =/= undefined ->  
-   % check local active category
-   case ek:whereis(Cat) of
-      undefined -> 
-         {error, no_category};
-      Pid       ->
-         gen_kvs:get(Cat, Key)
-   end;
-
 get({_, _, _} = Cat, Key) when Key =/= undefined ->
    % check remote category
-   gen_kvs:get(Cat, Key);
+   gen_kvs:get(remote, undefined, Cat, Key);
    
 get(Cat, Key) when Cat =/= undefined, 
                    Key =/= undefined ->
@@ -233,21 +205,12 @@ remove({kvs, undefined, _} = Cat, Key) when Key =/= undefined ->
       undefined -> 
          {error, no_category};
       Pid       ->
-         gen_kvs:remove(Pid, Key)
-   end;
-   
-remove({act, undefined, _} = Cat, Key) when Key =/= undefined ->  
-   % check local active category
-   case ek:whereis(Cat) of
-      undefined -> 
-         {error, no_category};
-      Pid       ->
-         gen_kvs:remove(Cat, Key)
+         gen_kvs:remove(type(Cat), Pid, Cat, Key)
    end;
 
 remove({_, _, _} = Cat, Key) when Key =/= undefined ->
    % check remote category
-   gen_kvs:remove(Cat, Key);
+   gen_kvs:remove(remote, undefined, Cat, Key);
    
 remove(Cat, Key) when Cat =/= undefined, 
                    Key =/= undefined ->
@@ -265,21 +228,12 @@ map({kvs, undefined, _} = Cat, Fun) when is_function(Fun) ->
       undefined -> 
          {error, no_category};
       Pid       ->
-         gen_kvs:map(Pid, Fun)
-   end;
-   
-map({act, undefined, _} = Cat, Fun) when is_function(Fun) ->  
-   % check local active category
-   case ek:whereis(Cat) of
-      undefined -> 
-         {error, no_category};
-      Pid       ->
-         gen_kvs:map(Cat, Fun)
+         gen_kvs:map(type(Cat), Pid, Cat, Fun)
    end;
 
 map({_, _, _} = Cat, Fun) when is_function(Fun) ->
    % check remote category
-   gen_kvs:map(Cat, Fun);
+   gen_kvs:map(remote, undefined, Cat, Fun);
    
 map(Cat, Fun) when Cat =/= undefined, 
                    is_function(Fun) ->
@@ -298,21 +252,12 @@ fold({kvs, undefined, _} = Cat, Acc, Fun) when is_function(Fun) ->
       undefined -> 
          {error, no_category};
       Pid       ->
-         gen_kvs:fold(Pid, Acc, Fun)
-   end;
-   
-fold({act, undefined, _} = Cat, Acc, Fun) when is_function(Fun) ->  
-   % check local active category
-   case ek:whereis(Cat) of
-      undefined -> 
-         {error, no_category};
-      Pid       ->
-         gen_kvs:fold(Cat, Acc, Fun)
+         gen_kvs:fold(type(Cat), Pid, Cat, Acc, Fun)
    end;
 
 fold({_, _, _} = Cat, Acc, Fun) when is_function(Fun) ->
-   % check remote category
-   gen_kvs:fold(Cat, Acc, Fun);
+   % remote category
+   gen_kvs:fold(remote, undefined, Cat, Acc, Fun);
    
 fold(Cat, Acc, Fun) when Cat =/= undefined, 
                    is_function(Fun) ->
@@ -325,7 +270,12 @@ fold(Cat, Acc, Fun) when Cat =/= undefined,
 %%%
 %%%------------------------------------------------------------------
 
-      
+%% detect type of category
+type({kvs, undefined, Path}) ->
+   case ek:whereis({kvs, undefined, <<Path/binary, "#key">>}) of
+      undefined -> passive;
+      _         -> active
+   end.
 
 
 
