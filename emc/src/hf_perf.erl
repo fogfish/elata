@@ -29,51 +29,28 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(emc_net).
+-module(hf_perf).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Network computation primitives
+%% High order-function: latency measurment
 %%
 
 -export([
-   uri_parse/1,
-   tcp/1,
-   ssl/1,
-   close/1
+   ht_get/0
 ]).
 
 %%
-%% Uri Parser
-uri_parse(Uri) ->
-   ek_uri:new(Uri).
+%% Measures latency for http service
+ht_get() ->
+   emc:do([
+      fun ek_uri:new/1,
+      fun hf_net:tcp/2,
+      fun hf_net:ssl/3,
+      fun hf_http:get/3,
+      fun hf_http:recv/2,
+      fun hf_http:recv/3,
+      fun hf_net:close/1
+   ]).
 
-%%
-%% Establish TCP/IP connection, and measure its latency
-tcp(Uri) ->
-   {ok, Tcp} = gen_tcp:connect(
-      binary_to_list(proplists:get_value(host, Uri)), 
-      proplists:get_value(port, Uri), 
-      [binary, {packet, 0}, {active, false}]
-   ),
-   {tcp, Uri, Tcp}.
-
-
-   
-%%
-%% Establish SSL connection and measures its latency
-ssl({tcp, Uri, Sock}) ->
-   {ok, Ssl} = ssl:connect(Sock, []),
-   {ssl, Uri, Ssl}.
- 
-%%
-%%
-close({tcp, Uri, Sock}) ->
-   gen_tcp:close(Sock),
-   Uri;
-   
-close({ssl, Uri, Sock}) ->
-   ssl:close(Sock),
-   Uri.
-   

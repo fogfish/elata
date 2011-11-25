@@ -29,40 +29,37 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(clib_perf).
+-module(em_debug, [M]).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Latency measurment strategy
+%% Debug Monad
 %%
-
 -export([
-   net/1,
-   net/2
+   unit/1,
+   bind/2
 ]).
-
+  
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
 
 %%
-%% Measures network latency
-net(X) ->
-   net(X, undefined).
-net(X, _) ->
-   {ok, [Uri | _]} = clib:seq([fun clib_net:uri_parse/2], [X]),
-   {ok, [_,  Raw]} = case proplists:get_value(schema, Uri) of
-      tcp -> 
-         clib:seq([
-            fun clib_net:tcp_connect/2, 
-            fun clib_net:tcp_close/2
-         ], [Uri]);
-      ssl -> 
-         clib:seq([
-            fun clib_net:tcp_connect/2, 
-            fun clib_net:ssl_connect/2, 
-            fun clib_net:ssl_close/2
-         ], [Uri])
-   end,
-   {ok, [X, Raw]}.
+%%
+unit(X) ->
+   fun() -> 
+      erlang:apply(M:unit(X), [])
+   end.
 
-
+%%
+%%
+bind(X, HF) ->
+   Y = M:bind(X, HF),
+   error_logger:info_report([{hof, HF}, {x, X}, {y, Y}]),
+   Y.
 

@@ -29,33 +29,67 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(emc_identity).
+-module(hf_http).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
--include("include/emc.hrl").
-
 
 %%
-%% Identity monad
+%% High order-function: http computation
 %%
 
 -export([
-   eval/3,
-   bind/3,
-   return/2
+   get/3,
+   recv/2,
+   recv/3
 ]).
 
+
 %%
-%% evaluate function within monad context
-eval(Fun, X, _) ->
-   Fun(X).
+%% get(Uri, Sock, Opts) -> [Uri, Sock]
+%%
+%% sends GET request
+%%
+get({Mod, Sock}, {Schema, Auth, Path} = Uri, Opts) ->
+   % authority & path depends on proxy option
+   {Rauth, Rpath} = case proplists:get_value(proxy, Opts) of
+      undefined ->
+         {Auth, Path};
+      Proxy     -> 
+         {ek_uri:authority(Proxy), ek_uri:to_binary(Uri)}      
+   end,
+   % request headers
+   Head = case proplists:get_value(header, Opts) of
+      undefined -> <<>>;
+      List      -> list_to_binary([<<H/binary, ": ", V/binary, "\r\n">> || {H, V} <- List])
+   end,
+   Req = <<
+      "GET ", Rpath/binary, " HTTP/1.1\r\n",
+      "Connection: close\r\n",
+      "Accept: */*\r\n",
+      "Host: ", Rauth/binary, "\r\n",
+      Head/binary,
+      "\r\n"
+   >>,
+   Mod:send(Sock, Req),
+   [{Mod, Sock}, Uri].
    
+
 %%
-%%
-bind(X, Seq, M) ->
-   emc:eval(X, Seq, M).
+%% Receive 1st byte
+recv({Mod, Sock}, Uri) ->
+   case Mod:recv(Sock, 0) of
+      {ok, Pckt}  -> [{Mod, Sock}, Uri, Pckt];
+      {error, _}  -> [{Mod, Sock}, Uri]
+   end.   
 
 %%
 %%
-return(X, _) ->
-   X.
+recv({Mod, Sock}, Uri, Data) -> 
+   case Mod:recv(Sock, 0) of
+      {ok,      Pckt}  ->
+         recv({Mod, Sock}, Uri, <<Data/binary, Pckt/binary>>);
+      {error, closed}  ->
+         [{Mod, Sock}, Uri, Data]
+   end.
+      
+   

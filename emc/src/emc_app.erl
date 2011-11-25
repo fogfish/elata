@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,62 +29,43 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(emc).
--author(sergey.boldyrev@nokia.com).
+-module(emc_app).
+-behaviour(application).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% Erlang Monadic Computation framework
-%%
-%% The computation is function, it takes input and returns output
-%% fun(x_1, x_2, ..., x_n) -> [y_1, y_2, ..., y_m]
-%% 
-%% A monad is a triple (M,unit,bind) consisting of a type constructor M 
-%% and two operations of the given polymorphic types.
-%%
-%% unit :: x → M x               
-%% turn a value into the computation that returns that value and does 
-%% nothing else
-%%
-%% bind :: M x → (x → M y) → M y 
-%% apply a function of type x → M y to a computation of type M x.
-%%
-%%
-
 -export([
-   do/1,
-   do/2
+   start/2,
+   stop/1
 ]).
 
-%%
-%% debug macro
--ifdef(DEBUG).
--define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
--else.
--define(DEBUG(M), true).
--endif.
+-define(APPNAME,  kvs).
 
-%%
-%% do(Seq) -> Fun({M, State}) -> Fun(X) -> Result
-%%
-%% The "do" operator wraps a computation pipeline of high order functions
-%% into monadic computation. The result is a monadic type constructor.
-%% The type constructor parametrizes the pipeline with a particular 
-%% monad instance. As the result, is the computation pipiline that 
-%% can be evaluated agains input values
-do(HOFs) ->
-   fun
-     (M) ->
-        fun(X) ->
-           lists:foldl(
-              fun(HF,X1) -> M:bind(X1, HF) end, 
-              erlang:apply(M:unit(X), []), 
-              HOFs
-           )
-        end
-   end.
+start(_Type, _Args) -> 
+   Config = config(?APPNAME, []),
+   {ok, self()}.
 
-do(M, HOFs) ->
-   C = do(HOFs),
-   C(M).
+stop(_State) ->
+        ok.
+
+%%%------------------------------------------------------------------
+%%%
+%%%  Private 
+%%%
+%%%------------------------------------------------------------------   
+config(App, List) ->
+   config(App, List, []).
+config(App, [{Key, Default} | T], Acc) ->        
+   Val = case application:get_env(App, Key) of 
+      undefined   -> Default;
+      {ok, Value} -> Value
+   end,
+   config(App, T, [{Key, Val} | Acc]);
+config(App, [Key | T], Acc) ->
+   case application:get_env(App, Key) of 
+      undefined -> config(App, T, Acc);
+      {ok, Val} -> config(App, T, [{Key, Val} | Acc])
+   end;   
+config(_, [], Acc) ->
+   Acc.
+   
    

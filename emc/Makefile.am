@@ -16,12 +16,15 @@
 SUBDIRS = test
 
 ESRC = \
+   src/emc_app.erl \
    src/emc.erl \
-   src/emc_identity.erl \
-   src/emc_performance.erl \
-   src/emc_net.erl 
-#   src/clib_http.erl \
-#   src/clib_perf.erl
+   src/em_id.erl   \
+   src/em_pipe.erl \
+   src/em_pf.erl   \
+   src/em_debug.erl \
+   src/hf_net.erl  \
+   src/hf_http.erl \
+   src/hf_perf.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 EBIN += ebin/emc.app

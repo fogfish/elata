@@ -13,7 +13,7 @@
 %%   the License for the specific language governing rights and limitations
 %%   under the License.
 %%
-{application, clib,
+{application, emc,
    [
       {description, "Erlang Monadic Computation"},
       {vsn,         "@VSN@"},
@@ -25,7 +25,7 @@
             kernel,
             stdlib
          ]
-      } %,
-      %{mod, {emc_app, []}}
+      },
+      {mod, {emc_app, []}}
    ]
 }.

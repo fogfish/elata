@@ -29,6 +29,42 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(clib_http).
+-module(em_pf, [M]).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
+
+%%
+%% Performance Monad
+%%
+-export([
+   unit/1,
+   bind/2
+]).
+  
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
+
+%%
+%%
+unit(X) ->
+   fun() -> 
+      {erlang:apply(M:unit(X), []), []}
+   end.
+
+%%
+%%
+bind({X, S}, HF) ->
+   ?DEBUG([{monad, {?MODULE, M}},{hof, HF}, {x, X}]),
+   {Time, Y} = timer:tc(M, bind, [X, HF]),
+   Info      = erlang:fun_info(HF),
+   Mod       = proplists:get_value(module, Info),
+   Name      = proplists:get_value(name,   Info),
+   Arity     = proplists:get_value(arity,  Info),
+   Id        = list_to_binary(atom_to_list(Mod) ++ ":" ++ atom_to_list(Name) ++ "/" ++ integer_to_list(Arity)),
+   {Y, [{Id, Time} | S]}.
+

@@ -25,19 +25,55 @@
 %%   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 %%   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 %%   HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-%%   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR  
+%%   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--record(monad, {
-   eval,   %% evaluates lambda-expression within monad context 
-           %% eval(X, Fun, M) -> {Fun(X), New_M} end
-   bind,
-   return,
+-module(hf_net).
+-author(sergey.boldyrev@nokia.com).
+-author(dmitry.kolesnikov@nokia.com).
 
+%%
+%% High order-function: network computation
+%%
 
+-export([
+   tcp/2,
+   ssl/3,
+   close/1
+]).
 
-   type,   %% monad type (Module)
-   inner   %% inner monad
-}).
+%%
+%% Establish TCP/IP connection, and measure its latency
+tcp({_,_,_} = Uri, Opts) ->
+   {Host, Port} = case proplists:get_value(proxy, Opts) of
+      undefined ->
+         {ek_uri:host(Uri), ek_uri:port(Uri)};
+      Proxy     ->
+         {ek_uri:host(Proxy), ek_uri:port(Proxy)}
+   end,
+   {ok, Tcp} = gen_tcp:connect(
+      binary_to_list(Host), 
+      Port,
+      [binary, {packet, 0}, {active, false}]
+   ),
+   [{gen_tcp, Tcp}, Uri, Opts].
+
+   
+%%
+%% Establish SSL connection and measures its latency
+ssl({gen_tcp, Sock}, {ssl,_,_} = Uri, Opts) ->
+   {ok, Ssl} = ssl:connect(Sock, []),
+   [{ssl, Ssl}, Uri, Opts];
+ssl({gen_tcp, Sock}, {https,_,_} = Uri, Opts) ->   
+   {ok, Ssl} = ssl:connect(Sock, []),
+   [{ssl, Ssl}, Uri, Opts];
+ssl(Sock, Uri, Opts) ->
+   [Sock, Uri, Opts].
+
+%%
+%%
+close({Mod, Sock}) ->
+   Mod:close(Sock),
+   [].
 

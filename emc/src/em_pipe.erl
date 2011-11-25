@@ -29,50 +29,61 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(emc_performance).
+-module(em_pipe).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
+
+%%
+%% Pipe monad
+%%
 -export([
-   eval/3,
-   bind/3,
-   return/2
+   unit/1,
+   bind/2         
 ]).
-  
-%%
-%% Evaluate function
-eval(Fun, {X, Stat}, [])  ->
-   Before = erlang:now(),
-   X1     = Fun(X),
-   After  = erlang:now(),
-   Name   = proplists:get_value(name, erlang:fun_info(Fun)),
-   {X1, Stat ++ [{Name, diff(After, Before)}]};
 
-eval(Fun, {X, Stat}, [Inner | Rest]) ->
-   Before = erlang:now(),
-   X1     = Inner:eval(Fun, X, Rest),
-   After  = erlang:now(),
-   Name   = proplists:get_value(name, erlang:fun_info(Fun)),
-   {X1, Stat ++ [{Name, diff(After, Before)}]}.
-   
 %%
-%% Bind
-bind(X, Seq, M) ->
-   emc:eval(X, Seq, M).
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
+
+%%
+%%
+unit(X) when is_list(X) ->
+   fun() ->  X  end;
+unit(X) ->
+   fun() -> [X] end.
+
    
 %%
 %%
-return(X, []) ->
-   {X, []};
+bind(X, HF) ->
+   Info      = erlang:fun_info(HF),
+   Arity     = proplists:get_value(arity,  Info),
+   %error_logger:info_report([{hof, HF}, {a, Arity}, {x, X}, {len, length(X)}]),
+   %try 
+      if
+         length(X) > Arity -> 
+            {NX, T} = lists:split(Arity, X),
+            Y = u(erlang:apply(HF, NX)) ++ T,
+            ?DEBUG([{hof, HF}, {in, X}, {out, Y}, {split, T}]),
+            Y;
+         true              -> 
+            Y = u(erlang:apply(HF, X)),
+            ?DEBUG([{hof, HF}, {in, X}, {out, Y}]),
+            Y
+      end.
+   %catch
+   %   Err -> 
+   %      ?DEBUG([{hof, HF}, {in, X}, {err, Err}]),
+   %      X
+   %end.
+
    
-return(X, [Inner | Rest]) ->
-   {Inner:return(X, Rest), []}.
-   
-
-%%%
-%%%
-%%%
-diff({A2, B2, C2}, {A1, B1, C1}) ->
-   ((A2-A1)*1000000 + B2-B1)*1000000 + C2-C1.
-
-
+u(X) when is_list(X) ->   
+   X;
+u(X) ->
+   [X].
