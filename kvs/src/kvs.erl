@@ -94,7 +94,7 @@ new({kvs, undefined, _} = Cat, Opts) ->
          %       deadlock within supervisor when category
          %       internally creates another category
          {ok, Pid} = kvs_sup:start_category(Spec),
-         ok        = gen_kvs:new(Pid),
+         ok = gen_kvs:new(Pid),
          {ok, Pid};
       Pid       ->
          {error, {already_exists, Pid}}

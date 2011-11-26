@@ -164,7 +164,10 @@ init([TX]) when is_record(TX, sync_tx) ->
 %%% 
 'LISTEN'(TX, S) when is_record(TX, sync_tx) ->
    ?DEBUG([{sync, accept}, {tx, TX}]),
-   kvs_sync_ht_tx_sup:create(TX),
+   case kvs_sync_ht_tx_sup:create(TX) of
+      {ok, Pid} -> ok;
+      _         -> prot_sync_stop(TX#sync_tx.uri)
+   end,
    {next_state, 'LISTEN', S};
 'LISTEN'(_Evt, S) ->
    {next_state, 'LISTEN', S}.
@@ -194,9 +197,10 @@ init([TX]) when is_record(TX, sync_tx) ->
          {Lhash, Lint, NHT} = ht_diff(Phash, Pint, HT),
          if
             % nothing to sync tree(s) are equal
-            %NHT =:= undefined ->
-            %   ?DEBUG([{sync, equal}, {tx, TX}]),
-            %   {stop, normal, S#fsm{ht = NHT}};
+            NHT =:= undefined ->
+               prot_sync_stop(TX#sync_tx.uri),
+               ?DEBUG([{sync, equal}, {tx, TX}]),
+               {stop, normal, S#fsm{ht = NHT}};
             % negotiate diff
             true ->
                prot_sync_diff(TX#sync_tx.uri, Lhash, Lint),
@@ -339,6 +343,16 @@ prot_sync_diff(Uri, Hash, Int) ->
       Msg
    ),
    ?DEBUG([{sync, diff}, {uri, Uri}, {msg, Msg}]).
+   
+prot_sync_stop(Uri) ->
+   ek:send(
+      {
+         sync,
+         ek_uri:authority(Uri),
+         tx({ek_uri:schema(Uri), ek:node(), ek_uri:path(Uri)})
+      },
+      sync_stop
+   ).
    
 %%%------------------------------------------------------------------   
 %%% 

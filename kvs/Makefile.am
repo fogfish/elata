@@ -29,6 +29,7 @@ ESRC = \
    src/kvs_val_sup.erl \
    src/kvs_cache.erl \
    src/kvs_rrd.erl \
+   src/kvs_fs.erl \
    src/kvs_ht.erl \
    src/kvs_sync_ht_tx.erl \
    src/kvs_sync_ht_tx_sup.erl

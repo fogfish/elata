@@ -143,14 +143,17 @@ init([Spec]) ->
 %%
 %% second phase constructor
 handle_call(kvs_new, _, #srv{spec = Spec, mod = Mod} = S) ->
-   {ok, Cat} = Mod:new(Spec),
-   Uri = proplists:get_value(uri, Spec),
-   case proplists:is_defined(direct, Spec) of
-      true  -> ek:register(Uri, {Mod, Cat});
-      false -> ek:register(Uri)
-   end,
-   {reply, ok, S#srv{cat = Cat}};
-   
+   case (catch Mod:new(Spec)) of
+      {ok, Cat} ->
+         Uri = proplists:get_value(uri, Spec),
+         case proplists:is_defined(direct, Spec) of
+            true  -> ek:register(Uri, {Mod, Cat});
+            false -> ek:register(Uri)
+         end,
+         {reply, ok, S#srv{cat = Cat}};
+      _  ->
+         {stop, normal, S}
+   end;
 %%
 %% Synchronous interface   
 handle_call({kvs_put, Key, Val}, _, S) ->
