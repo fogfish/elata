@@ -112,9 +112,11 @@ host(Uri) ->
 %%   Port = integer()
 port({_, undefined, _}) ->
    undefined;
-port({_, Auth, _}) ->
-   {_, _, Port} = p_auth(Auth, host, <<>>, ?NIL),
-   Port;
+port({Schema, Auth, _}) ->
+   case p_auth(Auth, host, <<>>, ?NIL) of
+      {_, _, undefined} -> schema_to_port(Schema);
+      {_, _, Port}      -> Port
+   end;
 port(Uri) ->
    port(new(Uri)).
    
@@ -219,4 +221,10 @@ p_auth(<<>>, port, Acc, {U, H, _}) ->
    {U, H, list_to_integer(binary_to_list(Acc))}.
    
 
+%%
+%% Maps schema to default ports
+schema_to_port(http)  -> 80;
+schema_to_port(https) -> 443;
+schema_to_port(_)     -> undefined.
+   
    
