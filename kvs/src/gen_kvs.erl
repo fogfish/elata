@@ -37,6 +37,7 @@
 
 %%
 %% TODO: refactor plugin interface
+%% TODO: clean-up key registry is value process is dead
 
 -export([
    start_link/1,

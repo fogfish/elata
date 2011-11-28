@@ -47,6 +47,7 @@
    drop/1,
    put/3,
    get/2,
+   get/3,
    has/2,
    remove/2,
    map/2,
@@ -192,6 +193,12 @@ get(Cat, Key) when Cat =/= undefined,
                    Key =/= undefined ->
    kvs:get(ek_uri:new(Cat), Key).   
 
+get(Cat, Key, Default) ->
+   case kvs:get(Cat, Key) of
+      {error, not_found} -> {ok, Default};
+      R -> R
+   end.
+   
    
 %%%
 %%% remove(Cat, Key) -> ok | {error, ...}
