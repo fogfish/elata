@@ -41,7 +41,7 @@
 %%   - node alive timeout
 %%   - disable code injection (trusted nodes only)
 %%   - ttl for queued messages
-
+                                  
 -export([
    %% api
    start_link/2,

@@ -57,11 +57,15 @@
    schema/1,
    host/1,
    port/1,
-   path/1,
    authority/1,
    q/1,
    fragment/1,
-   to_binary/1
+   path/1,
+   to_binary/1,
+   hash/1,
+   hash/2,
+   lhash/1,
+   lhash/2
 ]).
 
 -define(NIL, {undefined, undefined, undefined}).
@@ -118,14 +122,7 @@ port({Schema, Auth, _}) ->
    end;
 port(Uri) ->
    port(new(Uri)).
-   
-%%
-%% path(URI) -> binary()
-%%   URI  = list() | binary() | tuple()
-path({_, _, Path}) ->
-   Path;
-path(Uri) ->
-   path(new(Uri)).   
+ 
    
 %%
 %% authority(URI) -> binary()
@@ -137,6 +134,16 @@ authority({_, Auth, _}) ->
 authority(Uri) ->
    authority(new(Uri)).
 
+%%
+%% path(URI) -> binary()
+%%   URI  = list() | binary() | tuple()
+path({_, _, In}) ->
+   {Path, _, _} = p_path(In, path, <<>>, ?NIL),
+   Path;
+path(Uri) ->
+   path(new(Uri)).      
+
+   
 %%
 %% query(URI) -> binary()
 %%   URI   = list() | binary() | tuple()
@@ -154,6 +161,32 @@ fragment({_,_, Path}) ->
    Frag;
 fragment(Uri) ->
    fragment(new(Uri)).   
+   
+   
+%%
+%% hash(Uri)            -> binary()
+%% lhash(Uri)           -> list()
+%% hash(component, Uri) -> binary()
+%% lhash(component, Uri)-> list()
+%%
+hash(Uri) ->
+   crypto:sha(to_binary(Uri)).   
+   
+hash(authority, {_,Auth,_}) ->
+   Sfx = string:to_lower(
+         integer_to_list(erlang:phash2(Auth), 16)
+   ),
+   Len = 8 - string:len(Sfx),
+   hex_to_bin(string:chars($0, Len) ++ Sfx);
+hash(path, {_,_,Path}) ->
+   crypto:sha(to_binary(Path));
+hash(Part, Uri) ->
+   hash(Part, new(Uri)).
+
+lhash(Uri) ->
+   bin_to_hex(hash(Uri)).
+lhash(Part, Uri) ->
+   bin_to_hex(hash(Part, Uri)).
    
 %%
 %% to_binary(URI) -> binary()
@@ -266,4 +299,35 @@ schema_to_port(http)  -> 80;
 schema_to_port(https) -> 443;
 schema_to_port(_)     -> undefined.
    
+
+%%   
+%% binary to hex
+bin_to_hex(Bin) ->
+   bin_to_hex(Bin, "").
+   
+bin_to_hex(<<>>, Acc) ->
+   Acc;
+bin_to_hex(<<X:8, T/binary>>, Acc) ->  
+   bin_to_hex(T, Acc ++ [to_hex(X div 16), to_hex(X rem 16)]).
+   
+to_hex(X) when X < 10 ->
+   $0 + X;
+to_hex(X) ->
+   $a + (X - 10).
+
+%%
+%% hex to binary
+hex_to_bin(Hex) ->
+   hex_to_bin(Hex, <<>>).
+
+hex_to_bin([], Acc) ->
+   Acc;
+hex_to_bin([H, L | T], Acc) ->
+   V = to_int(H) * 16 + to_int(L),
+   hex_to_bin(T, <<Acc/binary, V>>).
+
+to_int(C) when C >= $a, C =< $f ->
+   10 + (C - $a);
+to_int(C) when C >= $0, C =< $9 ->
+   C - $0.  
    
