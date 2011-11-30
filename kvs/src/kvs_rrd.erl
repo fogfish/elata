@@ -222,11 +222,25 @@ handle(_Msg, State) ->
 
 %%
 %% converts a key into file name
-key_to_stream(Key) ->
-   Hash = crypto:sha(term_to_binary(Key)),
-   Hex  = [ integer_to_list(X, 16) || X <- binary_to_list(Hash) ],
-   File = lists:append(Hex),
-   "/" ++ lists:sublist(File, 2) ++ "/" ++ File.
+key_to_stream(Key) when is_list(Key) ->
+   "/" ++ Key;
+key_to_stream(Key) when is_binary(Key) ->
+   "/" ++ binary_to_list(Key);
+key_to_stream(Key) when is_atom(Key) ->
+   "/" ++ atom_to_list(Key);
+key_to_stream(Key) when is_tuple(Key) ->
+   lists:flatten(lists:map(
+      fun(X) -> 
+         key_to_stream(X)
+      end, 
+      erlang:tuple_to_list(Key)
+   )).
+%
+%key_to_stream(Key) ->
+%   Hash = crypto:sha(term_to_binary(Key)),
+%   Hex  = [ integer_to_list(X, 16) || X <- binary_to_list(Hash) ],
+%   File = lists:append(Hex),
+%   "/" ++ lists:sublist(File, 2) ++ "/" ++ File.
   
 %%
 %% retrive a time stamp

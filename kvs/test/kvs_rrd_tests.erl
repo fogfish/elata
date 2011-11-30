@@ -87,21 +87,21 @@ cleanup(Pid) ->
    os:cmd("killall rrdcached").
    
 put() ->
-   Key = {<<"eu">>, <<"http://localhost">>, tcp},
+   Key = {<<"localhost:80">>, "mycase", tcp},
    ?assert(
       ok =:= kvs:put("kvs:test", Key, 1000)
    ),
    timer:sleep(500), %% RRD put is async, we have to wait before file is created
    ?assert(
-      kvs:has("kvs:test#cache", key_to_stream(Key))
+      kvs:has("kvs:test#cache", "/localhost:80/mycase/tcp")
    ),
    ?assert(
-      filelib:is_file("/private/tmp/kvs" ++ key_to_stream(Key))
+      filelib:is_file("/private/tmp/kvs/localhost:80/mycase/tcp")
    ).
 
 has() ->
-   Key1 = {<<"eu">>, <<"http://localhost">>, tcp},
-   Key2 = {<<"us">>, <<"http://localhost">>, tcp},  
+   Key1 = {<<"localhost:80">>, "mycase", tcp},
+   Key2 = {<<"localhost:81">>, "mycase", tcp},  
    ?assert(
       true =:= kvs:has("kvs:test", Key1)
    ),
@@ -110,17 +110,11 @@ has() ->
    ).
    
 get() ->
-   Key1 = {<<"eu">>, <<"http://localhost">>, tcp},
-   Key2 = {<<"us">>, <<"http://localhost">>, tcp},  
+   Key1 = {<<"localhost:80">>, "mycase", tcp},
+   Key2 = {<<"localhost:81">>, "mycase", tcp},  
    ?assert(
       {ok, 1000} =:= kvs:get("kvs:test", Key1)
    ),
    ?assert(
       {error, not_found} =:= kvs:get("kvs:test", Key2)
    ).
-   
-key_to_stream(Key) ->
-   Hash = crypto:sha(term_to_binary(Key)),
-   Hex  = [ integer_to_list(X, 16) || X <- binary_to_list(Hash) ],
-   File = lists:append(Hex),
-   "/" ++ lists:sublist(File, 2) ++ "/" ++ File.   
