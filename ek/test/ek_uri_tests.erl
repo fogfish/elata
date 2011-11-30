@@ -113,3 +113,23 @@ uri_path_4_test() ->
    ?assert(
       <<"path">> =:= ek_uri:path("urn:path")
    ).   
+   
+uri_query_1_test() ->
+   ?assert(
+      <<"a=b">> =:= ek_uri:q("http://localhost:8080/path?a=b")
+   ).
+   
+uri_query_2_test() ->
+   ?assert(
+      <<"a=b">> =:= ek_uri:q("http://localhost:8080/path?a=b#test")
+   ).   
+   
+uri_frag_1_test() ->
+   ?assert(
+      <<"test">> =:= ek_uri:fragment("http://localhost:8080/path#test")
+   ).
+
+uri_frag_2_test() ->
+   ?assert(
+      <<"test">> =:= ek_uri:fragment("http://localhost:8080/path?a=b#test")
+   ).    

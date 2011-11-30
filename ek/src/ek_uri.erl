@@ -59,6 +59,8 @@
    port/1,
    path/1,
    authority/1,
+   q/1,
+   fragment/1,
    to_binary/1
 ]).
 
@@ -82,9 +84,8 @@ new(Uri) when is_binary(Uri)->
    p_uri(Uri, schema, <<>>, ?NIL).
    
 %%
-%% schema(URI) -> Host
+%% schema(URI) -> atom()
 %%   URI  = list() | binary() | tuple()
-%%   Host = binary()
 schema({undefined, _, _}) ->
    undefined;
 schema({Schema, _, _}) ->
@@ -95,9 +96,8 @@ schema(Uri) ->
    
    
 %%
-%% host(URI) -> Host
+%% host(URI) -> binary()
 %%   URI  = list() | binary() | tuple()
-%%   Host = binary()
 host({_, undefined, _}) ->
    undefined;
 host({_, Auth, _}) ->
@@ -107,9 +107,8 @@ host(Uri) ->
    host(new(Uri)).
    
 %%
-%% port(URI) -> Port
+%% port(URI) -> integer()
 %%   URI  = list() | binary() | tuple()
-%%   Port = integer()
 port({_, undefined, _}) ->
    undefined;
 port({Schema, Auth, _}) ->
@@ -121,18 +120,16 @@ port(Uri) ->
    port(new(Uri)).
    
 %%
-%% path(URI) -> Path
+%% path(URI) -> binary()
 %%   URI  = list() | binary() | tuple()
-%%   Path = binary()
 path({_, _, Path}) ->
    Path;
 path(Uri) ->
    path(new(Uri)).   
    
 %%
-%% authority(URI) -> Auth
+%% authority(URI) -> binary()
 %%   URI  = list() | binary() | tuple()
-%%   Auht = binary()
 authority({_, undefined, _}) ->
    undefined;
 authority({_, Auth, _}) ->
@@ -140,6 +137,23 @@ authority({_, Auth, _}) ->
 authority(Uri) ->
    authority(new(Uri)).
 
+%%
+%% query(URI) -> binary()
+%%   URI   = list() | binary() | tuple()
+q({_,_, Path}) ->
+   {_, Query, _} = p_path(Path, path, <<>>, ?NIL),
+   Query;
+q(Uri) ->
+   q(new(Uri)).
+
+%%
+%% fragment(URI) -> binary()
+%%   URI   = list() | binary() | tuple()
+fragment({_,_, Path}) ->
+   {_, _, Frag} = p_path(Path, path, <<>>, ?NIL),
+   Frag;
+fragment(Uri) ->
+   fragment(new(Uri)).   
    
 %%
 %% to_binary(URI) -> binary()
@@ -219,6 +233,31 @@ p_auth(<<>>, host, Acc, {U, _, P}) ->
    {U, Acc, P};
 p_auth(<<>>, port, Acc, {U, H, _}) ->
    {U, H, list_to_integer(binary_to_list(Acc))}.
+   
+%%
+%%   path: /over/there?name=ferret#nose
+%%
+p_path(<<"?", Str/binary>>, path, Acc, {_, Q, F}) ->
+   p_path(Str, 'query', <<>>, {Acc, Q, F});
+   
+p_path(<<"#", Str/binary>>, path, Acc, {_, Q, F}) ->
+   p_path(Str, fragment, <<>>, {Acc, Q, F});
+   
+p_path(<<"#", Str/binary>>, 'query', Acc, {P, _, F}) ->
+   p_path(Str, fragment, <<>>, {P, Acc, F});
+   
+%% accumulates token
+p_path(<<H:8, T/binary>>, Tag, Acc, P) ->
+   p_path(T, Tag, <<Acc/binary, H>>, P);   
+   
+%% eof
+p_path(<<>>, path, Acc, {_, Q, F}) ->
+   {Acc, Q, F};
+p_path(<<>>, 'query', Acc, {P, _, F}) ->
+   {P, Acc, F};
+p_path(<<>>, fragment, Acc, {P, Q, _}) ->
+   {P, Q, Acc}.
+   
    
 
 %%
