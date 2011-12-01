@@ -29,32 +29,38 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(elata_fe_sup).
+-module(fe).
 -author(dmitry.kolesnikov@nokia.com).
--behaviour(supervisor).
 
--export([
-   start_link/1,
-   init/1
-]).
+-export([start/0]).
 
-start_link(Config)->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
-   
-init([Config]) ->
-   WebAppApi = {
-      web_app_api,
-      {
-         restd_sup,
-         start_link,
-         [proplists:get_value(port, Config), fe_webapp_api]
-      },
-      permanent, 1000, supervisor, dynamic
-   }, 
-   % TODO: define processes 
-   {ok,
-      {
-         {one_for_one, 4, 3600},
-         [WebAppApi]
-      }
-   }.
+start() ->
+   % load application resource
+   {file, Module} = code:is_loaded(?MODULE),
+   AppFile = filename:dirname(Module) ++ "/" ++ atom_to_list(?MODULE) ++ ".app",
+   {ok, [{application, _, List}]} = file:consult(AppFile), 
+   % load system configuration
+   CfgFile = filename:dirname(Module) ++ "/sys.config",
+   case file:consult(CfgFile) of
+      {error, _}   -> ok;
+      {ok, [Config]} -> 
+         lists:foreach(
+            fun({App, Cfg}) -> 
+               lists:foreach(
+                  fun
+                     ({K, V}) -> application:set_env(App, K, V);
+                     (K)      -> application:set_env(kvs, K, true)
+                  end,
+                  Cfg
+               )
+            end, 
+            Config
+         )
+   end,
+   % load applications
+   Apps = proplists:get_value(applications, List, []),
+   lists:foreach(
+      fun(X) -> application:start(X) end,
+      Apps
+   ),
+   application:start(?MODULE).

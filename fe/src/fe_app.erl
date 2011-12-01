@@ -29,10 +29,9 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(elata_fe_app).
+-module(fe_app).
 -behaviour(application).
 -author(dmitry.kolesnikov@nokia.com).
--include("include/def.hrl").
 
 -export([
    start/2,
@@ -42,14 +41,45 @@
 %%%------------------------------------------------------------------   
 %%% Default Config
 %%%------------------------------------------------------------------   
--define(PORT, 8000).  
+-define(APPNAME, fe).
 
 %%
 %% start application
 start(_Type, _Args) ->
-   {ok, Config} = config(),
-   boot_storage(Config),
-   elata_fe_sup:start_link(Config).
+   Config = config(?APPNAME, [
+      {port, 8080}
+   ]),
+   case fe_sup:start_link(Config) of
+      {ok, Pid} ->
+         % discover root(s) 
+         {file, Module} = code:is_loaded(?MODULE),
+         Root = filename:dirname(filename:dirname(Module)) ++ "/priv/www",
+         {ok, DataDir} = application:get_env(be, datapath),
+         % web app content
+         {ok, _} = kvs:new("kvs:/elata/web", [
+            {storage, kvs_fs},
+            {root,    Root},
+            {type,    file}
+         ]),
+         % view content
+         {ok, _} = kvs:new("kvs:/elata/img", [
+            {storage, kvs_fs},
+            {root, DataDir ++ "/view"},
+            {type, file}
+         ]),
+         % users TODO: dets
+         {ok, _} = kvs:new("kvs:/elata/user",    [
+            {storage, kvs_dets},
+            {file, DataDir ++ "/user.dets"}
+         ]),
+         {ok, _} = kvs:new("kvs:/elata/usecase", [
+            {storage, kvs_dets},
+            {file, DataDir ++ "/ucase.dets"}
+         ]),
+         {ok, Pid};
+      Err ->
+         Err
+   end.
    
 stop(_State) ->
    ok.
@@ -59,6 +89,25 @@ stop(_State) ->
 %%% Private Functions
 %%%
 %%%------------------------------------------------------------------   
+config(App, List) ->
+   config(App, List, []).
+config(App, [{Key, Default} | T], Acc) ->        
+   Val = case application:get_env(App, Key) of 
+      undefined   -> Default;
+      {ok, Value} -> Value
+   end,
+   config(App, T, [{Key, Val} | Acc]);
+config(App, [Key | T], Acc) ->
+   case application:get_env(App, Key) of 
+      undefined -> config(App, T, Acc);
+      {ok, Val} -> config(App, T, [{Key, Val} | Acc])
+   end;   
+config(_, [], Acc) ->
+   Acc.
+
+
+
+
 
 %% read application config key
 get_conf(Key, Default) ->
@@ -70,7 +119,7 @@ get_conf(Key, Default) ->
 %% return an application configuration
 config() ->
    {ok, [
-      {port,      get_conf(port, ?PORT)},
+      {port,      get_conf(port, 8080)},
       {datapath,  get_conf(datapath, "/private/tmp/elata")}
    ]}.
    

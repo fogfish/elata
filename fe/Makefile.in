@@ -159,7 +159,6 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-with_yuicompressor = @with_yuicompressor@
 
 #
 #   Copyright (c) 2011, Nokia Corporation
@@ -177,44 +176,22 @@ with_yuicompressor = @with_yuicompressor@
 #   under the License.
 #
 ESRC = \
-   src/elata_fe.erl \
-   src/elata_fe_app.erl \
-   src/elata_fe_sup.erl \
-   src/fe_webapp_api.erl
+   src/fe.erl \
+   src/fe_app.erl \
+   src/fe_sup.erl \
+   src/fe_web.erl
 
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
-	priv/sys.config priv/elata_fe ebin/elata_fe.app \
-	ebin/elata_fe.rel ebin/elata_fe.script ebin/elata_fe.boot \
-	ebin/elata_fe.tar.gz priv/webapp/index.html \
-	priv/webapp/elata-$(VERSION).css \
-	priv/webapp/elata-$(VERSION).js
-EINC = include/def.hrl
-CSS = \
-   priv/webapp/css/copyright.css \
-   priv/webapp/css/doc.css \
-   priv/webapp/css/list.css \
-   priv/webapp/css/navi.css \
-   priv/webapp/css/grid.css \
-   priv/webapp/css/editor.css \
-   priv/webapp/css/button.css
+	ebin/sys.config ebin/fe.app
+EDAT = \
+   priv/www/index.html \
+   priv/www/js/elata.js \
+   priv/www/js/navigator.js \
+   priv/www/style/bg.png \
+   priv/www/style/ui.css
 
-JS = \
-   priv/webapp/js/copyright.js \
-   priv/webapp/js/app.js \
-   priv/webapp/js/kvset.js \
-   priv/webapp/js/navigator.js \
-   priv/webapp/js/grid.js \
-   priv/webapp/js/locale.js \
-   priv/webapp/js/mainview.js \
-   priv/webapp/js/caseview.js \
-   priv/webapp/js/newcaseview.js \
-   priv/webapp/js/signin.js 
-
-EXT = \
-   priv/webapp/js/base64.js
-
-nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC) $(EXT) $(distdir).tgz
-CLEANFILES = $(EBIN) $(distdir).tgz
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(EDAT) 
+CLEANFILES = $(EBIN) 
 EXTRA_DIST = $(ESRC)
 all: all-am
 
@@ -566,26 +543,7 @@ uninstall-am: uninstall-nobase_pkgliberlSCRIPTS
 	uninstall-nobase_pkgliberlSCRIPTS
 
 
-@HAVE_YUICOMPRESSOR_TRUE@priv/webapp/elata-$(VERSION).css: $(CSS)
-@HAVE_YUICOMPRESSOR_TRUE@	cat $^ > /tmp/elata.css
-@HAVE_YUICOMPRESSOR_TRUE@	cat $< > $@
-@HAVE_YUICOMPRESSOR_TRUE@	java -jar $(with_yuicompressor) --type css --line-break 80 /tmp/elata.css >> $@
-
-@HAVE_YUICOMPRESSOR_TRUE@priv/webapp/elata-$(VERSION).js: $(JS)
-@HAVE_YUICOMPRESSOR_TRUE@	cat $^ > /tmp/elata.js
-@HAVE_YUICOMPRESSOR_TRUE@	cat $< > $@
-@HAVE_YUICOMPRESSOR_TRUE@	java -jar $(with_yuicompressor) --type js --line-break 80 /tmp/elata.js >> $@
-
-@HAVE_YUICOMPRESSOR_FALSE@priv/webapp/elata-$(VERSION).css: $(CSS)
-@HAVE_YUICOMPRESSOR_FALSE@	cat $^ > $@
-
-@HAVE_YUICOMPRESSOR_FALSE@priv/webapp/elata-$(VERSION).js: $(JS)
-@HAVE_YUICOMPRESSOR_FALSE@	cat $^ > $@  
-
 include $(top_builddir)/Makefile.erlang
-
-priv/webapp/index.html: priv/webapp/index.html.in
-	sed $(DOCONF) $^ > $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -1,0 +1,412 @@
+html, body, div, span, h1, h2, h3, h4, h5, h6, 
+p, blockquote,  a, abbr, acronym, address, 
+big, cite, code, del, dfn, em, font, img, ins, 
+kbd, q, s, samp, small, strike, strong,   sub,
+sup, tt, var, dl, dt, dd, ol, ul, li, fieldset,
+form,  label,  legend,  table,  caption, tbody,
+tfoot, thead, tr, th, td, input
+{
+   margin: 0;
+   padding: 0;
+   border: 0;
+   outline: 0;
+   font-weight: inherit;
+   font-style: inherit;
+   font-size: 100%;
+   font-family: inherit;
+   vertical-align: baseline;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   text-decoration: none;
+}
+
+html, body
+{
+	overflow-y: visible;
+}
+
+body
+{
+   font-family: Helvetica;
+   overflow-x: hidden;
+   font-size: 16px;
+   background: url(bg.png) repeat-x #fff;
+}
+
+ul li
+{
+   position: relative;
+   text-align: left;
+   list-style: none;
+}
+
+p
+{
+	overflow: visible;
+   font-weight: normal;
+   text-align: justify;
+   white-space: normal;
+}
+
+a
+{
+	text-decoration: none;
+}
+
+
+.view
+{
+	position: relative;
+   display: none;
+}
+
+.view[focused="true"]
+{
+   display: block;
+}
+
+.header
+{
+   margin-top: 1.5em;
+   margin:  0;
+	padding: 0;
+	position: relative;
+	min-height: 90px;
+	max-height: 90px;
+}
+
+.main
+{
+   /*min-width: 50em;*/
+   overflow: hidden;
+   width: 100%;
+	max-width: none;
+	margin: 2em auto;
+	padding: 0 0 0 0;
+}
+
+.viewport
+{
+	/*min-width: 64em;*/
+	max-width: 64em;
+	width: 64em;
+	margin: 0 auto;
+	padding: 0 1em 0 1em;
+}
+
+
+/*
+ --------------------------------------------------------------------
+ 
+ Horizontal menu at header 
+ 
+ --------------------------------------------------------------------
+ */
+.menu
+{
+	position: absolute;
+	top: 50%;
+	height: 32px;
+	margin: -16px 0px 0px 90px;
+	background: none;
+	width: 80%;
+}
+
+.menu > li
+{
+	float: left;
+	margin-left: 0.4em;
+	margin-right: 0.4em;
+}
+.menu > li.right
+{
+	float: right;
+}
+
+.menu > li > a
+{
+	/*display: inline-block;*/
+	
+	margin:  0;
+   padding: 0;
+   position: relative;
+	background: none;
+	border: none;
+}
+
+.header .list li > a,
+.header .list li > span
+{
+	color: #cfc;
+	text-shadow: rgba(0, 0, 0, 0.398438)  -1px -1px 0px;
+}
+
+.header .list li > a small
+{
+	color: #cfc;
+	font-size: 10px;
+	text-shadow: rgba(0, 0, 0, 0.398438)  -1px -1px 0px;
+}
+
+.header .list li > a:hover,
+.header .list li > a:hover small
+{
+	color: #fc0;
+	text-shadow: rgba(0, 0, 0, 0.398438)  3px 3px 2px;
+}
+
+.header .list li.button > a
+{
+	background-color: #77a85f;
+	color: #fff;
+	text-shadow: rgba(0, 0, 0, 0.59765) 0px -1px 0px;
+	height: 16px;
+	padding: 6px 12px 6px 12px;
+	border: 1px solid #77a85f;
+	border-bottom-left-radius: 6px 6px;
+   border-bottom-right-radius: 6px 6px;
+   border-top-left-radius: 6px 6px;
+   border-top-right-radius: 6px 6px;
+   -moz-box-shadow: inset 0 0 2px #000000;
+   -webkit-box-shadow: inset 0 0 2px #000000;
+   box-shadow: inset 0 0 2px #000000;
+}
+
+.header .list li.button:hover > a,
+.header .list li.button > a:hover
+{
+	text-shadow: rgba(0, 0, 0, 0.398438)  3px 3px 2px;
+	background-color: #859bbc;
+}
+
+.header .list li.button:hover > a.warn,
+.header .list li.button > a.warn:hover
+{
+	background-color: #c00;
+}
+
+
+.footer .label
+{
+	width: 99%;
+	text-align: right;
+	color: #666;
+	font-size: 0.6em;
+}
+
+/*
+ --------------------------------------------------------------------
+ 
+ Editor 
+ 
+ --------------------------------------------------------------------
+ */
+.view form
+{
+	text-align: center;
+}
+
+.view form > div
+{
+   position: relative;
+   text-align: left;
+   margin: 0;
+   padding: 8px 0px 8px 10px;
+   list-style: none;
+   line-height: 32px;
+   font-size: 18px;
+   font-weight: bold;
+   border-bottom: 1px dotted #ccc;
+}
+
+.view form > div label 
+{
+   display: inline-block;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px 10px 0px 0px;
+   overflow: hidden;
+   padding: 0.3em 0 0 0;
+   text-align: right;
+   width: 15%;
+   font-size: 13px;
+   color: #4C566C;
+}
+
+.view form > div.required label
+{
+   color: #ff0099;	
+}
+
+.view form > div input 
+{
+   display: inline-block;
+   padding: 0.3em;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px;
+   overflow: visible;
+   white-space: normal;
+   width: 83%;
+   font-size: 13px;
+   font-weight: bold;
+   border: 1px solid #ccc;
+}
+
+.view form > div p
+{
+	display: inline-block;
+   padding: 0px;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px;
+   overflow: visible;
+   white-space: normal;
+   width: 83%;
+   font-size: 13px;
+   font-weight: normal;
+}
+
+.view form .button
+{
+	margin: 1em 0 0 0 !important;
+}
+
+
+.main .list li
+{
+	position: relative;
+   text-align: left;
+   margin: 0;
+   padding: 8px 0 8px 10px;
+   list-style: none;
+   line-height: 32px;
+   background-color: #fff;
+   font-size: 16px;
+   font-weight: bold;
+   border-bottom: 1px dotted #ccc;
+}
+
+.main .list li:last-child
+{
+	border-bottom: none;
+}
+
+.main .list li a
+{
+	position: relative;
+   text-decoration: none;
+   display: block;
+   margin: -8px 0 -8px -10px;
+   padding: 8px 96px 8px 10px;
+}
+
+.main .list li:hover a,
+.main .list li a:hover
+{
+	display: block;
+	background-color: #eee;
+}
+
+.main .list li a > small
+{
+   position:absolute;
+   top: 50%;
+   right: 0%;
+   height: 16px;
+   margin: -8px 32px 0px 0px;
+   line-height: 16px;
+   font-size: 13px;
+   color: #333;
+}
+
+.main .list li a > span
+{
+	display: block;
+	text-align: left;
+   font-size: 14px;
+   line-height: 16px;
+   font-weight: normal;
+   color: #000;
+}
+
+.main .list li a > img
+{
+   vertical-align: middle;
+   width: 96px;
+   height: 32px;
+   margin-right: 8px;
+}
+
+.main .list li a > div
+{
+   display: inline-block;
+   vertical-align: middle;
+   width: 80%;
+   font-size: 16px;
+}
+
+.main .list li a > div span
+{
+   display: block;
+   line-height: 14px;
+   font-size: 12px;
+}
+
+.main .list li a > div span:last-child
+{
+   color: #4C566C;
+}
+
+
+.main .list li a > div  big
+{
+   display: block;
+   line-height: 18px;
+   font-size: 16px;
+}
+
+.main .proplist li > h3 
+{
+   display: inline-block;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px 10px 0px 0px;
+   overflow: hidden;
+   padding: 0px;
+   text-align: right;
+   /*width: 35%;*/
+   width: 15%;
+   font-size: 13px;
+   color: #4C566C;
+}
+
+
+.main .proplist li > span,
+.main .proplist li > p,
+.main .proplist li > pre 
+{
+   display: inline-block;
+   vertical-align: top;
+   line-height: 18px;
+   margin: 0px;
+   overflow: visible;
+   padding: 0px;   
+   white-space: normal;
+   /*width: 65%;*/
+   width: 85%;
+   font-size: 13px;
+}
+
+.main .proplist li > pre 
+{
+	font-weight: normal;
+	white-space: pre;
+}
+
+#stat .viewport img
+{
+	display: block;
+	margin: 0.2em auto;
+}
+

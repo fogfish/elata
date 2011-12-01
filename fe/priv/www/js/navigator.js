@@ -15,34 +15,34 @@
 %%   under the License.
 %%
 */
-elata.Navigator = new Class({
+Navigator = new Class({
 	Implements  : Events,
 		
-	titles   : [],	
+	ui       : null, 
 	items    : [],   // multi-dim array of items	
+	                 // item[level] = [{id: ..., title: ...} ...]
 	selected	: [],   
 	
 	/**
 	 * Initialize the navigation object 
 	 */
-	initialize: function() 
+	initialize: function(list) 
 	{
+		this.ui = list;
 	},
 	
 	/**
 	 * Update the navigation with data
 	 * @param {object} data
 	 */
-	 setItems: function(level, title, list)
+	 setItems: function(level, list)
 	 {
-	 	 this.titles[level] = title;
 	 	 this.items[level]  = list;
 	 	 this.createUI(level);
 	 },
 	 
 	 resetItems: function(level)
 	 {
-	 	 this.titles[level] = null;
 	 	 this.items[level]  = [];
 	 	 $('navi' + level).empty();
 	 },
@@ -53,19 +53,11 @@ elata.Navigator = new Class({
 	 */
 	createUI: function(level)
 	{
-		var ui = $('navi' + level).empty(); //parent div
-		// level title
-		new Element(
-			'span', 
-			{
-				'class': 'label',
-				text: this.titles[level]
-			}
-		).inject(ui);	
-	   
+		var ui = this.ui[level].empty(); //parent div
 		// level selector
-		var el     = new Element('span', {'class': 'item'}).inject(ui); //wrapper
-		var select = new Element('select', {id: 'selnav' + level}).inject(el).addEvent('change', this.handleChange.bind(this)); //select
+		var select = new Element('select', {id: 'nav' + level})
+		             .inject(ui)
+		             .addEvent('change', this.handleChange.bind(this)); //select
 		this.items[level].each(
 			function(item)
 			{
@@ -73,7 +65,7 @@ elata.Navigator = new Class({
 					new Element(
 						'option',
 						{
-							rel:  item.sys_id,
+							rel:  item.id,
 							text: item.title
 						}
 					),
@@ -81,19 +73,20 @@ elata.Navigator = new Class({
 				);
 		   }.bind(this)
 		);
+		this.selected[level] = this.items[level][0].id;
 	},
 	 
 	handleChange: function(e)
 	{
-		var level = e.target.getAttribute('id').substring(6);
+		var level = e.target.getAttribute('id').substring(3);
 		this.selected = [];
 		for (var i = 0; i <= level; i++)
 		{
-		    var sel = $('selnav' + i);
+		    var sel = $('nav' + i);
 		    var opt = sel.options[ sel.selectedIndex ];
 		    this.selected.push(opt.getAttribute('rel'));
 		}
-		this.fireEvent('change', this);
+		this.fireEvent('change', this.selected);
 	},
 	
 	getSelected: function()

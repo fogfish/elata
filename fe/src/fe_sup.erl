@@ -29,18 +29,39 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(elata_fe).
+-module(fe_sup).
 -author(dmitry.kolesnikov@nokia.com).
+-behaviour(supervisor).
 
--export([start/0]).
+-export([
+   start_link/1,
+   init/1
+]).
 
-start() ->
-   {file, Module} = code:is_loaded(?MODULE),
-   AppFile = filename:dirname(Module) ++ "/" ++ atom_to_list(?MODULE) ++ ".app",
-   {ok, [{application, _, List}]} = file:consult(AppFile), 
-   Apps = proplists:get_value(applications, List, []),
-   lists:foreach(
-      fun(X) -> application:start(X) end,
-      Apps
-   ),
-   application:start(?MODULE).
+start_link(Config)->
+   supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
+   
+init([Config]) ->
+   WebCfg = [
+      {name, fe_web},
+      {loop, {fe_web, h}},
+      {port, proplists:get_value(port, Config)}
+   ],
+   {ok,
+      {
+         {one_for_one, 4, 3600},
+         [httpd(WebCfg)]
+      }
+   }.
+   
+httpd(Config) ->
+   {
+      httpd,       % child id
+      {
+         mochiweb_http,  % Mod
+         start,          % Fun
+         [Config]        % Args
+      },
+      transient, 2000, worker, dynamic 
+   }.   
+   
