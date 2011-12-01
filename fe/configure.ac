@@ -13,7 +13,7 @@ dnl   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
 dnl   the License for the specific language governing rights and limitations
 dnl   under the License.
 dnl
-AC_INIT([elata_fe], [0.4], [dmitry.kolesnikov@nokia.com])
+AC_INIT([elata_fe], [0.4.0], [dmitry.kolesnikov@nokia.com])
 AM_INIT_AUTOMAKE
 
 AC_ARG_WITH(erlang,       [--with-erlang=PREFIX path to erlang runtime])

@@ -30,6 +30,6 @@
 
    %% key-value interface
    {kvs, [
-      cluster
+      {cluster, true}
    ]}
 ].

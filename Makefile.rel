@@ -49,12 +49,12 @@ ebin/%.tar.gz : ebin/%.rel ebin/%.boot
 	n=`echo $< | sed -n -e 's|ebin/\(.*\).rel|"ebin/\1"|p'` ; \
 	$(ERL) -noshell $$f -eval "systools:make_tar($$n, [{dirs, [src]}, {erts, code:root_dir()}]),halt(0)" ; \
 
-%-$(VERSION).tgz: ebin/%.tar.gz ebin/elata ebin/%.config
+%-$(VERSION).tgz: ebin/%.tar.gz ebin/elata
 	n=`echo $< | sed -n -e 's|ebin/\(.*\).tar.gz|\1|p'` ; \
 	mkdir -p /tmp/rel/bin ; \
 	tar -C /tmp/rel -xf $< ; \
 	cp ebin/elata /tmp/rel/bin/ ; \
-	cp ebin/$$n.config /tmp/rel/releases/$(VERSION)/sys.config ; \
+	cp $$n/ebin/sys.config /tmp/rel/releases/$(VERSION)/sys.config ; \
 	chmod 777 /tmp/rel/bin/elata ; \
 	tar -C /tmp/rel -czpf $@ `ls /tmp/rel`; \
 	rm -R /tmp/rel
