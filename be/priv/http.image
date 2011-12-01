@@ -7,7 +7,7 @@
 --border 0
 --width 720
 --height 240
---title "<?title?>"
+--title "http <?title?>"
 --start <?from?>
 --end now
 DEF:_a=<?data?>/<?host?>/<?uid?>/ttfb:val:AVERAGE

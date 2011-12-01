@@ -184,12 +184,18 @@ ESRC = \
    src/be_rrd.erl
 
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
-	ebin/sys.config ebin/be.app priv/availability.image \
-	priv/http.image priv/icon.image priv/latency.image \
-	priv/tcp.image priv/uri.image
-nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC)
+	ebin/sys.config ebin/be.app
+EDAT = \
+   priv/availability.image \
+   priv/http.image \
+   priv/icon.image \
+   priv/latency.image \
+   priv/tcp.image \
+   priv/uri.image
+
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(EDAT)
 CLEANFILES = $(EBIN) 
-EXTRA_DIST = $(ESRC)
+EXTRA_DIST = $(ESRC) $(EDAT)
 all: all-am
 
 .SUFFIXES:

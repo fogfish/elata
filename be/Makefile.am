@@ -24,7 +24,7 @@ ESRC = \
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 EBIN += \
    ebin/sys.config \
-   ebin/be.app \
+   ebin/be.app
 
 EDAT = \
    priv/availability.image \

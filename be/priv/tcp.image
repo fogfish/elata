@@ -8,7 +8,7 @@
 --border 0
 --width 720
 --height 240
---title "<?title?>"
+--title "tcp <?title?>"
 --start <?from?>
 --end now
 DEF:_a=<?data?>/<?host?>/<?uid?>/tcp:val:AVERAGE

@@ -8,13 +8,13 @@
 --border 0
 --width 720
 --height 240
---title <?title?>
+--title "latency <?title?>"
 --start <?from?>
 --end now
 DEF:_a=<?data?>/<?host?>/<?uid?>/tcp:val:AVERAGE
 DEF:_b=<?data?>/<?host?>/<?uid?>/ssl:val:AVERAGE
 DEF:_c=<?data?>/<?host?>/<?uid?>/ttfb:val:AVERAGE
-DEF:_d=<?data?>/<?host?>/<?uid?>/ttfmr:val:AVERAGE
+DEF:_d=<?data?>/<?host?>/<?uid?>/ttmr:val:AVERAGE
 DEF:_e=<?data?>/<?host?>/<?uid?>/uri:val:AVERAGE
 CDEF:a=_a,1000000,/
 CDEF:b=_b,1000000,/
@@ -23,7 +23,7 @@ CDEF:d=_d,1000000,/
 CDEF:e=_e,1000000,/
 
 
-AREA:a#99ccff:tcp
+AREA:a#3399FF:tcp
 VDEF:amin=a,MINIMUM
 VDEF:aavg=a,AVERAGE
 VDEF:astd=a,STDEV
@@ -37,7 +37,7 @@ GPRINT:ap95:"95%% %1.3lf"
 GPRINT:ap98:"98%% %1.3lf"
 GPRINT:amax:"max %1.3lf\l"
 
-AREA:b#CC99FF:ssl:STACK
+AREA:b#9933FF:ssl:STACK
 VDEF:bmin=b,MINIMUM
 VDEF:bavg=b,AVERAGE
 VDEF:bstd=b,STDEV
@@ -51,7 +51,7 @@ GPRINT:bp95:"95%% %1.3lf"
 GPRINT:bp98:"98%% %1.3lf"
 GPRINT:bmax:"max %1.3lf\l"
 
-AREA:c#FF99CC:ttfb:STACK
+AREA:c#FF3399:ttfb:STACK
 VDEF:cmin=c,MINIMUM
 VDEF:cavg=c,AVERAGE
 VDEF:cstd=c,STDEV
@@ -65,7 +65,7 @@ GPRINT:cp95:"95%% %1.3lf"
 GPRINT:cp98:"98%% %1.3lf"
 GPRINT:cmax:"max %1.3lf\l"
 
-AREA:d#CCFF99:ttmr:STACK
+AREA:d#99FF33:ttmr:STACK
 VDEF:dmin=d,MINIMUM
 VDEF:davg=d,AVERAGE
 VDEF:dstd=d,STDEV
@@ -79,7 +79,7 @@ GPRINT:dp95:"95%% %1.3lf"
 GPRINT:dp98:"98%% %1.3lf"
 GPRINT:dmax:"max %1.3lf\l"
 
-LINE1:e#669900:latency
+LINE1:e#333300:latency
 VDEF:emin=e,MINIMUM
 VDEF:eavg=e,AVERAGE
 VDEF:estd=e,STDEV

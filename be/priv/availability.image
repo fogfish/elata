@@ -8,7 +8,7 @@
 --border 0
 --width 720
 --height 240
---title "<?title?>"
+--title "avail. <?title?>"
 --start <?from?>
 --end now
 DEF:a=<?data?>/<?host?>/<?uid?>/code:val:AVERAGE

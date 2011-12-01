@@ -8,7 +8,7 @@
 --border 0
 --width 720
 --height 240
---title <?title?>
+--title "uri <?title?>"
 --start <?from?>
 --end now
 DEF:_e=<?data?>/<?host?>/<?uid?>/uri:val:AVERAGE
