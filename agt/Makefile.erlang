@@ -68,10 +68,7 @@ ebin/%.tar.gz : ebin/%.rel $(ESRC) $(EBIN)
 	tar -C /tmp/rel -czpf $@ `ls /tmp/rel`; \
 	rm -R /tmp/rel
 	
-priv/%.config : priv/%.config.in
-	cat $^ | sed $(DOCONF) > $@
-
-priv/%.cfg  : priv/%.cfg.in
+ebin/%.config : src/%.config.in
 	cat $^ | sed $(DOCONF) > $@
 
 priv/% : priv/%.in

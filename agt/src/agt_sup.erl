@@ -42,15 +42,6 @@ start_link(Config)->
    supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
 init([Config]) ->
-   AgtJobSup = {
-      agt_job_sup,
-      {
-         agt_job_sup,
-         start_link,
-         [proplists:get_value(worker, Config)]
-      },
-      permanent, 1000, supervisor, dynamic
-   }, 
    {ok,
       {
          {one_for_one, 4, 3600},

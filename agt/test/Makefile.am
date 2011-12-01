@@ -1,4 +1,4 @@
-TESTS  = agt_job_tests
+#TESTS  = todo_tests
 
 .SECONDARY:
 

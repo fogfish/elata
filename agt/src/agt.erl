@@ -35,12 +35,33 @@
 -export([start/0]).
 
 start() ->
+   % load application resource
    {file, Module} = code:is_loaded(?MODULE),
    AppFile = filename:dirname(Module) ++ "/" ++ atom_to_list(?MODULE) ++ ".app",
    {ok, [{application, _, List}]} = file:consult(AppFile), 
+   % load system configuration
+   CfgFile = filename:dirname(Module) ++ "/sys.config",
+   case file:consult(CfgFile) of
+      {error, _}   -> ok;
+      {ok, [Config]} -> 
+         lists:foreach(
+            fun({App, Cfg}) -> 
+               lists:foreach(
+                  fun
+                     ({K, V}) -> application:set_env(App, K, V);
+                     (K)      -> application:set_env(kvs, K, true)
+                  end,
+                  Cfg
+               )
+            end, 
+            Config
+         )
+   end,
+   % load applications
    Apps = proplists:get_value(applications, List, []),
    lists:foreach(
       fun(X) -> application:start(X) end,
       Apps
    ),
    application:start(?MODULE).
+   

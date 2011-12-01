@@ -22,14 +22,14 @@
       {error_logger_mf_maxbytes, 1073741824}
    ]},
 
-   %% agent
-   {elata_agt, [
-      {port,   8080},
-      {worker, [
-         {idletime,  300000},
-         {thinktime,   1000},
-         {cycle,         10}
-      ]}
-   ]}
+   %% cluster
+   {ek, [
+      {node, "node://localhost:8001"}
+      %% {proxy, {host, port}}
+   ]},
 
+   %% key-value interface
+   {kvs, [
+      cluster
+   ]}
 ].

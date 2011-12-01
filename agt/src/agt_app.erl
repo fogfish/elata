@@ -41,7 +41,7 @@
 %%%------------------------------------------------------------------   
 %%% Default Config
 %%%------------------------------------------------------------------   
--define(APPNAME,  elata_agt).
+-define(APPNAME,  agt).
 
 %%
 %% start application
@@ -49,12 +49,13 @@ start(_Type, _Args) ->
    Config = config(?APPNAME, []),
    case agt_sup:start_link(Config) of
       {ok, Pid} ->
-         % bucket to keep a definition of jobs
-         kvs_bucket:define(bckt_proc, [{storage, agt_proc_sup}]),
-         % bucket to keep raw telemetry 
-         kvs_bucket:define(bckt_ds,   [{storage, kvs_sys}, event, evtlog]),
-         % bucket to keep documents
-         kvs_bucket:define(bckt_doc,  [{storage, kvs_sys}, event, evtlog]),
+         % process category
+         kvs:new("kvs:/elata/proc", [{storage, agt_proc}]),
+         % federated category (raw telemetry)
+         % BeNode = proplists:get_value(be, Config),
+         % kvs:new(BeNode ++ "/elata/ds",      [{storage, kvs_fed}]),
+         % federated category (documents)
+         % kvs:new(BeNode ++ "/elata/doc",  [{storage, kvs_fed}]),
          {ok, Pid};
       Other     -> 
          {error, Other}

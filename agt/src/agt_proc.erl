@@ -35,22 +35,14 @@
 
 %%
 %% ELATA: Agent Process
-%%        It is periodcally executed sample and hold process
+%%        it is periodcally executed sample and hold process
 %%
-%% id        - unique job identity SHA1( script )
-%% thinktime - defines number of seconds between job runs
-%% ttl       - time to live, number of seconds to keep sampling running
-%% proc      - process code (script) to be executed
-%%
-%% Results of job execution are agregated into Process object
-%%
-%% timestamp - unix timestamp of last sample (local time of process)
-%% cycle     - number of executed cycles
-%%
-%% Additionally
-%%   bckt_raw is populated with raw/measured data streams
-%%   bckt_doc  - output of script execution
-%%
+%% key - unique proc identity SHA1( script )
+%% val - process descriptor proplists
+%%    script    - [Uri, Opts]
+%%    thinktime - time between probes
+%%    authority - owner node
+%%    [ttl]     -
 
 -export([
    start_link/3,
@@ -63,21 +55,20 @@
    code_change/3
 ]).
 
-%% Job internall state
+%% Process internall state
 -record(srv, {
-   bucket,      %% bucket descriptor
+   cat,         %% bucket descriptor
    key,         %% unique job identifier
-   proc         %% job description                  
+   proc,        %% job description                  
    
-   %% timestamp,   %% unix timestamp when job is started (in seconds)  
-   %% ttl,         %% time-to-live (effective time-to-live)
-   %% cycles       %% nbr of executed cycles
+   timestamp,   %% unix timestamp when job is started (in seconds)  
+   code         %% script executor 
 }).
 
 %%
 %% debug macro
 -ifdef(DEBUG).
--define(DEBUG(M), error_logger:info_report(M)).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
 -else.
 -define(DEBUG(M), true).
 -endif.
@@ -85,78 +76,109 @@
 
 %%
 %% 
-start_link(Bucket, Key, Proc) ->
-   gen_server:start_link(?MODULE, [Bucket, Key, Proc], []).
+start_link(Spec, Key, Proc) ->
+   gen_server:start_link(?MODULE, [Spec, Key, Proc], []).
    
 %%
 %% Init
-init([Bucket, Key, Proc]) ->
-   % register itself to keyspace
-   Name  = proplists:get_value(name, Bucket),
-   ok    = kvs:put({keyspace, Name}, Key, self()),
-   think_timer(Proc),
-   ?DEBUG([{process, started} | Proc]),
+init([Spec, Key, Proc]) ->
+   ?DEBUG([{cat, Spec}, {key, Key}, {proc, Proc}]),
+   Cat = proplists:get_value(uri, Spec),
+   gen_kvs:val_init(Cat, Key),
+   t_thinktime(Proc),
    % return a state
    {ok,
       #srv{
-         bucket=Bucket,
-         key=Key,
-         proc=[{timestamp, timestamp()} | Proc]
+         cat = Spec,
+         key = Key,
+         proc= Proc,
+         timestamp = timestamp(),
+         code= erlang:apply(hf_perf:ht_get(), [em_pf:new(em_pipe)])
        }
     }.
-        
+         
 %%% set
-handle_call({kvs_put, Key, Proc}, _From, State) ->
-   {reply, ok, State#srv{proc = [{timestamp, timestamp()} | Proc]} };
-   
-handle_call({kvs_get, Key}, _From, State) ->
+handle_call({kvs_put, _Key, Proc}, _From, State) ->
+   {reply, ok, 
+      State#srv{
+         proc = Proc,
+         timestamp = timestamp()
+      }
+   };
+handle_call({kvs_get, _Key}, _From, State) ->
    {reply, {ok, State#srv.proc}, State};
 handle_call(_Req, _From, State) ->
    {reply, undefined, State}.
-handle_cast({kvs_remove, Key}, State) ->
+handle_cast({kvs_remove, _Key}, State) ->
    {stop, normal, State};
 handle_cast(_Req, State) ->
    {noreply, State}.
 
-handle_info(run, State) ->
-   Now  = timestamp(),
-   Dead = proplists:get_value(timestamp, State#srv.proc) + 
-          proplists:get_value(ttl, State#srv.proc, Now),
-   if 
-      Now < Dead  ->
-         % measure performance and record results
-         case clib_perf:net(proplists:get_value(code, State#srv.proc)) of
-            {ok, [_, Ds]}      ->
-               lists:foreach(
-                  fun({Tag, Value}) ->
-                     ok = kvs:put(bckt_ds, {State#srv.key, Tag}, {Now, Value})
-                  end,
-                  Ds
-               ); 
-            {ok, [_, Ds, Doc]} ->
-               ok = kvs:put(bckt_doc, State#srv.key, Doc),
-               lists:foreach(
-                  fun({Tag, Value}) ->
-                     ok = kvs:put(bckt_ds, {State#srv.key, Tag}, {Now, Value})
-                  end,
-                  Ds
-               )
-         end,
-         think_timer(State#srv.proc),
-         Cycles = proplists:get_value(cycles, State#srv.proc, 0),
-         NProc  = [{cycles, Cycles + 1} | proplists:delete(cycles, State#srv.proc)],
-         {noreply, State#srv{proc = NProc}};
-      true        ->
-         {stop, normal, State}
+handle_info(thinktime, #srv{proc = Proc, code = Fun} = S) ->
+   % run a script and collect telemetry
+   {[_Uri, {Code, Doc}], Tele} = Fun([
+      % uri
+      proplists:get_value(script, Proc),
+      % opts
+      [
+         {header, proplists:get_value(http,  Proc)},
+         {proxy,  proplists:get_value(proxy, Proc)}
+      ]
+   ]),
+   % filter telemetry
+   FTele = lists:foldl(
+      fun
+         ({<<"hf_net:tcp/2">>,   V}, A) -> [{tcp, V} | A];
+         % TODO: pure hack 
+         ({<<"hf_net:ssl/3">>,   V}, A) when V < 50 -> [{ssl, 0} | A];
+         ({<<"hf_net:ssl/3">>,   V}, A) -> [{ssl, V} | A];
+         ({<<"hf_http:recv/2">>, V}, A) -> [{ttfb,V} | A];
+         ({<<"hf_http:recv/3">>, V}, A) -> [{ttmr,V} | A];
+         (_, A) -> A
+      end,
+      [],
+      Tele
+   ),
+   % accumulate telemetry values
+   Sum = lists:foldl(fun({_, V}, A) -> A + V end, 0, FTele),
+   NTele = [{uri, Sum}, {code, Code} | FTele],
+   ?DEBUG([{doc, Doc}, {telemetry, NTele}]),
+   % store a telemetry
+   Owner = proplists:get_value(owner, Proc),
+   Key  = list_to_binary(bin_to_hex(S#srv.key)),
+   lists:foreach(
+      fun({Tag, Value}) ->
+         Sfx = atom_to_binary(Tag, utf8),
+         Uri = {http, ek:node(), <<"/", Key/binary, "/", Sfx/binary>>},
+         ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/ds">>}, Uri, {timestamp(), Value})
+      end,
+      NTele
+   ),
+   ok = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/doc">>}, {ek:node(), S#srv.key}, Doc),
+   % re-schedule a process
+   case proplists:get_value(ttl, Proc) of
+      undefined ->
+         t_thinktime(Proc),
+         {noreply, S};      
+      TTL       ->
+         Now  = timestamp(),
+         Dead = S#srv.timestamp + TTL,
+         if 
+            Now < Dead ->
+               t_thinktime(Proc),
+               {noreply, S};
+            true       ->
+               {stop, normal, S}
+         end
    end;
 handle_info(_Msg, State) ->
    {noreply, State}.
    
-terminate(_Reason, State) ->
-   ?DEBUG([{process, terminated} | State#srv.proc]),
-   % unregister itself from keyspace
-   Name = proplists:get_value(name, State#srv.bucket),
-   kvs:remove({keyspace, Name}, State#srv.key).
+terminate(_Reason, S) ->
+   ?DEBUG([{process, terminated} | S#srv.proc]),
+   Cat = proplists:get_value(uri, S#srv.cat),
+   gen_kvs:val_terminate(Cat, S#srv.key),
+   ok.
    
 code_change(_OldVsn, State, _Extra) ->
    {ok, State}.     
@@ -173,7 +195,39 @@ timestamp() ->
    Mega * 1000000 + Sec.
 
 % starts think timer   
-think_timer(Proc) ->   
+t_thinktime(Proc) ->   
    Thinktime = proplists:get_value(thinktime, Proc, 300),
-   timer:send_after(Thinktime * 1000, run).
-      
+   timer:send_after(Thinktime * 1000, thinktime).
+   
+   
+%%   
+%% binary to hex
+bin_to_hex(Bin) ->
+   bin_to_hex(Bin, "").
+   
+bin_to_hex(<<>>, Acc) ->
+   Acc;
+bin_to_hex(<<X:8, T/binary>>, Acc) ->  
+   bin_to_hex(T, Acc ++ [to_hex(X div 16), to_hex(X rem 16)]).
+   
+to_hex(X) when X < 10 ->
+   $0 + X;
+to_hex(X) ->
+   $a + (X - 10).
+
+%%
+%% hex to binary
+hex_to_bin(Hex) ->
+   hex_to_bin(Hex, <<>>).
+
+hex_to_bin([], Acc) ->
+   Acc;
+hex_to_bin([H, L | T], Acc) ->
+   V = to_int(H) * 16 + to_int(L),
+   hex_to_bin(T, <<Acc/binary, V>>).
+
+to_int(C) when C >= $a, C =< $f ->
+   10 + (C - $a);
+to_int(C) when C >= $0, C =< $9 ->
+   C - $0.   
+   
