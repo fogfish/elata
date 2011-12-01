@@ -1,0 +1,20 @@
+--interlace
+--imgformat PNG
+--slope-mode
+--full-size-mode
+--lower-limit 0
+--vertical-label sec
+--rigid
+--border 0
+--only-graph
+--width 96
+--height 32
+--start <?from?>
+--end now
+DEF:_e=<?data?>/<?host?>/<?uid?>/uri:val:AVERAGE
+CDEF:e=_e,1000000,/
+
+AREA:e#ccff66
+LINE1:e#333300
+
+

@@ -29,41 +29,71 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(be_static_view_sup).
--behaviour(supervisor).
+-module(be_sync).
+-behaviour(gen_server).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% ELATA: Agent interface factory
+%% ELATA: Back-end to Agent synchronization
 %%
 
 -export([
-   % factory
-   create/2,
-   % supervisor
-   start_link/0,
-   init/1
+   % api
+   start_link/1,
+   %% gen_server
+   init/1, 
+   handle_call/3,
+   handle_cast/2, 
+   handle_info/2, 
+   terminate/2, 
+   code_change/3 
 ]).
 
-start_link() ->
-   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+-record(srv, {
+   thinktime   
+}).
 
-create(View, Scale) ->
-   supervisor:start_child(?MODULE, [View, Scale]).
-   
-init([]) ->
-   View = {
-      be_static_view,
-      {
-         be_static_view,
-         start_link,
-         []
-      },
-      permanent, 2000, worker, dynamic
-   },
+%%
+%% start
+start_link(Config) ->
+   gen_server:start_link({local, ?MODULE}, ?MODULE, [Config], []).
+
+init([Config]) ->
+   % ignore crash of underlying transactions this is normal
+   erlang:process_flag(trap_exit, true),
    {ok,
-      {
-         {simple_one_for_one, 4, 1800}, 
-         [View]
-      }
+      #srv{
+         thinktime   = proplists:get_value(sync, Config) * 1000
+      },
+      1000
    }.
+
+handle_call(_Req, _From, S) ->
+   {reply, undefined, S}.
+   
+handle_cast(_Req, S) ->
+   {noreply, S}.
+   
+handle_info(timeout, #srv{thinktime = T} = S) ->
+   lists:foreach(
+      fun({_,Node,_}) ->
+         catch(kvs_sync_ht_tx:start_link(master, {kvs, Node, <<"/elata/proc">>}))
+      end,
+      ek:nodes()
+   ),
+   timer:send_after(T,   timeout),
+   {noreply, S};
+handle_info(_Msg, State) ->
+   {noreply, State}.
+   
+terminate(_Reason, _State) ->
+   ok.
+   
+code_change(_OldVsn, State, _Extra) ->
+   {ok, State}.   
+   
+%%%------------------------------------------------------------------
+%%%
+%%% Private functions
+%%%
+%%%------------------------------------------------------------------

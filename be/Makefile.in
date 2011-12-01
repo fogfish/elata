@@ -176,18 +176,17 @@ top_srcdir = @top_srcdir@
 #   under the License.
 #
 ESRC = \
-   src/elata_be.erl \
-   src/elata_be_app.erl \
-   src/elata_be_sup.erl \
-   src/be_agt_if.erl \
-   src/be_agt_if_sup.erl \
-   src/be_static_view.erl \
-   src/be_static_view_sup.erl
+   src/be.erl \
+   src/be_app.erl \
+   src/be_sup.erl \
+   src/be_sync.erl \
+   src/be_image.erl \
+   src/be_rrd.erl
 
 EBIN = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam))) \
-	ebin/elata_be.app priv/agent.config priv/job.config \
-	priv/view.config
-EINC = include/def.hrl
+	ebin/sys.config ebin/be.app priv/availability.image \
+	priv/http.image priv/icon.image priv/latency.image \
+	priv/tcp.image priv/uri.image
 nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC)
 CLEANFILES = $(EBIN) 
 EXTRA_DIST = $(ESRC)

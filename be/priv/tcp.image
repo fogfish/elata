@@ -1,0 +1,34 @@
+--interlace
+--imgformat PNG
+--slope-mode
+--full-size-mode
+--lower-limit 0
+--vertical-label sec
+--rigid
+--border 0
+--width 720
+--height 240
+--title "<?title?>"
+--start <?from?>
+--end now
+DEF:_a=<?data?>/<?host?>/<?uid?>/tcp:val:AVERAGE
+CDEF:a=_a,1000000,/
+CDEF:d=a,1800,TRENDNAN
+
+
+AREA:a#ccff66:ttfb
+VDEF:amin=a,MINIMUM
+VDEF:aavg=a,AVERAGE
+VDEF:astd=a,STDEV
+VDEF:ap95=a,95,PERCENTNAN
+VDEF:ap98=a,98,PERCENTNAN
+VDEF:amax=a,MAXIMUM
+GPRINT:amin:"min %1.3lf"
+GPRINT:aavg:"avg %1.3lf"
+GPRINT:astd:"std %1.3lf"
+GPRINT:ap95:"95%% %1.3lf"
+GPRINT:ap98:"98%% %1.3lf"
+GPRINT:amax:"max %1.3lf\l"
+
+LINE1:d#333300
+

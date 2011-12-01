@@ -1,0 +1,39 @@
+--interlace
+--imgformat PNG
+--slope-mode
+--full-size-mode
+--lower-limit 0
+--vertical-label sec
+--rigid
+--border 0
+--width 720
+--height 240
+--title <?title?>
+--start <?from?>
+--end now
+DEF:_e=<?data?>/<?host?>/<?uid?>/uri:val:AVERAGE
+CDEF:e=_e,1000000,/
+
+VDEF:s=e,STDEV
+CDEF:u=e,s,+
+CDEF:b=e,s,-
+
+AREA:u#ccff66
+AREA:b#ffffff
+LINE1:u#99CC33
+LINE1:e#333300:latency
+LINE1:b#99CC33
+
+
+VDEF:emin=e,MINIMUM
+VDEF:eavg=e,AVERAGE
+VDEF:estd=e,STDEV
+VDEF:ep95=e,95,PERCENTNAN
+VDEF:ep98=e,98,PERCENTNAN
+VDEF:emax=e,MAXIMUM
+GPRINT:emin:"min %1.3lf"
+GPRINT:eavg:"avg %1.3lf"
+GPRINT:estd:"std %1.3lf"
+GPRINT:ep95:"95%% %1.3lf"
+GPRINT:ep98:"98%% %1.3lf"
+GPRINT:emax:"max %1.3lf\l"

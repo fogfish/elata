@@ -29,7 +29,7 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(elata_be_sup).
+-module(be_sup).
 -author(dmitry.kolesnikov@nokia.com).
 -behaviour(supervisor).
 
@@ -42,37 +42,10 @@ start_link(Config)->
    supervisor:start_link({local, ?MODULE}, ?MODULE, [Config]).
    
 init([Config]) ->
-   AgtIfSup = {
-      be_agt_if_sup,
-      {
-         be_agt_if_sup,
-         start_link,
-         []
-      },
-      permanent, 1000, supervisor, dynamic
-   },
-   ViewSup   = {
-      view_sup,
-      {
-         be_static_view_sup,
-         start_link,
-         []
-      },
-      permanent, 1000, supervisor, dynamic
-   },
-   TsaSup = {
-      tsa_sup,
-      {
-         tsa_sup,
-         start_link,
-         [Config]
-      },
-      permanent, 1000, supervisor, dynamic
-   }, 
    {ok,
       {
          {one_for_one, 4, 3600},
-         [AgtIfSup, ViewSup, TsaSup]
+         sync(Config)
       }
    }.
    
@@ -81,3 +54,14 @@ init([Config]) ->
 %%% Private function
 %%%
 %%%------------------------------------------------------------------   
+sync(Config) ->
+   [{
+      be_sync,
+      {
+         be_sync,
+         start_link,
+         [Config]
+      },
+      permanent, brutal_kill, supervisor, dynamic
+   }].
+

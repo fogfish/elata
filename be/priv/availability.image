@@ -1,0 +1,17 @@
+--interlace
+--imgformat PNG
+--slope-mode
+--full-size-mode
+--lower-limit 0
+--vertical-label sec
+--rigid
+--border 0
+--width 720
+--height 240
+--title "<?title?>"
+--start <?from?>
+--end now
+DEF:a=<?data?>/<?host?>/<?uid?>/code:val:AVERAGE
+
+AREA:a#ccff66:"http status"
+

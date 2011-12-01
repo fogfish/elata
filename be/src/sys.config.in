@@ -13,14 +13,35 @@
 %%   the License for the specific language governing rights and limitations
 %%   under the License.
 %%
+[
+   %% log file
+   {sasl, [
+      {errlog_type, error},
+      {error_logger_mf_dir, "/tmp"},
+      {error_logger_mf_maxfiles, 10},
+      {error_logger_mf_maxbytes, 1073741824}
+   ]},
 
-%%
-%% List of built-in Jobs
+   %% cluster
+   {ek, [
+      % local node name
+      {node,  "node://localhost:8000"},
+      % nodes to be connected
+      {nodes, [
+         "node://localhost:8001"
+      ]}
+      %% {proxy, {host, port}}
+   ]},
 
-{kvset, <<"http://localhost:80/">>,
-   [
-      {ua, <<"Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_7; da-dk) AppleWebKit/533.21.1 (KHTML, like Gecko) Version/5.0.5 Safari/533.21.1">>}
-   ]
-}.
-
-
+   %% key-value interface
+   {kvs, [
+      cluster
+   ]},
+   
+   %% back-end
+   {be, [
+      {codepath, "/usr/local/macports"},
+      {datapath, "/private/tmp/elata"}
+   ]}
+   
+].
