@@ -37,7 +37,7 @@
 %%
 %% RRD key/val is round-robin bucket to collect time series data 
 %% within rrd files, a dedicated file per key is created
-%%    Key   is identity of data stream
+%%    Key   is URI, unique identity of data stream
 %%    Value is time series stream value, in one of following format
 %%       * integer(), float() then timestamp is calculated by erlang:now() 
 %%       * tuple {timestamp, value}
@@ -164,9 +164,11 @@ put(Key, {Timestamp, Value}, #srv{code = Code, stream = S, sock = Sock} = State)
       _         ->
          % socket is exists, all data stream I/O handled by daemon
          % TODO: UPDATE ~s ~b:~f~n for float values is required
+         [$/ | Tds] = DS, % absolute path is not allowed for daemon
          Msg = lists:flatten(
-            io_lib:format('UPDATE ~s ~b:~b~n', [DS, Timestamp, Value])
+            io_lib:format('UPDATE ~s ~b:~b~n', [Tds, Timestamp, Value])
          ),
+         ?DEBUG([{rrd, Msg}]), 
          gen_tcp:send(Sock, Msg)
    end,
    kvs:put(State#srv.cache, DS, {Timestamp, Value});   
@@ -222,25 +224,10 @@ handle(_Msg, State) ->
 
 %%
 %% converts a key into file name
-key_to_stream(Key) when is_list(Key) ->
-   "/" ++ Key;
-key_to_stream(Key) when is_binary(Key) ->
-   "/" ++ binary_to_list(Key);
-key_to_stream(Key) when is_atom(Key) ->
-   "/" ++ atom_to_list(Key);
-key_to_stream(Key) when is_tuple(Key) ->
-   lists:flatten(lists:map(
-      fun(X) -> 
-         key_to_stream(X)
-      end, 
-      erlang:tuple_to_list(Key)
-   )).
-%
-%key_to_stream(Key) ->
-%   Hash = crypto:sha(term_to_binary(Key)),
-%   Hex  = [ integer_to_list(X, 16) || X <- binary_to_list(Hash) ],
-%   File = lists:append(Hex),
-%   "/" ++ lists:sublist(File, 2) ++ "/" ++ File.
+key_to_stream({_,_,_}=Uri) ->
+   "/" ++ ek_uri:lhash(authority, Uri) ++ binary_to_list(ek_uri:path(Uri));
+key_to_stream(Uri) ->
+   key_to_stream(ek_uri:new(Uri)).
   
 %%
 %% retrive a time stamp

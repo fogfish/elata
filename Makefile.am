@@ -14,9 +14,11 @@
 #  under the License.
 #
 
-SUBDIRS = ek kvs agt
+SUBDIRS = ek emc kvs agt be fe
 
-SRC  = agt-$(VERSION).tgz
+SRC  = \
+   agt-$(VERSION).tgz \
+   fe-$(VERSION).tgz
 
 rel: $(SRC)
 

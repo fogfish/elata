@@ -190,8 +190,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = ek kvs agt
-SRC = agt-$(VERSION).tgz
+SUBDIRS = ek emc kvs agt be fe
+SRC = \
+   agt-$(VERSION).tgz \
+   fe-$(VERSION).tgz
+
 all: all-recursive
 
 .SUFFIXES:

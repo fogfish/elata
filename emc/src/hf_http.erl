@@ -40,7 +40,8 @@
 -export([
    get/3,
    recv/2,
-   recv/3
+   recv/3,
+   status/2
 ]).
 
 
@@ -60,7 +61,7 @@ get({Mod, Sock}, {Schema, Auth, Path} = Uri, Opts) ->
    % request headers
    Head = case proplists:get_value(header, Opts) of
       undefined -> <<>>;
-      List      -> list_to_binary([<<H/binary, ": ", V/binary, "\r\n">> || {H, V} <- List])
+      List      -> list_to_binary([<<H/binary, "\r\n">> || H <- List])
    end,
    Req = <<
       "GET ", Rpath/binary, " HTTP/1.1\r\n",
@@ -89,7 +90,17 @@ recv({Mod, Sock}, Uri, Data) ->
       {ok,      Pckt}  ->
          recv({Mod, Sock}, Uri, <<Data/binary, Pckt/binary>>);
       {error, closed}  ->
-         [{Mod, Sock}, Uri, Data]
+         [{Mod, Sock}, Uri, {status(Data, <<>>), Data}]
    end.
       
+   
+%%
+%%
+status(<<"\r\n", T/binary>>, Acc) ->
+   [_, Code, _] = string:tokens(binary_to_list(Acc), " "),
+   list_to_integer(Code);
+
+status(<<H:8, T/binary>>, Acc) ->
+   status(T, <<Acc/binary, H:8>>).
+
    

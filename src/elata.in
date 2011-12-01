@@ -42,7 +42,7 @@ NODE=`ls releases/*.rel | sed -n "s,releases/\(.*\)\.rel,\1,p"`
 case "$1" in
     start)
         if [ "$(ls -A $PIPEDIR)" ]; then
-            echo "Agent is already running"
+            echo "Node is already running"
 	     else
             $RUNERL -daemon $PIPEDIR/ $LOGDIR/ \
                 "$ERL -sname $NODE \
@@ -57,7 +57,7 @@ case "$1" in
             echo 'q().' | $TOERL $PIPEDIR/ 2>/dev/null
             echo "OK"
         else
-            echo "Agent is not running"
+            echo "Node is not running"
         fi
         ;;
 
@@ -65,7 +65,7 @@ case "$1" in
         if [ "$(ls -A $PIPEDIR)" ]; then
 	         exec $TOERL $PIPEDIR/
         else
-            echo "Agent is not running"
+            echo "Node is not running"
         fi
         ;;
 

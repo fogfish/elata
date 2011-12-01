@@ -142,7 +142,9 @@ init([_Config, Uri]) ->
    {next_state, 'IDLE', State#fsm{attempt = State#fsm.attempt + 1}};
    
 'IDLE'({send, Uri, Msg}, S) ->   
-   {next_state, 'IDLE', S#fsm{q = q_in(Uri, Msg, S#fsm.q)}};   
+   % TODO: for idle node message q is disabled (fix via state machine)
+   % {next_state, 'IDLE', S#fsm{q = q_in(Uri, Msg, S#fsm.q)}}; 
+   {next_state, 'IDLE', S}; 
 
 'IDLE'({socket, Sock}, S) ->
    join_node(S#fsm.node),
