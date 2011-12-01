@@ -641,9 +641,9 @@ with_erlang
       ac_precious_vars='build_alias
 host_alias
 target_alias'
-ac_subdirs_all='kvs
-rest
-tsa
+ac_subdirs_all='ek
+emc
+kvs
 agt
 be
 fe'
@@ -2371,11 +2371,11 @@ fi
 
 
 
+subdirs="$subdirs ek"
+
+subdirs="$subdirs emc"
+
 subdirs="$subdirs kvs"
-
-subdirs="$subdirs rest"
-
-subdirs="$subdirs tsa"
 
 subdirs="$subdirs agt"
 
