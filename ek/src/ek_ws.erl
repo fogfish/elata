@@ -207,17 +207,31 @@ handle_info({tcp, _Sock, Data}, 'HANDSHAKE', #fsm{peer = undefined} = State) ->
 handle_info({tcp, _Sock, Data}, 'HANDSHAKE', State) ->   
    % connected socket / active peer
    case Data of
+      %
       <<"HTTP/1.1 101", _/binary>> ->
          ?DEBUG([{socket, connected}, {peer, State#fsm.peer}]),
          % transfer socket control to ek_prot (sideA)
          ok = gen_tcp:controlling_process(State#fsm.sock, State#fsm.sideA),
          gen_fsm:send_event(State#fsm.sideA, {socket, State#fsm.sock}),
          {stop, normal, State};
+      <<"HTTP/1.1 200", _/binary>> ->   
+         % stupid proxy cannot upgrade but TCP/IP peer is on 
+         ?DEBUG([{socket, connected}, {peer, State#fsm.peer}]),
+         Node = ek_uri:to_binary({
+            ek_uri:schema(State#fsm.peer),
+            ek:node(),
+            ek_uri:path(State#fsm.peer)
+         }),
+         gen_tcp:send(State#fsm.sock, ws_con_req(State#fsm.peer, undefined)),
+         % transfer socket control to ek_prot (sideA)
+         ok = gen_tcp:controlling_process(State#fsm.sock, State#fsm.sideA),
+         gen_fsm:send_event(State#fsm.sideA, {socket, State#fsm.sock}),
+         {stop, normal, State};
       _ ->
          ?DEBUG([{socket, error}, {data, Data}]),
-         {next_state, 'HANDSHAKE', State}
+         {next_state, 'HANDSHAKE', State} 
    end;
-
+ 
 %%
 %% Sock closed
 handle_info({tcp_closed, _Sock}, _Name, State) ->
@@ -288,11 +302,13 @@ ws_con_req(Peer, Proxy) ->
    Req = <<
       "CONNECT ", Host/binary, ":", Port/binary, " HTTP/1.1\r\n",
       "Host: ", Host/binary, ":", Port/binary, "\r\n",
+      "Proxy-Connection: keep-alive\r\n",
       "X-Node: ", Node/binary , "\r\n",
       "Connection: Upgrade\r\n",
-      "Upgrade: websocket\r\n\r\n"   
-   >>.
-  
+      "Upgrade: websocket\r\n", 
+      "\r\n"
+   >>. 
+   
 ws_con_rsp() ->
    <<
       "HTTP/1.1 101 Switching Protocols\r\n",
