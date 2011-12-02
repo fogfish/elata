@@ -23,6 +23,9 @@
       {public_key, "0.11"},
       {ssl,    "4.1.4"},
       {inets,  "5.5.2"},
+      {compiler, "4.7.3"},
+      {syntax_tools, "1.6.7"},
+      {xmerl,    "1.2.8"}
       {mochiweb, "1.5.1"},
       {ek,  "0.1.0"},
       {kvs, "0.2.0"},

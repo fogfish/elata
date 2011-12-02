@@ -245,6 +245,7 @@ function ui_usecases_update()
 	{
       var ui = $(id);
       var u  = user.usecase[id];
+      ui.getElement('img').src = '/view/' + locId + '/' + id + '/icon.image/1hours';
       ui.getElements('span')[1].innerHTML = u.script;
 	   if (u.telemetry && u.telemetry[locId])
 	   	if (u.telemetry[locId].latency)
