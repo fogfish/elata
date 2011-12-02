@@ -116,7 +116,7 @@ handle_cast(_Req, State) ->
 
 handle_info(thinktime, #srv{proc = Proc, code = Fun} = S) ->
    % run a script and collect telemetry
-   {[_Uri, {Code, Doc}], Tele} = Fun([
+   {[_Uri, {Code, Rsp, Doc}], Tele} = Fun([
       % uri
       proplists:get_value(script, Proc),
       % opts
@@ -154,6 +154,7 @@ handle_info(thinktime, #srv{proc = Proc, code = Fun} = S) ->
       end,
       NTele
    ),
+   ok = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/rsp">>}, {ek:node(), S#srv.key}, Rsp),
    ok = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/doc">>}, {ek:node(), S#srv.key}, Doc),
    % re-schedule a process
    case proplists:get_value(ttl, Proc) of

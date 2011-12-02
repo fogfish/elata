@@ -80,6 +80,7 @@ start(_Type, _Args) ->
             {storage, kvs_dets},
             {file, proplists:get_value(datapath, Config) ++ "/proc.dets"}
          ]), 
+         kvs:new("kvs:/elata/rsp",  [{storage, kvs_ets}]), 
          kvs:new("kvs:/elata/doc",  [{storage, kvs_ets}]), 
          % telemetry category
          kvs:new("kvs:/elata/ds",   [

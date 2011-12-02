@@ -262,13 +262,21 @@ h('GET', [User, "telemetry", Key], Req) ->
    BKey = list_to_binary(Key),
    List = lists:map(
       fun(Node) ->
+         {ok, Rsp}  = kvs:get("kvs:/elata/rsp", {ek_uri:authority(Node), hex_to_bin(Key)}, <<"">>),
          {ok, Doc}  = kvs:get("kvs:/elata/doc", {ek_uri:authority(Node), hex_to_bin(Key)}, <<"">>), 
          {ok, Tcp}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/tcp">>},  0),
          {ok, Ssl}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ssl">>},  0),
          {ok, Ttfb} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ttfb">>}, 0),
          {ok, Ttmr} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ttmr">>}, 0),
          {ok, Lat}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/uri">>},  0),
-         {ek_uri:authority(Node), elata_to_mochi([{doc, Doc}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {latency, Lat}])}
+         try
+            mochijson2:encode(Doc),
+            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, Doc/binary>>}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {latency, Lat}])}
+         catch
+            _:_ ->
+            SafeDoc = base64:encode(Doc),
+            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, SafeDoc/binary>>}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {latency, Lat}])}
+         end
       end,
       ek:nodes()
    ),

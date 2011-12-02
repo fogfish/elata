@@ -41,7 +41,7 @@
    get/3,
    recv/2,
    recv/3,
-   status/2
+   response/3
 ]).
 
 
@@ -90,17 +90,24 @@ recv({Mod, Sock}, Uri, Data) ->
       {ok,      Pckt}  ->
          recv({Mod, Sock}, Uri, <<Data/binary, Pckt/binary>>);
       {error, closed}  ->
-         [{Mod, Sock}, Uri, {status(Data, <<>>), Data}]
+         [{Mod, Sock}, Uri, Data]
    end.
       
    
 %%
-%%
-status(<<"\r\n", T/binary>>, Acc) ->
-   [_, Code, _] = string:tokens(binary_to_list(Acc), " "),
-   list_to_integer(Code);
+%% parse response as tuple
+response(Sock, Uri, Data) ->
+   [Sock, Uri, rsp(Data, <<>>, undefined)].
 
-status(<<H:8, T/binary>>, Acc) ->
-   status(T, <<Acc/binary, H:8>>).
+rsp(<<"\r\n", T/binary>>, Acc, undefined) ->
+   [_, Status, _] = string:tokens(binary_to_list(Acc), " "),
+   Code = list_to_integer(Status),
+   rsp(T, <<Acc/binary, "\r\n">>, Code);
+   
+rsp(<<"\r\n\r\n", T/binary>>, Acc, Code) ->
+   {Code, <<Acc/binary, "\r\n\r\n">>, T};
+
+rsp(<<H:8, T/binary>>, Acc, Code) ->
+   rsp(T, <<Acc/binary, H:8>>, Code).
 
    

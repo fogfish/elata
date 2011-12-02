@@ -214,6 +214,7 @@ handle_info({tcp, _Sock, Data}, 'HANDSHAKE', State) ->
          gen_fsm:send_event(State#fsm.sideA, {socket, State#fsm.sock}),
          {stop, normal, State};
       _ ->
+         ?DEBUG([{socket, error}, {data, Data}]),
          {next_state, 'HANDSHAKE', State}
    end;
 

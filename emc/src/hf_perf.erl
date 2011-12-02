@@ -51,6 +51,7 @@ ht_get() ->
       fun hf_http:get/3,
       fun hf_http:recv/2,
       fun hf_http:recv/3,
+      fun hf_http:response/3,
       fun hf_net:close/1
    ]).
 
