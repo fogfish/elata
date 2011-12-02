@@ -14,5 +14,16 @@
 #  under the License.
 #
 
-SUBDIRS = kvs rest tsa agt be fe
+SUBDIRS = ek emc kvs agt be fe
+
+SRC  = \
+   agt-$(VERSION).tgz \
+   fe-$(VERSION).tgz
+
+rel: $(SRC)
+
+rel-clean:
+	rm $(SRC)
+
+include $(top_builddir)/Makefile.rel
 

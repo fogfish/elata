@@ -13,19 +13,30 @@
 #   the License for the specific language governing rights and limitations
 #   under the License.
 #
+SUBDIRS = test
 
 ESRC = \
-   src/keyval_store.erl \
+   src/kvs.erl \
    src/kvs_app.erl \
    src/kvs_sup.erl \
-   src/kvs_bucket_sup.erl \
-   src/kvs_bucket.erl \
    src/kvs_evt.erl \
-   src/kvs_reg.erl \
-   src/kvset.erl
+   src/kvs_evt_sup.erl \
+   src/kvs_evt_handler_sup.erl \
+   src/gen_kvs.erl \
+   src/kvs_ets.erl \
+   src/kvs_dets.erl \
+   src/kvs_act.erl \
+   src/kvs_val_sup.erl \
+   src/kvs_cache.erl \
+   src/kvs_rrd.erl \
+   src/kvs_fs.erl \
+   src/kvs_ht.erl \
+   src/kvs_sync_ht_tx.erl \
+   src/kvs_sync_ht_tx_sup.erl
+
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
-EBIN += ebin/elata_kvs.app
+EBIN += ebin/kvs.app
 
 nobase_pkgliberl_SCRIPTS = $(EBIN)
 CLEANFILES = $(EBIN)

@@ -1,0 +1,69 @@
+#
+#   Copyright (c) 2011, Nokia Corporation
+#   All Rights Reserved.
+#
+#   The contents of this file are subject to the 3-clause BSD License,
+#   (the "License"); you may not use this file except in compliance 
+#   with the License. You should have received a copy of the 3-clause
+#   BSD Licensee along with this software. 
+#
+#   Software distributed under the License is distributed on an "AS IS"
+#   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+#   the License for the specific language governing rights and limitations
+#   under the License.
+#
+
+# configure text files
+ifndef DOCONF
+  DOCONF =
+endif
+
+DOCONF += \
+   -e "s,@VSN@,$(VERSION)," \
+   -e "s,@PKG@,$(PACKAGE)," \
+   -e "s,@ERL@,$(ERL)," \
+   -e "s,@pkgliberldir@,$(pkgliberldir)," 
+
+ifndef CCFLAGS
+  CCFLAGS =
+endif
+
+ifeq ($(BUILD),debug)
+   CCFLAGS += +debug_info -DDEBUG
+endif
+
+ebin/%.rel  : src/%.rel.in
+	cat $^ | sed $(DOCONF) > $@
+
+ebin/%.script:
+	@echo 
+
+ebin/%.boot : ebin/%.rel
+	l=`cat $^ | sed -n -e 's|.*{\([a-z]*\),.*|\1|p'` ; \
+	for d in $$l ; do f="$$f -pa ./$$d -pa ./$$d/ebin"; done; \
+	$(ERLC) $(CCFLAGS) $$f -o ebin $<
+
+ebin/%.tar.gz : ebin/%.rel ebin/%.boot
+	l=`cat $< | sed -n -e 's|.*{\([a-z]*\),.*|\1|p'` ; \
+	for d in $$l ; do f="$$f -pa ./$$d -pa ./$$d/ebin"; done; \
+	n=`echo $< | sed -n -e 's|ebin/\(.*\).rel|"ebin/\1"|p'` ; \
+	$(ERL) -noshell $$f -eval "systools:make_tar($$n, [{dirs, [src]}, {erts, code:root_dir()}]),halt(0)" ; \
+
+%-$(VERSION).tgz: ebin/%.tar.gz ebin/elata
+	n=`echo $< | sed -n -e 's|ebin/\(.*\).tar.gz|\1|p'` ; \
+	mkdir -p /tmp/rel/bin ; \
+	tar -C /tmp/rel -xf $< ; \
+	cp ebin/elata /tmp/rel/bin/ ; \
+	cp $$n/ebin/sys.config /tmp/rel/releases/$(VERSION)/sys.config ; \
+	chmod 777 /tmp/rel/bin/elata ; \
+	tar -C /tmp/rel -czpf $@ `ls /tmp/rel`; \
+	rm -R /tmp/rel
+	
+ebin/%.config : src/%.config.in
+	cat $^ | sed $(DOCONF) > $@
+
+ebin/% : src/%.in
+	cat $^ | sed $(DOCONF) > $@ ; \
+	chmod ugo+x $@
+
+	

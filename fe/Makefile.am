@@ -14,78 +14,26 @@
 #   under the License.
 #
 ESRC = \
-   src/elata_fe.erl \
-   src/elata_fe_app.erl \
-   src/elata_fe_sup.erl \
-   src/fe_webapp_api.erl
+   src/fe.erl \
+   src/fe_app.erl \
+   src/fe_sup.erl \
+   src/fe_web.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
 EBIN += \
-   priv/sys.config   \
-   priv/elata_fe \
-   ebin/elata_fe.app \
-   ebin/elata_fe.rel \
-   ebin/elata_fe.script \
-   ebin/elata_fe.boot \
-   ebin/elata_fe.tar.gz \
-   priv/webapp/index.html \
-   priv/webapp/elata-$(VERSION).css \
-   priv/webapp/elata-$(VERSION).js
+   ebin/sys.config \
+   ebin/fe.app
 
-EINC  = include/def.hrl
-
-CSS   = \
-   priv/webapp/css/copyright.css \
-   priv/webapp/css/doc.css \
-   priv/webapp/css/list.css \
-   priv/webapp/css/navi.css \
-   priv/webapp/css/grid.css \
-   priv/webapp/css/editor.css \
-   priv/webapp/css/button.css
-
-JS    = \
-   priv/webapp/js/copyright.js \
-   priv/webapp/js/app.js \
-   priv/webapp/js/kvset.js \
-   priv/webapp/js/navigator.js \
-   priv/webapp/js/grid.js \
-   priv/webapp/js/locale.js \
-   priv/webapp/js/mainview.js \
-   priv/webapp/js/caseview.js \
-   priv/webapp/js/newcaseview.js \
-   priv/webapp/js/signin.js 
-
-EXT = \
-   priv/webapp/js/base64.js
+EDAT = \
+   priv/www/index.html \
+   priv/www/js/elata.js \
+   priv/www/js/navigator.js \
+   priv/www/style/bg.png \
+   priv/www/style/ui.css
    
-nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC) $(EXT) $(distdir).tgz
-CLEANFILES = $(EBIN) $(distdir).tgz
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(EDAT) 
+CLEANFILES = $(EBIN) 
 EXTRA_DIST = $(ESRC)
-
-if HAVE_YUICOMPRESSOR
-
-priv/webapp/elata-$(VERSION).css: $(CSS)
-	cat $^ > /tmp/elata.css
-	cat $< > $@
-	java -jar $(with_yuicompressor) --type css --line-break 80 /tmp/elata.css >> $@
-
-priv/webapp/elata-$(VERSION).js: $(JS)
-	cat $^ > /tmp/elata.js
-	cat $< > $@
-	java -jar $(with_yuicompressor) --type js --line-break 80 /tmp/elata.js >> $@
-
-else
-
-priv/webapp/elata-$(VERSION).css: $(CSS)
-	cat $^ > $@
-
-priv/webapp/elata-$(VERSION).js: $(JS)
-	cat $^ > $@  
-	
-endif
 
 include $(top_builddir)/Makefile.erlang
 
-priv/webapp/index.html: priv/webapp/index.html.in
-	sed $(DOCONF) $^ > $@
-	

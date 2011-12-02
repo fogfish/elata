@@ -14,25 +14,29 @@
 #   under the License.
 #
 ESRC = \
-   src/elata_be.erl \
-   src/elata_be_app.erl \
-   src/elata_be_sup.erl \
-   src/be_agt_if.erl \ 
-   src/be_agt_if_sup.erl \
-   src/be_static_view.erl \
-   src/be_static_view_sup.erl
+   src/be.erl \
+   src/be_app.erl \
+   src/be_sup.erl \
+   src/be_sync.erl \
+   src/be_image.erl \
+   src/be_rrd.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))
-EBIN += ebin/elata_be.app
-EBIN += priv/agent.config
-EBIN += priv/job.config
-EBIN += priv/view.config
+EBIN += \
+   ebin/sys.config \
+   ebin/be.app
 
-EINC  = include/def.hrl
+EDAT = \
+   priv/availability.image \
+   priv/http.image \
+   priv/icon.image \
+   priv/latency.image \
+   priv/tcp.image \
+   priv/uri.image
 
-nobase_pkgliberl_SCRIPTS = $(EBIN) $(EINC)
+nobase_pkgliberl_SCRIPTS = $(EBIN) $(EDAT)
 CLEANFILES = $(EBIN) 
-EXTRA_DIST = $(ESRC)
+EXTRA_DIST = $(ESRC) $(EDAT)
 
 include $(top_builddir)/Makefile.erlang
 

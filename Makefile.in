@@ -190,7 +190,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = kvs rest tsa agt be fe
+SUBDIRS = ek emc kvs agt be fe
+SRC = \
+   agt-$(VERSION).tgz \
+   fe-$(VERSION).tgz
+
 all: all-recursive
 
 .SUFFIXES:
@@ -655,6 +659,13 @@ uninstall-am:
 	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
 	pdf-am ps ps-am tags tags-recursive uninstall uninstall-am
 
+
+rel: $(SRC)
+
+rel-clean:
+	rm $(SRC)
+
+include $(top_builddir)/Makefile.rel
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -24,9 +24,18 @@ DOCONF += \
    -e "s,@ERL@,$(ERL)," \
    -e "s,@pkgliberldir@,$(pkgliberldir)," 
 
+ifndef CCFLAGS
+  CCFLAGS =
+endif
+
+ifeq ($(BUILD),debug)
+   CCFLAGS += +debug_info -DDEBUG
+endif
+
 #
 # compile
 ebin/%.beam : src/%.erl
+	test  -d ebin || mkdir ebin
 	$(ERLC) $(CCFLAGS) -I ./include -b beam -o ebin $<
 
 ebin/%.app  : src/%.app.in
@@ -59,10 +68,7 @@ ebin/%.tar.gz : ebin/%.rel $(ESRC) $(EBIN)
 	tar -C /tmp/rel -czpf $@ `ls /tmp/rel`; \
 	rm -R /tmp/rel
 	
-priv/%.config : priv/%.config.in
-	cat $^ | sed $(DOCONF) > $@
-
-priv/%.cfg  : priv/%.cfg.in
+ebin/%.config : src/%.config.in
 	cat $^ | sed $(DOCONF) > $@
 
 priv/% : priv/%.in
@@ -78,5 +84,8 @@ priv/% : priv/%.in
 	cat $^ | sed $(DOCONF) >> $@ ; \
 	chmod ugo+x $@
 
+debug:
+	$(MAKE) BUILD=debug
+
 run:
-	$(ERL) -pa ./ebin -pa ./*/ebin -pa ./priv -pa ./*/priv
+	$(ERL) -pa ./ebin -pa ../*/ebin -pa ./priv -pa ../*/priv

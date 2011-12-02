@@ -13,32 +13,16 @@ dnl   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
 dnl   the License for the specific language governing rights and limitations
 dnl   under the License.
 dnl
-AC_INIT([elata_fe], [0.3.3], [dmitry.kolesnikov@nokia.com])
+AC_INIT([fe], [0.4.0], [dmitry.kolesnikov@nokia.com])
 AM_INIT_AUTOMAKE
 
 AC_ARG_WITH(erlang,       [--with-erlang=PREFIX path to erlang runtime])
-AC_ARG_WITH(yuicompressor,[--with-yuicompressor=PATH path to yuicompressor-x.y.z.jar, available on-line at http://yuilibrary.com/downloads])
 
 dnl check erlang runtime
 erlang_path=$with_erlang:$with_erlang/bin:$PATH
 AC_PATH_PROG([ERLC], [erlc], [], [$erlang_path])
 AC_PATH_PROG([ERL],  [erl],  [], [$erlang_path])
 AC_PATH_PROG([PERL], [perl])
-
-
-if test "x$with_yuicompressor" == "x" ; then
-   AC_WARN([
--------------------------------------------------------------------------
- 
-   compression of JavaScript and Style-sheet is disabled
- 
--------------------------------------------------------------------------
-   ])
-   AM_CONDITIONAL(HAVE_YUICOMPRESSOR, [false])
-else
-   AM_CONDITIONAL(HAVE_YUICOMPRESSOR, [true])
-fi
-AC_SUBST([with_yuicompressor])
 
 
 dnl check erlang directories

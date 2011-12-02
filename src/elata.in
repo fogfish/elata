@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+#   Copyright (c) 2011, Nokia Corporation
+#   All Rights Reserved.
+#
+#   The contents of this file are subject to the 3-clause BSD License,
+#   (the "License"); you may not use this file except in compliance 
+#   with the License. You should have received a copy of the 3-clause
+#   BSD Licensee along with this software. 
+#
+#   Software distributed under the License is distributed on an "AS IS"
+#   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+#   the License for the specific language governing rights and limitations
+#   under the License.
+#
+
+#
+# Start-up script for Erlang Latency Agent
+# $1 - action start/stop etc.
+
+# 1. We have to re-base an path to Erlang run-time.
+# path within erl script reflects build machine
+ROOT=`pwd`
+ERTS=`ls $ROOT | grep erts`
+ERL=$ROOT/$ERTS/bin/erl
+sed s:%FINAL_ROOTDIR%:$ROOT: $ROOT/$ERTS/bin/erl.src > $ROOT/$ERTS/bin/erl
+
+LOGDIR=$ROOT/logs
+test -d $LOGDIR || mkdir -p $LOGDIR
+
+PIPEDIR=$ROOT/run
+test -d $PIPEDIR || mkdir -p $PIPEDIR
+
+SCRIPT=`basename $0`
+
+TOERL=$ROOT/$ERTS/bin/to_erl
+RUNERL=$ROOT/$ERTS/bin/run_erl
+
+#detect node name (same as release name)
+NODE=`ls releases/*.rel | sed -n "s,releases/\(.*\)\.rel,\1,p"`
+
+case "$1" in
+    start)
+        if [ "$(ls -A $PIPEDIR)" ]; then
+            echo "Node is already running"
+	     else
+            $RUNERL -daemon $PIPEDIR/ $LOGDIR/ \
+                "$ERL -sname $NODE \
+                -boot $ROOT/releases/@VSN@/start \
+                -config $ROOT/releases/@VSN@/sys"
+            echo "OK"
+        fi
+        ;;
+
+    stop)
+        if [ "$(ls -A $PIPEDIR)" ]; then
+            echo 'q().' | $TOERL $PIPEDIR/ 2>/dev/null
+            echo "OK"
+        else
+            echo "Node is not running"
+        fi
+        ;;
+
+    attach)
+        if [ "$(ls -A $PIPEDIR)" ]; then
+	         exec $TOERL $PIPEDIR/
+        else
+            echo "Node is not running"
+        fi
+        ;;
+
+    *)
+        echo "Usage: $SCRIPT {start|stop|attach}"
+        exit 1
+        ;;
+esac
+
+exit 0  

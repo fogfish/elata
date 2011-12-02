@@ -33,38 +33,31 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% ELATA: KVS I/O events
+%% kvs I/O events
 %%
 
 %% Public API
 -export([
    start_link/0,
-   subscribe/2,
-   unsubscribe/2,
-   create/2,
-   insert/2,
-   lookup/2,
-   delete/2
+   subscribe/1,
+   unsubscribe/1,
+   notify/4
 ]).
 
 start_link() ->
    gen_event:start_link({local, ?MODULE}).
-   
-subscribe(Mod, Args) ->
-   gen_event:add_handler(?MODULE, Mod, Args).
-   
-unsubscribe(Mod, Args) ->
-   gen_event:delete_handler(?MODULE, Mod, Args).
-   
-create(Bucket, Value) ->
-   gen_event:notify(?MODULE, {create, Bucket, Value}).
-   
-insert(Bucket, Value) ->
-   gen_event:notify(?MODULE, {insert, Bucket, Value}).
-   
-lookup(Bucket, Key) ->
-   gen_event:notify(?MODULE, {lookup, Bucket, Key}).
 
-delete(Bucket, Key) ->
-   gen_event:notify(?MODULE, {delete, Bucket, Key}).
+subscribe({Handler, Args}) ->
+   ok = gen_event:add_sup_handler(?MODULE, Handler, Args);
+subscribe(Handler) ->
+   io:format('subscribe: ~p~n', [Handler]),
+   ok = gen_event:add_sup_handler(?MODULE, Handler, []).
    
+unsubscribe({Handler, Args}) ->
+   gen_event:delete_handler(?MODULE, Handler, Args);
+unsubscribe(Handler) ->
+   gen_event:delete_handler(?MODULE, Handler, []).   
+   
+notify(Act, Cat, Key, Val) ->
+   gen_event:notify(?MODULE, {Act, Cat, Key, Val}).
+      

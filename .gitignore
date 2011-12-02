@@ -12,10 +12,5 @@ ebin/
 !ebin/README
 Makefile
 autom4te.cache/
-index.html
-elata-*.js
-elata-*.css
-elata_agt
-elata_fe
 *.config
 *.rrd

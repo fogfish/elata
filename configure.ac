@@ -13,7 +13,7 @@ dnl   basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
 dnl   the License for the specific language governing rights and limitations
 dnl   under the License.
 dnl
-AC_INIT([elata], [0.3.3], [dmitry.kolesnikov@nokia.com])
+AC_INIT([elata], [0.4.0], [dmitry.kolesnikov@nokia.com])
 AM_INIT_AUTOMAKE
 
 AC_PATH_PROG([PDFTEX], [pdflatex])
@@ -26,9 +26,9 @@ AC_PATH_PROG([ERL],  [erl],  [], [$erlang_path])
 AC_PATH_PROG([PERL], [perl])
 
 
+AC_CONFIG_SUBDIRS(ek)
+AC_CONFIG_SUBDIRS(emc)
 AC_CONFIG_SUBDIRS(kvs)
-AC_CONFIG_SUBDIRS(rest)
-AC_CONFIG_SUBDIRS(tsa)
 AC_CONFIG_SUBDIRS(agt)
 AC_CONFIG_SUBDIRS(be)
 AC_CONFIG_SUBDIRS(fe)
