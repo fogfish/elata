@@ -71,7 +71,8 @@
    seq/1,
    alt/1,
    '?'/1,
-   '*'/1
+   '*'/1,
+   '='/1
 ]).
 
 %%
@@ -138,7 +139,12 @@ alt(Seq) ->
 '*'(Seq) ->
    fun(X) when is_record(X, emc) -> '_*'(Seq, X) end.
 
-
+%%
+%% Pseudo operand to unpack monad state into stack
+%%
+'='(M) -> 
+   fun(X) when is_record(X, emc) -> '_='(M, X) end.
+   
 %%
 %% do(Seq) -> Fun({M, State}) -> Fun(X) -> Result
 %%
@@ -197,7 +203,14 @@ alt(Seq) ->
       {error, _} -> {ok, S};
       {ok, Snew} -> '_*'(F, Snew)
    end.
-   
+
+'_='(M, #emc{s = {m, X, MX}} = S) ->
+   Mx = proplists:get_value(M, MX),
+   {ok,
+      S#emc{
+         s = {m, [Mx | X], MX}
+      }
+   }.
    
 %%
 %% evaluates a computation

@@ -53,11 +53,11 @@
 %%
 unit(X) ->
    {m, Xm, MX} = M:unit(X),
-   {m, Xm, {[], MX}}.
+   {m, Xm, [{?MODULE, []} | MX]}.
 
 %%
 %%
-bind({m, X, {S, MX}}, HOF) ->
+bind({m, X, MX}, HOF) ->
    ?DEBUG([{monad, {?MODULE, M}},{hof, HOF}, {x, X}]),
    case timer:tc(M, bind, [{m, X, MX}, HOF]) of
       {Time, {ok, {m, Y, MY}}} ->
@@ -66,7 +66,9 @@ bind({m, X, {S, MX}}, HOF) ->
          Name      = proplists:get_value(name,   Info),
          Arity     = proplists:get_value(arity,  Info),
          Id        = list_to_binary(atom_to_list(Mod) ++ ":" ++ atom_to_list(Name) ++ "/" ++ integer_to_list(Arity)),
-         {ok, {m, Y, {[{Id, Time} | S], MY}}};
+         MYself    = [ {Id, Time} | proplists:get_value(?MODULE, MY)],
+         MYglob    = [ MYself | proplists:delete(?MODULE, MY)],
+         {ok, {m, Y, MYglob}};
       {_Time, Error}  -> Error
    end.
 

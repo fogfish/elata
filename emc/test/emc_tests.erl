@@ -41,7 +41,7 @@ emc_seq_test() ->
    ]),
    C = emc:c(emc_id, P),
    ?assert( 
-      {[20, 10, 5], undefined} =:= C(5)
+      {[20, 10, 5], [emc_id]} =:= C(5)
    ).
    
 emc_seq_error_test() ->
@@ -68,10 +68,10 @@ emc_alt_test() ->
    ]),
    C = emc:c(emc_id, P),
    ?assert( 
-      {[1], undefined} =:= C(6)
+      {[1], [emc_id]} =:= C(6)
    ),
    ?assert( 
-      {[6], undefined} =:= C(1)
+      {[6], [emc_id]} =:= C(1)
    ),
    ?assert(
       {error, no_alt}  =:= C(5)
@@ -85,7 +85,7 @@ emc_alt_test() ->
    ]),
    C = emc:c(emc_id, P),
    ?assert( 
-      {[20, 10, 5], undefined} =:= C(5)
+      {[20, 10, 5], [emc_id]} =:= C(5)
    ).   
    
 'emc_*_test'() ->
@@ -97,7 +97,7 @@ emc_alt_test() ->
    ),
    C = emc:c(emc_id, P),
    ?assert(
-      {[10, 10], undefined} =:= C([0, 0])
+      {[10, 10], [emc_id]} =:= C([0, 0])
    ).
    
 emc_sub_pipe_test() ->
@@ -111,9 +111,18 @@ emc_sub_pipe_test() ->
    ]),
    C = emc:c(emc_id, P),
    ?assert( 
-      {[20, 10, 5], undefined} =:= C(5)
+      {[20, 10, 5], [emc_id]} =:= C(5)
    ).
 
-
+'emc_=_test'() ->   
+   P = emc:seq([
+      fun(X) -> [X + 5, X] end,
+      fun(X) -> [X * 2, X] end,
+      emc:'='(emc_id)
+   ]),
+   C = emc:c(emc_id, P),
+   ?assert( 
+      {[true, 20, 10, 5], [emc_id]} =:= C(5)
+   ).
 
 

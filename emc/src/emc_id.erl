@@ -45,9 +45,9 @@
 %%
 %%
 unit(X) when is_list(X) -> 
-   {m,  X, undefined};
+   {m,  X,  [?MODULE]};
 unit(X) -> 
-   {m, [X],undefined}.
+   {m, [X], [?MODULE]}.
 
 %%
 %%
