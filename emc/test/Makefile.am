@@ -1,6 +1,5 @@
 TESTS  = emc_tests
-TESTS += emc_net_tests
-#TESTS += job_script_tests
+#TESTS += emc_net_tests
 
 .SECONDARY:
 

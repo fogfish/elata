@@ -29,7 +29,7 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(hf_http).
+-module(hof_http).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
@@ -72,35 +72,35 @@ get({Mod, Sock}, {Schema, Auth, Path} = Uri, Opts) ->
       "\r\n"
    >>,
    Mod:send(Sock, Req),
-   [{Mod, Sock}, Uri].
+   {ok, [{Mod, Sock}, Uri]}.
    
 
 %%
 %% Receive 1st byte
 recv({Mod, Sock}, Uri) ->
    case Mod:recv(Sock, 0) of
-      {ok, Pckt}  -> [{Mod, Sock}, Uri, Pckt];
-      {error, _}  -> [{Mod, Sock}, Uri]
+      {ok, Pckt}  -> {ok, [{Mod, Sock}, Uri, Pckt]};
+      {error, _}  -> {ok, [{Mod, Sock}, Uri]}
    end.   
 
 %%
-%%
+%% Receive reminder
 recv({Mod, Sock}, Uri, Data) -> 
    case Mod:recv(Sock, 0) of
       {ok,      Pckt}  ->
          recv({Mod, Sock}, Uri, <<Data/binary, Pckt/binary>>);
       {error, closed}  ->
-         [{Mod, Sock}, Uri, Data]
+         {ok, [{Mod, Sock}, Uri, Data]}
    end.
       
    
 %%
 %% parse response as tuple
 response(Sock, Uri, Data) ->
-   [Sock, Uri, rsp(Data, <<>>, undefined)].
+   {ok, [Sock, Uri, rsp(Data, <<>>, undefined)]}.
 
 rsp(<<"\r\n", T/binary>>, Acc, undefined) ->
-   [_, Status, _] = string:tokens(binary_to_list(Acc), " "),
+   {[_, Status, _], _} = lists:split(3, string:tokens(binary_to_list(Acc), " ")),
    Code = list_to_integer(Status),
    rsp(T, <<Acc/binary, "\r\n">>, Code);
    

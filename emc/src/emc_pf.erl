@@ -29,51 +29,44 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(hf_net).
+-module(emc_pf, [M]).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% High order-function: network computation
+%% Performance Monad
 %%
-
 -export([
-   tcp/2,
-   ssl/3,
-   close/1
+   unit/1,
+   bind/2
 ]).
-
+  
 %%
-%% Establish TCP/IP connection, and measure its latency
-tcp({_,_,_} = Uri, Opts) ->
-   {Host, Port} = case proplists:get_value(proxy, Opts) of
-      undefined ->
-         {ek_uri:host(Uri), ek_uri:port(Uri)};
-      Proxy     ->
-         {ek_uri:host(Proxy), ek_uri:port(Proxy)}
-   end,
-   {ok, Tcp} = gen_tcp:connect(
-      binary_to_list(Host), 
-      Port,
-      [binary, {packet, 0}, {active, false}]
-   ),
-   [{gen_tcp, Tcp}, Uri, Opts].
-
-   
-%%
-%% Establish SSL connection and measures its latency
-ssl({gen_tcp, Sock}, {ssl,_,_} = Uri, Opts) ->
-   {ok, Ssl} = ssl:connect(Sock, []),
-   [{ssl, Ssl}, Uri, Opts];
-ssl({gen_tcp, Sock}, {https,_,_} = Uri, Opts) ->   
-   {ok, Ssl} = ssl:connect(Sock, []),
-   [{ssl, Ssl}, Uri, Opts];
-ssl(Sock, Uri, Opts) ->
-   [Sock, Uri, Opts].
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
 
 %%
 %%
-close({Mod, Sock}) ->
-   Mod:close(Sock),
-   [].
+unit(X) ->
+   {m, Xm, MX} = M:unit(X),
+   {m, Xm, {[], MX}}.
+
+%%
+%%
+bind({m, X, {S, MX}}, HOF) ->
+   ?DEBUG([{monad, {?MODULE, M}},{hof, HOF}, {x, X}]),
+   case timer:tc(M, bind, [{m, X, MX}, HOF]) of
+      {Time, {ok, {m, Y, MY}}} ->
+         Info      = erlang:fun_info(HOF),
+         Mod       = proplists:get_value(module, Info),
+         Name      = proplists:get_value(name,   Info),
+         Arity     = proplists:get_value(arity,  Info),
+         Id        = list_to_binary(atom_to_list(Mod) ++ ":" ++ atom_to_list(Name) ++ "/" ++ integer_to_list(Arity)),
+         {ok, {m, Y, {[{Id, Time} | S], MY}}};
+      {_Time, Error}  -> Error
+   end.
 

@@ -29,19 +29,18 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(em_pipe).
+-module(emc_debug, [M]).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
-
 %%
-%% Pipe monad
+%% Debug Monad
 %%
 -export([
    unit/1,
-   bind/2         
+   bind/2
 ]).
-
+  
 %%
 %% debug macro
 -ifdef(DEBUG).
@@ -52,38 +51,13 @@
 
 %%
 %%
-unit(X) when is_list(X) ->
-   fun() ->  X  end;
 unit(X) ->
-   fun() -> [X] end.
+   M:unit(X).
 
-   
 %%
 %%
-bind(X, HF) ->
-   Info      = erlang:fun_info(HF),
-   Arity     = proplists:get_value(arity,  Info),
-   %error_logger:info_report([{hof, HF}, {a, Arity}, {x, X}, {len, length(X)}]),
-   %try 
-      if
-         length(X) > Arity -> 
-            {NX, T} = lists:split(Arity, X),
-            Y = u(erlang:apply(HF, NX)) ++ T,
-            ?DEBUG([{hof, HF}, {in, X}, {out, Y}, {split, T}]),
-            Y;
-         true              -> 
-            Y = u(erlang:apply(HF, X)),
-            ?DEBUG([{hof, HF}, {in, X}, {out, Y}]),
-            Y
-      end.
-   %catch
-   %   Err -> 
-   %      ?DEBUG([{hof, HF}, {in, X}, {err, Err}]),
-   %      X
-   %end.
+bind(X, HOF) ->
+   Y = M:bind(X, HOF),
+   error_logger:info_report([{hof, HOF}, {x, X}, {y, Y}]),
+   Y.
 
-   
-u(X) when is_list(X) ->   
-   X;
-u(X) ->
-   [X].

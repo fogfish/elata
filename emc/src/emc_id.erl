@@ -29,37 +29,32 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(em_debug, [M]).
+-module(emc_id).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
+
 %%
-%% Debug Monad
+%% Identity monad
 %%
 -export([
    unit/1,
    bind/2
 ]).
-  
-%%
-%% debug macro
--ifdef(DEBUG).
--define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
--else.
--define(DEBUG(M), true).
--endif.
 
 %%
 %%
-unit(X) ->
-   fun() -> 
-      erlang:apply(M:unit(X), [])
+unit(X) when is_list(X) -> 
+   {m,  X, undefined};
+unit(X) -> 
+   {m, [X],undefined}.
+
+%%
+%%
+bind({m, X, _}, HOF) ->
+   case erlang:apply(HOF, X) of
+      {ok,    Y} -> {ok, unit(Y)};
+      {error, E} -> {error,    E};
+      Y          -> {ok, unit(Y)}
    end.
-
-%%
-%%
-bind(X, HF) ->
-   Y = M:bind(X, HF),
-   error_logger:info_report([{hof, HF}, {x, X}, {y, Y}]),
-   Y.
-
+   

@@ -34,26 +34,86 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-emc_identity_test() ->
-   C = emc:do(emc_identity,
-   [
-      fun(X) -> X + 5 end,
-      fun(X) -> X * 2 end
+emc_seq_test() ->
+   P = emc:seq([
+      fun(X) -> [X + 5, X] end,
+      fun(X) -> [X * 2, X] end
    ]),
-   ?assert( C(5) =:= 20 ).
+   C = emc:c(emc_id, P),
+   ?assert( 
+      {[20, 10, 5], undefined} =:= C(5)
+   ).
+   
+emc_seq_error_test() ->
+   P = emc:seq([
+      fun(X) -> [X + 5, X] end,
+      fun(X) -> {error, not_supported} end,
+      fun(X) -> [X * 2, X] end
+   ]),
+   C = emc:c(emc_id, P),
+   ?assert( 
+      {error, not_supported} =:= C(5)
+   ).
+   
+emc_alt_test() ->
+   P = emc:alt([
+      fun
+         (X) when X > 5 -> X - 5; 
+         (_) -> {error, not_supported}
+      end,
+      fun
+         (X) when X < 5 -> X + 5;
+         (_) -> {error, not_supported}
+      end
+   ]),
+   C = emc:c(emc_id, P),
+   ?assert( 
+      {[1], undefined} =:= C(6)
+   ),
+   ?assert( 
+      {[6], undefined} =:= C(1)
+   ),
+   ?assert(
+      {error, no_alt}  =:= C(5)
+   ).
+   
+'emc_?_test'() ->
+   P = emc:seq([
+      fun(X) -> [X + 5, X] end,
+      emc:'?'(fun(X) -> {error, not_supported} end),
+      fun(X) -> [X * 2, X] end
+   ]),
+   C = emc:c(emc_id, P),
+   ?assert( 
+      {[20, 10, 5], undefined} =:= C(5)
+   ).   
+   
+'emc_*_test'() ->
+   P = emc:'*'(
+      fun
+         (10,X) -> {error, normal};
+         (I, X) -> [I + 1, X + 1]
+      end
+   ),
+   C = emc:c(emc_id, P),
+   ?assert(
+      {[10, 10], undefined} =:= C([0, 0])
+   ).
+   
+emc_sub_pipe_test() ->
+   P = emc:seq([
+      fun(X) -> [X + 5, X] end,
+      emc:seq([
+         fun(X) -> X + 1 end,
+         fun(X) -> X - 1 end
+      ]),
+      fun(X) -> [X * 2, X] end
+   ]),
+   C = emc:c(emc_id, P),
+   ?assert( 
+      {[20, 10, 5], undefined} =:= C(5)
+   ).
 
-   
-emc_performance_test() ->
-   C = emc:do([emc_performance, emc_identity],
-   [
-      fun(X) -> timer:sleep(100), X + 5 end,
-      fun(X) -> timer:sleep(50),  X * 2 end
-   ]),
-   {Val, [Op1, Op2]} = C(5),
-   ?assert( Val =:= 20 ),
-   ?assert(Op1 > 100000),
-   ?assert(Op2 >  50000).
-   
 
 
 

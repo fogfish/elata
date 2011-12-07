@@ -29,42 +29,30 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(em_pf, [M]).
+-module(hof_perf).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Performance Monad
+%% High order-function: latency measurment
 %%
+
 -export([
-   unit/1,
-   bind/2
+   http_get/0
 ]).
-  
-%%
-%% debug macro
--ifdef(DEBUG).
--define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
--else.
--define(DEBUG(M), true).
--endif.
 
 %%
-%%
-unit(X) ->
-   fun() -> 
-      {erlang:apply(M:unit(X), []), []}
-   end.
-
-%%
-%%
-bind({X, S}, HF) ->
-   ?DEBUG([{monad, {?MODULE, M}},{hof, HF}, {x, X}]),
-   {Time, Y} = timer:tc(M, bind, [X, HF]),
-   Info      = erlang:fun_info(HF),
-   Mod       = proplists:get_value(module, Info),
-   Name      = proplists:get_value(name,   Info),
-   Arity     = proplists:get_value(arity,  Info),
-   Id        = list_to_binary(atom_to_list(Mod) ++ ":" ++ atom_to_list(Name) ++ "/" ++ integer_to_list(Arity)),
-   {Y, [{Id, Time} | S]}.
+%% Measures latency for http service
+http_get() ->
+   emc:seq([
+      fun ek_uri:new/1,
+      fun hof_inet:dns/1,
+      fun hof_inet:tcp/3,
+      fun hof_inet:ssl/3,
+      fun hof_http:get/3,
+      fun hof_http:recv/2,
+      fun hof_http:recv/3,
+      fun hof_http:response/3,
+      fun hof_inet:close/1
+   ]).
 

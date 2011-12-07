@@ -29,29 +29,61 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(hf_perf).
+-module(hof_inet).
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% High order-function: latency measurment
+%% High order-function: Internet
 %%
 
 -export([
-   ht_get/0
+   dns/1,
+   tcp/2,
+   tcp/3,
+   ssl/3,
+   %TODO: statistic/1,
+   close/1
 ]).
 
 %%
-%% Measures latency for http service
-ht_get() ->
-   emc:do([
-      fun ek_uri:new/1,
-      fun hf_net:tcp/2,
-      fun hf_net:ssl/3,
-      fun hf_http:get/3,
-      fun hf_http:recv/2,
-      fun hf_http:recv/3,
-      fun hf_http:response/3,
-      fun hf_net:close/1
-   ]).
+%% resolve IP address of URI authority
+dns({Schema,_,Path} = Uri) ->
+   {ok, IP} = inet:getaddr(binary_to_list(ek_uri:host(Uri)), inet),
+   {ok, [IP, Uri]}.
+
+%%
+%% Establish TCP/IP connection, and measure its latency
+tcp({_,_,_} = Uri, Opts) ->
+   {ok, IP} = inet:getaddr(binary_to_list(ek_uri:host(Uri)), inet),
+   tcp(IP, Uri, Opts).
+tcp(IP, {_,_,_} = Uri, Opts) ->
+   {Host, Port} = case proplists:get_value(proxy, Opts) of
+      undefined ->
+         {IP, ek_uri:port(Uri)};
+      Proxy     ->
+         {binary_to_list(ek_uri:host(Proxy)), ek_uri:port(Proxy)}
+   end,
+   {ok, Tcp} = gen_tcp:connect(
+      Host, Port,
+      [binary, {packet, 0}, {active, false}]
+   ),
+   {ok, [{gen_tcp, Tcp}, Uri, Opts]}.
+   
+%%
+%% Establish SSL connection and measures its latency
+ssl({gen_tcp, Sock}, {ssl,_,_} = Uri, Opts) ->
+   {ok, Ssl} = ssl:connect(Sock, []),
+   {ok, [{ssl, Ssl}, Uri, Opts]};
+ssl({gen_tcp, Sock}, {https,_,_} = Uri, Opts) ->   
+   {ok, Ssl} = ssl:connect(Sock, []),
+   {ok, [{ssl, Ssl}, Uri, Opts]};
+ssl(Sock, Uri, Opts) ->
+   {ok, [Sock, Uri, Opts]}.
+   
+%%
+%%
+close({Mod, Sock}) ->
+   Mod:close(Sock),
+   {ok, []}.
 
