@@ -39,6 +39,7 @@
 
 -export([
    dns/1,
+   %TODO: dns_full
    tcp/2,
    tcp/3,
    ssl/3,
@@ -57,6 +58,8 @@ dns({Schema,_,Path} = Uri) ->
 tcp({_,_,_} = Uri, Opts) ->
    {ok, IP} = inet:getaddr(binary_to_list(ek_uri:host(Uri)), inet),
    tcp(IP, Uri, Opts).
+tcp(IP, {_,_,_} = Uri, undefined) ->   
+   tcp(IP, Uri, []);
 tcp(IP, {_,_,_} = Uri, Opts) ->
    {Host, Port} = case proplists:get_value(proxy, Opts) of
       undefined ->

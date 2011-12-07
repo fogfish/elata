@@ -38,21 +38,74 @@
 %%
 
 -export([
-   http_get/0
+   net/0
 ]).
 
 %%
-%% Measures latency for http service
-http_get() ->
+%% Measures latency for various network services
+net() ->
    emc:seq([
       fun ek_uri:new/1,
-      fun hof_inet:dns/1,
-      fun hof_inet:tcp/3,
-      fun hof_inet:ssl/3,
-      fun hof_http:get/3,
-      fun hof_http:recv/2,
-      fun hof_http:recv/3,
-      fun hof_http:response/3,
-      fun hof_inet:close/1
+      emc:alt([
+         %% dns pipeline
+         emc:seq([
+            fun
+               ({dns,_,_}=Uri) -> {ok, [Uri]};
+               (_)             -> {error, uri_scheme}
+            end,
+            fun hof_inet:dns/1
+         ]),
+         %% tcp pipeline
+         emc:seq([
+            fun
+               ({tcp,_,_}=Uri) -> {ok, [Uri]};
+               (_)             -> {error, uri_scheme}
+            end,
+            fun hof_inet:dns/1,
+            fun hof_inet:tcp/3,
+            fun hof_inet:close/1
+         ]),
+         %% ssl pipeline
+         emc:seq([
+            fun
+               ({ssl,_,_}=Uri) -> {ok, [Uri]};
+               (_)             -> {error, uri_scheme}
+            end,
+            fun hof_inet:dns/1,
+            fun hof_inet:tcp/3,
+            fun hof_inet:ssl/3,
+            fun hof_inet:close/1
+         ]),
+         %% http pipeline
+         emc:seq([
+            fun
+               ({http,_,_}=Uri) -> {ok, [Uri]};
+               (_)              -> {error, uri_scheme}
+            end,
+            fun hof_inet:dns/1,
+            fun hof_inet:tcp/3,
+            fun hof_http:get/3,
+            fun hof_http:recv/2,
+            fun hof_http:recv/3,
+            fun hof_http:response/3,
+            fun hof_inet:close/1
+         ]),
+         %% https pipeline
+         emc:seq([
+            fun
+               ({https,_,_}=Uri) -> {ok, [Uri]};
+               (_)               -> {error, uri_scheme}
+            end,
+            fun hof_inet:dns/1,
+            fun hof_inet:tcp/3,
+            fun hof_inet:ssl/3,
+            fun hof_http:get/3,
+            fun hof_http:recv/2,
+            fun hof_http:recv/3,
+            fun hof_http:response/3,
+            fun hof_inet:close/1
+         ])
+      ])
    ]).
 
+   
