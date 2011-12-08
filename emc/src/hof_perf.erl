@@ -38,7 +38,8 @@
 %%
 
 -export([
-   net/0
+   net/0,
+   filter/2
 ]).
 
 %%
@@ -53,7 +54,11 @@ net() ->
                ({dns,_,_}=Uri) -> {ok, [Uri]};
                (_)             -> {error, uri_scheme}
             end,
-            fun hof_inet:dns/1
+            fun hof_inet:dns/1,
+            fun (IP, Uri) ->
+               % TODO: fix pipeline dimensions
+               {ok, [Uri, []]}
+            end
          ]),
          %% tcp pipeline
          emc:seq([
@@ -63,6 +68,7 @@ net() ->
             end,
             fun hof_inet:dns/1,
             fun hof_inet:tcp/3,
+            fun hof_inet:statistic/1,
             fun hof_inet:close/1
          ]),
          %% ssl pipeline
@@ -74,6 +80,7 @@ net() ->
             fun hof_inet:dns/1,
             fun hof_inet:tcp/3,
             fun hof_inet:ssl/3,
+            fun hof_inet:statistic/1,
             fun hof_inet:close/1
          ]),
          %% http pipeline
@@ -88,6 +95,7 @@ net() ->
             fun hof_http:recv/2,
             fun hof_http:recv/3,
             fun hof_http:response/3,
+            fun hof_inet:statistic/1,
             fun hof_inet:close/1
          ]),
          %% https pipeline
@@ -103,9 +111,37 @@ net() ->
             fun hof_http:recv/2,
             fun hof_http:recv/3,
             fun hof_http:response/3,
+            fun hof_inet:statistic/1,
             fun hof_inet:close/1
          ])
-      ])
+      ]),
+      emc:'='(emc_pf),
+      fun(X) -> 
+         hof_perf:filter(X, [
+            {<<"hof_inet:dns/1">>, dns},
+            {<<"hof_inet:tcp/3">>, tcp},
+            {<<"hof_inet:ssl/3">>, ssl},
+            {<<"hof_http:recv/2">>, ttfb},
+            {<<"hof_http:recv/3">>, ttmr}
+         ]) 
+      end
    ]).
 
+   
+   
+%%
+%% Filters performance results 
+filter(Pf, Sample) ->
+   {ok, 
+      [lists:foldl(
+         fun({Smpl, Tag}, Acc) ->
+            case proplists:get_value(Smpl, Pf) of
+               undefined -> Acc;
+               Val       -> [{Tag, Val} | Acc]
+            end
+         end,
+         [],
+         Sample
+      )]
+   }.
    

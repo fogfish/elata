@@ -99,7 +99,7 @@ c(M, P) ->
       end
    end.
 
-c(runable, M, P) ->
+c(runnable, M, P) ->
    fun(X) ->
       case P(#emc{m = M, s = M:unit(X)}) of
          {ok, {emc, _, {m, Y, _MY}}} -> Y;
@@ -211,7 +211,7 @@ alt(Seq) ->
          s = {m, [Mx | X], MX}
       }
    }.
-   
+    
 %%
 %% evaluates a computation
 eval(F, #emc{m = M, s = {m, X, MX}} = S) ->

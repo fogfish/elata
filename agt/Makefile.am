@@ -18,6 +18,7 @@ ESRC = \
    src/agt.erl \
    src/agt_app.erl \
    src/agt_sup.erl \
+   src/agt_hof.erl \
    src/agt_proc.erl
 
 EBIN  = $(addprefix ebin/, $(notdir $(ESRC:.erl=.beam)))

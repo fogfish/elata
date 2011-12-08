@@ -43,7 +43,7 @@
    tcp/2,
    tcp/3,
    ssl/3,
-   %TODO: statistic/1,
+   statistic/1,
    close/1
 ]).
 
@@ -83,7 +83,16 @@ ssl({gen_tcp, Sock}, {https,_,_} = Uri, Opts) ->
    {ok, [{ssl, Ssl}, Uri, Opts]};
 ssl(Sock, Uri, Opts) ->
    {ok, [Sock, Uri, Opts]}.
-   
+  
+%%
+%% Reports statistic on socket usage
+statistic({gen_tcp, Sock}) ->
+   {ok, Stat} = inet:getstat(Sock, [recv_avg, recv_cnt, recv_oct]),
+   {ok, [{gen_tcp, Sock}, Stat]};
+statistic({ssl, Sock}) ->
+   % TODO: statistic for ssl sockets
+   {ok, [{ssl, Sock}, []]}.
+
 %%
 %%
 close({Mod, Sock}) ->

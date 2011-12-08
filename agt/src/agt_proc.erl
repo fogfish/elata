@@ -62,7 +62,7 @@
    proc,        %% job description                  
    
    timestamp,   %% unix timestamp when job is started (in seconds)  
-   code         %% script executor 
+   pipeline     %% script executor 
 }).
 
 %%
@@ -86,6 +86,9 @@ init([Spec, Key, Proc]) ->
    Cat = proplists:get_value(uri, Spec),
    gen_kvs:val_init(Cat, Key),
    t_thinktime(Proc),
+   % pipelien params
+   Owner = proplists:get_value(owner, Proc),
+   BKey  = list_to_binary(bin_to_hex(Key)),
    % return a state
    {ok,
       #srv{
@@ -93,7 +96,7 @@ init([Spec, Key, Proc]) ->
          key = Key,
          proc= Proc,
          timestamp = timestamp(),
-         code= erlang:apply(hf_perf:ht_get(), [em_pf:new(em_pipe)])
+         pipeline  = emc:c(runnable, emc_pf:new(emc_id, 120), agt_hof:pipeline(Owner, BKey))
        }
     }.
          
@@ -114,9 +117,9 @@ handle_cast({kvs_remove, _Key}, State) ->
 handle_cast(_Req, State) ->
    {noreply, State}.
 
-handle_info(thinktime, #srv{proc = Proc, code = Fun} = S) ->
+handle_info(thinktime, #srv{proc = Proc, pipeline = Fun} = S) ->
    % run a script and collect telemetry
-   {[_Uri, {Code, Rsp, Doc}], Tele} = Fun([
+   Fun([
       % uri
       proplists:get_value(script, Proc),
       % opts
@@ -125,37 +128,6 @@ handle_info(thinktime, #srv{proc = Proc, code = Fun} = S) ->
          {proxy,  proplists:get_value(proxy, Proc)}
       ]
    ]),
-   % filter telemetry
-   FTele = lists:foldl(
-      fun
-         ({<<"hf_net:tcp/2">>,   V}, A) -> [{tcp, V} | A];
-         % TODO: pure hack 
-         ({<<"hf_net:ssl/3">>,   V}, A) when V < 50 -> [{ssl, 0} | A];
-         ({<<"hf_net:ssl/3">>,   V}, A) -> [{ssl, V} | A];
-         ({<<"hf_http:recv/2">>, V}, A) -> [{ttfb,V} | A];
-         ({<<"hf_http:recv/3">>, V}, A) -> [{ttmr,V} | A];
-         (_, A) -> A
-      end,
-      [],
-      Tele
-   ),
-   % accumulate telemetry values
-   Sum = lists:foldl(fun({_, V}, A) -> A + V end, 0, FTele),
-   NTele = [{uri, Sum}, {code, Code} | FTele],
-   ?DEBUG([{doc, Doc}, {telemetry, NTele}]),
-   % store a telemetry
-   Owner = proplists:get_value(owner, Proc),
-   Key  = list_to_binary(bin_to_hex(S#srv.key)),
-   lists:foreach(
-      fun({Tag, Value}) ->
-         Sfx = atom_to_binary(Tag, utf8),
-         Uri = {http, ek:node(), <<"/", Key/binary, "/", Sfx/binary>>},
-         ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/ds">>}, Uri, {timestamp(), Value})
-      end,
-      NTele
-   ),
-   ok = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/rsp">>}, {ek:node(), S#srv.key}, Rsp),
-   ok = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/doc">>}, {ek:node(), S#srv.key}, Doc),
    % re-schedule a process
    case proplists:get_value(ttl, Proc) of
       undefined ->

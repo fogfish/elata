@@ -261,21 +261,25 @@ h('DELETE', [User, "proc", Key], Req) ->
 h('GET', [User, "telemetry", Key], Req) ->   
    BKey = list_to_binary(Key),
    List = lists:map(
-      fun(Node) ->
-         {ok, Rsp}  = kvs:get("kvs:/elata/rsp", {ek_uri:authority(Node), hex_to_bin(Key)}, <<"">>),
-         {ok, Doc}  = kvs:get("kvs:/elata/doc", {ek_uri:authority(Node), hex_to_bin(Key)}, <<"">>), 
+      fun(Node) ->                                                                                        
+         {ok, Rsp}  = kvs:get("kvs:/elata/rsp", {http, ek_uri:authority(Node), <<"/", BKey/binary>>}, <<"">>),
+         {ok, Doc}  = kvs:get("kvs:/elata/doc", {http, ek_uri:authority(Node), <<"/", BKey/binary>>}, <<"">>), 
+         {ok, Dns}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/dns">>},  0),
          {ok, Tcp}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/tcp">>},  0),
          {ok, Ssl}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ssl">>},  0),
          {ok, Ttfb} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ttfb">>}, 0),
          {ok, Ttmr} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ttmr">>}, 0),
+         {ok, RecvAvg} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/recv_avg">>}, 0),
+         {ok, RecvCnt} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/recv_cnt">>}, 0),
+         {ok, RecvOct} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/recv_oct">>}, 0),
          {ok, Lat}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/uri">>},  0),
          try
             mochijson2:encode(Doc),
-            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, Doc/binary>>}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {latency, Lat}])}
+            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, Doc/binary>>}, {dns, Dns}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {recv_avg, RecvAvg}, {recv_cnt, RecvCnt}, {recv_oct, RecvOct}, {latency, Lat}])}
          catch
             _:_ ->
             SafeDoc = base64:encode(Doc),
-            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, SafeDoc/binary>>}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {latency, Lat}])}
+            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, SafeDoc/binary>>}, {dns, Dns}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {recv_avg, RecvAvg}, {recv_cnt, RecvCnt}, {recv_oct, RecvOct}, {latency, Lat}])}
          end
       end,
       ek:nodes()

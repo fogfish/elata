@@ -29,38 +29,56 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(emc_id).
--author(sergey.boldyrev@nokia.com).
+-module(agt_hof).
 -author(dmitry.kolesnikov@nokia.com).
 
-
 %%
-%% Identity monad
+%% High-order functions: Elata agent
 %%
 -export([
-   unit/1,
-   bind/2
+   pipeline/2
 ]).
 
 %%
-%%
-unit(X) -> 
-   {m, pack(X), [?MODULE]}.
+%% agent measurment pipeline
+pipeline(Owner, Key) ->
+   emc:seq([
+      hof_perf:net(),                 % latency measurment pipeline
+      fun telemetry/2,                % telemetry aggregation
+      fun(Tele, Uri, Doc) ->          % telemetry persistency
+         store(Owner, Key, Tele, Uri, Doc) 
+      end  
+   ]).
+
 
 %%
+%% accumulates telemetry
+telemetry(PfStat, SockStat) ->
+   Uri  = lists:foldl(fun({_, V}, A) -> A + V end, 0, PfStat),
+   Stat = [{uri, Uri} | PfStat ++ SockStat], 
+   {ok, [Stat]}.
+   
 %%
-bind({m, X, MX}, HOF) ->
-   case erlang:apply(HOF, X) of
-      {ok,    Y} -> {ok, {m, pack(Y), MX}};
-      {error, E} -> {error,    E};
-      Y          -> {ok, {m, pack(Y), MX}}
-   end.
-   
+%%
+store(Owner, Key, Tele, Uri, {Code, HTTP, Doc}) ->
+   lists:foreach(
+      fun({Tag, Value}) ->
+         Sfx = atom_to_binary(Tag, utf8),
+         Tid = {http, ek:node(), <<"/", Key/binary, "/", Sfx/binary>>},
+         ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/ds">>}, Tid, {timestamp(), Value})
+      end,
+      Tele
+   ),
+   Tid = {http, ek:node(), <<"/", Key/binary, "/code">>},
+   ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/ds">>}, Tid, {timestamp(), Code}),
+   ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/rsp">>}, {http, ek:node(), <<"/", Key/binary>>}, HTTP),
+   ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/doc">>}, {http, ek:node(), <<"/", Key/binary>>}, Doc),
+   {ok, []}.
 
-pack(X) when is_list(X) ->
-    X;
-pack(X) ->
-   [X].
-   
-   
+
+
+% return unix timestamp
+timestamp() ->
+   {Mega, Sec, _Micro} = erlang:now(),
+   Mega * 1000000 + Sec.   
    

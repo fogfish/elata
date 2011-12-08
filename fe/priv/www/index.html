@@ -87,13 +87,15 @@
 
 
 <div id="dashboard" class="view" focused="false">
+   
    <div class="toolbar header">
      <ul class="list menu">
         <li><span>Latency In-Focus</span></li>
         <li id="nav-agent"></li>
         <li class="button right"><a id="action-add">Add</a></li>
      </ul>
-   </div>
+   <div class="signout"><a href="#" id="action-out">sign out</a></div>  
+   </div>                          
    
    <div class="main">
       <div class="viewport">
@@ -218,6 +220,10 @@
                <h3>latency</h3>
                <span>0</span>
             </li>
+            <li id="li-dns">
+               <h3>dns</h3>
+               <span>0</span>
+            </li>
             <li id="li-tcp">
                <h3>tcp</h3>
                <span>0</span>
@@ -232,6 +238,18 @@
             </li>
             <li id="li-ttmr">
                <h3>ttmr</h3>
+               <span>0</span>
+            </li>
+            <li id="li-size">
+               <h3>size</h3>
+               <span>0</span>
+            </li>
+            <li id="li-pckt">
+               <h3>IP packets</h3>
+               <span>0</span>
+            </li>
+            <li id="li-pckt-size">
+               <h3>IP pckt size</h3>
                <span>0</span>
             </li>
             <li id="li-doc">

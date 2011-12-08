@@ -29,7 +29,10 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(emc_pf, [M]).
+-module(emc_pf, [M, T]).
+%% M - Inner monad
+%% T - Lower threshold
+
 -author(sergey.boldyrev@nokia.com).
 -author(dmitry.kolesnikov@nokia.com).
 
@@ -66,8 +69,11 @@ bind({m, X, MX}, HOF) ->
          Name      = proplists:get_value(name,   Info),
          Arity     = proplists:get_value(arity,  Info),
          Id        = list_to_binary(atom_to_list(Mod) ++ ":" ++ atom_to_list(Name) ++ "/" ++ integer_to_list(Arity)),
-         MYself    = [ {Id, Time} | proplists:get_value(?MODULE, MY)],
-         MYglob    = [ MYself | proplists:delete(?MODULE, MY)],
+         MYself = if
+            Time >= T -> [ {Id, Time} | proplists:get_value(?MODULE, MY)];
+            true      -> [ {Id, 0} | proplists:get_value(?MODULE, MY)]
+         end,   
+         MYglob    = [ {?MODULE, MYself} | proplists:delete(?MODULE, MY)],
          {ok, {m, Y, MYglob}};
       {_Time, Error}  -> Error
    end.
