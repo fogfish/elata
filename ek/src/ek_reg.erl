@@ -33,7 +33,7 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% Resource registry binds URI with resource id (e.g. Pid, Port, etc)
+%% Resource registry binds URI with resource (e.g. Pid, Port, etc.)
 %% Implements Erlang BIF register/2, unregister/1, whereis/1 
 %%
 
@@ -81,10 +81,10 @@ start_link() ->
 %% Failure: badarg if Pid is not an existing, if Uri is already in use,
 %% or if Uri is not complient http://tools.ietf.org/html/rfc3986.
 %%
-register({_Scheme, _Node, _Path} = Uri, Pid) ->
+register({_, _} = Uri, Pid) ->
    assert_pid(Pid),
    case ek_reg:whereis(Uri) of
-      undefined -> ets:insert(?MODULE, {Uri, Pid}), ok;
+      undefined -> ets:insert(?MODULE, {ek_uri:hash(Uri), Uri, Pid}), ok;
       _         -> throw(badarg)
    end;
 register(Uri, Pid) ->
@@ -97,10 +97,10 @@ register(Uri, Pid) ->
 %% Removes the registered name Uri, associated with a pid.
 %% Failure: badarg if Uri is not a registered name, Uri is assotiated 
 %% with invalid pid or if Uri is not complient http://tools.ietf.org/html/rfc3986.
-unregister({_Scheme, _Node, _Path} = Uri) ->
+unregister({_, _} = Uri) ->
    case ek_reg:whereis(Uri) of
       undefined -> throw(badarg);
-      _         -> ets:delete(?MODULE, Uri), ok
+      _         -> ets:delete(?MODULE, ek_uri:hash(Uri)), ok
    end;
 unregister(Uri) ->   
    ek_reg:unregister(ek_uri:new(Uri)).
@@ -111,9 +111,9 @@ unregister(Uri) ->
 %%
 %% Returns the pid or port identifier with the registered name Uri. 
 %% Returns undefined if the name is not registered. 
-whereis({_Scheme, _Node, _Path} = Uri) ->
-   case ets:lookup(?MODULE, Uri) of
-      [{Uri, Pid}] ->
+whereis({_, _} = Uri) ->
+   case ets:lookup(?MODULE, ek_uri:hash(Uri)) of
+      [{Hash, Uri, Pid}] ->
          case is_alive(Pid) of
             true  -> Pid;
             false -> undefined
@@ -131,18 +131,18 @@ whereis(Uri) ->
 %% query identities
 q(Scheme, Authority, Path) ->
    lists:foldl(
-      fun({{S,A,P}, Pid}, Acc) ->
+      fun({Hash, Uri, Pid}, Acc) ->
          case is_alive(Pid) of
             true  -> 
-               SB = Scheme(S),
-               AB = Authority(A),
-               PB = Path(P),
+               SB = Scheme(ek_uri:get(schema, Uri)),
+               AB = Authority(ek_uri:get(authority, Uri)),
+               PB = Path(ek_uri:get(path, Uri)),
                if 
-                  SB, AB, PB -> [{S,A,P} | Acc];
+                  SB, AB, PB -> [Uri | Acc];
                   true       -> Acc
                end;
             false -> 
-               ets:delete(?MODULE, {S,A,P}), Acc
+               ets:delete(?MODULE, Hash), Acc
          end
       end,
       [],
@@ -156,7 +156,7 @@ q(Scheme, Authority, Path) ->
 registered() ->
    ek_reg:q(
       fun(_) -> true end,
-      fun(undefined) -> true; (_) -> false end,
+      fun([]) -> true; (_) -> false end,
       fun(_) -> true end
    ).
    
@@ -167,7 +167,7 @@ registered() ->
 registered(Schema) ->
    ek_reg:q(
       fun(X) -> if X =:= Schema -> true; true -> false end end,
-      fun(undefined) -> true; (_) -> false end,
+      fun([]) -> true; (_) -> false end,
       fun(_) -> true end
    ). 
    
@@ -178,7 +178,7 @@ registered(Schema) ->
 remote() ->
    ek_reg:q(
       fun(_) -> true end,
-      fun(undefined) -> false; (_) -> true end,
+      fun([]) -> false; (_) -> true end,
       fun(_) -> true end
    ).
    
@@ -189,7 +189,7 @@ remote() ->
 remote(Schema) ->
    ek_reg:q(
       fun(X) -> if X =:= Schema -> true; true -> false end end,
-      fun(undefined) -> false; (_) -> true end,
+      fun([]) -> false; (_) -> true end,
       fun(_) -> true end
    ).    
    

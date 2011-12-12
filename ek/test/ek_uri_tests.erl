@@ -34,102 +34,320 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-uri_list_test() ->
+uri_1_test() ->
+   Uri = ek_uri:new("http://user@localhost:8080/p/a/t/h?query#frag"),
    ?assert(
-      {http, <<"localhost:8080">>, <<"/path">>} =:= ek_uri:new("http://localhost:8080/path")
-   ).
-
-uri_bin_test() ->
+      http =:= ek_uri:get(schema, Uri)
+   ),
    ?assert(
-      {http, <<"localhost:8080">>, <<"/path">>} =:= ek_uri:new(<<"http://localhost:8080/path">>)
-   ).
-
-uri_auth_only_test() ->   
+      "user@localhost:8080" =:= ek_uri:get(authority, Uri)
+   ),
    ?assert(
-      {http, <<"localhost:8080">>, <<"/">>} =:= ek_uri:new(<<"http://localhost:8080">>)
-   ).
-
-uri_path_only_test() ->
+      "user" =:= ek_uri:get(userinfo, Uri)
+   ),
    ?assert(
-      {http, undefined, <<"/path">>} =:= ek_uri:new(<<"http:/path">>)
-   ).
-   
-urn_test() ->
+      "localhost" =:= ek_uri:get(host, Uri)
+   ),
    ?assert(
-      {urn, undefined, <<"path">>} =:= ek_uri:new(<<"urn:path">>)
-   ).
-   
-uri_host_1_test() ->
+      8080 =:= ek_uri:get(port, Uri)
+   ),
    ?assert(
-      <<"localhost">> =:= ek_uri:host("http://localhost:8080/path")
+      "/p/a/t/h" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "query" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "frag" =:= ek_uri:get(fragment, Uri)
    ).
    
-uri_host_2_test() ->
+uri_2_test() ->
+   Uri = ek_uri:new("http://user@localhost:8080/p/a/t/h?query"),
    ?assert(
-      <<"localhost">> =:= ek_uri:host("http://localhost/path")
-   ).
-   
-uri_host_3_test() ->
+      http =:= ek_uri:get(schema, Uri)
+   ),
    ?assert(
-      <<"localhost">> =:= ek_uri:host("http://user@localhost:8080/path")
+      "user@localhost:8080" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "user" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "localhost" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      8080 =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "/p/a/t/h" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "query" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
    ).   
    
+uri_3_test() ->
+   Uri = ek_uri:new("http://user@localhost:8080/p/a/t/h"),
+   ?assert(
+      http =:= ek_uri:get(schema, Uri)
+   ),
+   ?assert(
+      "user@localhost:8080" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "user" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "localhost" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      8080 =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "/p/a/t/h" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
+   ).      
+
+uri_4_test() ->
+   Uri = ek_uri:new("http://user@localhost:8080"),
+   ?assert(
+      http =:= ek_uri:get(schema, Uri)
+   ),
+   ?assert(
+      "user@localhost:8080" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "user" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "localhost" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      8080 =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "/" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
+   ).      
+   
+uri_5_test() ->
+   Uri = ek_uri:new("http://user@localhost"),
+   ?assert(
+      http =:= ek_uri:get(schema, Uri)
+   ),
+   ?assert(
+      "user@localhost:80" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "user" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "localhost" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      80 =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "/" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
+   ).    
+  
+uri_6_test() ->
+   Uri = ek_uri:new("http://localhost:8080"),
+   ?assert(
+      http =:= ek_uri:get(schema, Uri)
+   ),
+   ?assert(
+      "localhost:8080" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "localhost" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      8080 =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "/" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
+   ).    
+   
+uri_7_test() ->
+   Uri = ek_uri:new("http:/p/a/t/h"),
+   ?assert(
+      http =:= ek_uri:get(schema, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      80 =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "/p/a/t/h" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
+   ).    
+   
+urn_test() ->
+   Uri = ek_uri:new("urn:p/a/t/h"),
+   ?assert(
+      urn =:= ek_uri:get(schema, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(authority, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(userinfo, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(host, Uri)
+   ),
+   ?assert(
+      undefined =:= ek_uri:get(port, Uri)
+   ),
+   ?assert(
+      "p/a/t/h" =:= ek_uri:get(path, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(q, Uri)
+   ),
+   ?assert(
+      "" =:= ek_uri:get(fragment, Uri)
+   ).    
+   
+
+uri_host_1_test() ->
+   ?assert(
+      "localhost" =:= ek_uri:get(host, "http://localhost:8080/path")
+   ).
+    
+uri_host_2_test() ->
+   ?assert(
+      "localhost" =:= ek_uri:get(host, "http://localhost/path")
+   ).
+    
+uri_host_3_test() ->
+   ?assert(
+      "localhost" =:= ek_uri:get(host, "http://user@localhost:8080/path")
+   ).   
+    
 uri_host_4_test() ->
    ?assert(
-      undefined =:= ek_uri:host("urn:path")
+      "" =:= ek_uri:get(host, "urn:path")
    ).
    
 uri_port_1_test() ->
    ?assert(
-      8080 =:= ek_uri:port("http://localhost:8080/path")
+      8080 =:= ek_uri:get(port, "http://localhost:8080/path")
    ).
-   
+    
 uri_port_2_test() ->
    ?assert(
-      8080 =:= ek_uri:port("http://user@localhost:8080/path")
+      8080 =:= ek_uri:get(port, "http://user@localhost:8080/path")
    ).   
-   
+    
 uri_port_3_test() ->
    ?assert(
-      undefined =:= ek_uri:port("urn:path")
+      undefined =:= ek_uri:get(port, "urn:path")
    ).   
-  
+   
 uri_path_1_test() ->
    ?assert(
-      <<"/path">> =:= ek_uri:path("http://localhost:8080/path")
+      "/path" =:= ek_uri:get(path, "http://localhost:8080/path")
    ).   
-   
+    
 uri_path_2_test() ->
    ?assert(
-      <<"/">> =:= ek_uri:path("http://localhost:8080/")
+      "/" =:= ek_uri:get(path, "http://localhost:8080/")
    ).   
-   
+    
 uri_path_3_test() ->
    ?assert(
-      <<"/">> =:= ek_uri:path("http://localhost:8080")
+      "/" =:= ek_uri:get(path, "http://localhost:8080")
    ).   
-   
+    
 uri_path_4_test() ->
    ?assert(
-      <<"path">> =:= ek_uri:path("urn:path")
+      "path" =:= ek_uri:get(path, "urn:path")
    ).   
-   
+    
 uri_query_1_test() ->
    ?assert(
-      <<"a=b">> =:= ek_uri:q("http://localhost:8080/path?a=b")
+      "a=b" =:= ek_uri:get(q, "http://localhost:8080/path?a=b")
    ).
-   
+    
 uri_query_2_test() ->
    ?assert(
-      <<"a=b">> =:= ek_uri:q("http://localhost:8080/path?a=b#test")
+      "a=b" =:= ek_uri:get(q, "http://localhost:8080/path?a=b#test")
    ).   
-   
+    
 uri_frag_1_test() ->
    ?assert(
-      <<"test">> =:= ek_uri:fragment("http://localhost:8080/path#test")
+      "test" =:= ek_uri:get(fragment, "http://localhost:8080/path#test")
    ).
-
+ 
 uri_frag_2_test() ->
    ?assert(
-      <<"test">> =:= ek_uri:fragment("http://localhost:8080/path?a=b#test")
+      "test" =:= ek_uri:get(fragment, "http://localhost:8080/path?a=b#test")
    ).    
+   
+uri_path_test() ->
+   Uri = ek_uri:new("http://user@localhost:8080/p/a/t/h"),
+   ?assert(
+      "/p/a/t/h" =:= ek_uri:path(0, Uri)
+   ),
+   ?assert(
+      "/a/t/h" =:= ek_uri:path(1, Uri)
+   ),  
+   ?assert(
+      "/t/h" =:= ek_uri:path(2, Uri)
+   ),
+   ?assert(
+      "/h" =:= ek_uri:path(3, Uri)
+   ),
+   ?assert(
+      "/p/a/t" =:= ek_uri:path(-1, Uri)
+   ),
+   ?assert(
+      "/p/a" =:= ek_uri:path(-2, Uri)
+   ),
+   ?assert(
+      "/p" =:= ek_uri:path(-3, Uri)
+   ).
+   
+   

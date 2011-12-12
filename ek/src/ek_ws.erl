@@ -43,6 +43,7 @@
    start_link/2,
    % gen_fsm
    init/1,
+   'IDLE'/2, 
    'LISTEN'/2,
    'HANDSHAKE'/2,
    'CONNECTED'/2,
@@ -62,6 +63,7 @@
 }).
 
 -define(SOCK_OPTS, [{active, true}, {mode, binary}]).
+-define(T_TCP_LISTEN,    30000).  %% timer to repeat failed socket listen
 -define(T_TCP_SOCK_CON,  20000).  %% timer for tcp socket connection
 -define(T_WEB_SOCK_CON,  20000).  %% timer for web socket connection
 
@@ -84,22 +86,14 @@ start_link(Config, {connect, Uri, SideA}) ->
 
    
 init([Config, {listen, Uri}]) ->
-   ?DEBUG([{socket, listen}, {node, Uri}]),
-   {ok, Sock} = gen_tcp:listen(
-      ek_uri:port(Uri), 
-      ?SOCK_OPTS
-   ),
-   % register process as ek-local listener
-   NUri = {ek, ek_uri:authority(Uri), <<"/">>},
-   ek:register(NUri, self()),
    {ok, 
-      'LISTEN', 
+      'IDLE', 
        #fsm{
           peer    = Uri,
           proxy   = proplists:get_value(proxy, Config), 
-          sock    = Sock
+          sock    = undefined
        }, 
-       0   %% timeout jumps to accept loop
+       0   %% timeout jumps to idle loop (trying to listen)
     };   
     
 init([Config, {handshake, Sock}]) ->
@@ -125,15 +119,15 @@ init([Config, {connect, Uri, SideA}]) ->
    {ok, Sock} = case proplists:get_value(proxy, Config) of
       undefined    ->
          gen_tcp:connect(
-            binary_to_list( ek_uri:host(Uri) ),
-            ek_uri:port(Uri),
+            ek_uri:get(host, Uri),
+            ek_uri:get(port, Uri),
             ?SOCK_OPTS,
             ?T_TCP_SOCK_CON
          );
-      {Host, Port} ->
+      Proxy ->
          gen_tcp:connect(
-            Host,
-            Port,
+            ek_uri:get(host, Proxy),
+            ek_uri:get(port, Proxy),
             ?SOCK_OPTS,
             ?T_TCP_SOCK_CON
          )
@@ -148,8 +142,24 @@ init([Config, {connect, Uri, SideA}]) ->
       },
       0   %% timeout jump to connect loop
    }.
-   
-   
+
+%%
+%% creates listen socket
+%%
+'IDLE'(timeout, S) ->   
+   ?DEBUG([{socket, listen}, {node, S#fsm.peer}]),
+   case gen_tcp:listen(ek_uri:get(port, S#fsm.peer), ?SOCK_OPTS) of
+      {ok, Sock} ->
+         % TODO: fix listener identity based on ek scheme
+         ek:register(ek_uri:set(schema, ek, S#fsm.peer), self()),
+         {next_state, 'LISTEN', S#fsm{sock = Sock}, 0};
+      {error, _} ->
+         {next_state, 'IDLE', S, ?T_TCP_LISTEN}
+   end.
+
+%%
+%% listening on port
+%%
 'LISTEN'(timeout, State) ->
    % accept loop
    {ok, Sock} = gen_tcp:accept(State#fsm.sock),
@@ -158,6 +168,8 @@ init([Config, {connect, Uri, SideA}]) ->
    {ok, Pid} = ek_ws_sup:create({handshake, Sock}),
    ok = gen_tcp:controlling_process(Sock, Pid),
    {next_state, 'LISTEN', State, 0}.
+   
+   
    
 'HANDSHAKE'(timeout, State) ->   
    % handshake is not accomplished
@@ -217,11 +229,6 @@ handle_info({tcp, _Sock, Data}, 'HANDSHAKE', State) ->
       <<"HTTP/1.1 200", _/binary>> ->   
          % stupid proxy cannot upgrade but TCP/IP peer is on 
          ?DEBUG([{socket, connected}, {peer, State#fsm.peer}]),
-         Node = ek_uri:to_binary({
-            ek_uri:schema(State#fsm.peer),
-            ek:node(),
-            ek_uri:path(State#fsm.peer)
-         }),
          gen_tcp:send(State#fsm.sock, ws_con_req(State#fsm.peer, undefined)),
          % transfer socket control to ek_prot (sideA)
          ok = gen_tcp:controlling_process(State#fsm.sock, State#fsm.sideA),
@@ -270,15 +277,11 @@ code_change(_OldVsn, Name, State, _Extra) ->
 %% Connect request primitive
 ws_con_req(Peer, undefined) ->
    % w/o proxy
-   Host = ek_uri:host(Peer),
+   Host = list_to_binary(ek_uri:get(host, Peer)),
    Port = list_to_binary(
-      integer_to_list(ek_uri:port(Peer))
+      integer_to_list(ek_uri:get(port, Peer))
    ),
-   Node = ek_uri:to_binary({
-      ek_uri:schema(Peer),
-      ek:node(),
-      ek_uri:path(Peer)
-   }),
+   Node = ek_uri:to_binary(ek_uri:set(authority, ek:node(), Peer)),
    <<
       "GET / HTTP/1.1\r\n", 
       "Host: ", Host/binary, ":", Port/binary, "\r\n",
@@ -290,15 +293,11 @@ ws_con_req(Peer, undefined) ->
    
 ws_con_req(Peer, Proxy) ->
    % with proxy
-   Host = ek_uri:host(Peer),
+   Host = list_to_binary(ek_uri:get(host, Peer)),
    Port = list_to_binary(
-      integer_to_list(ek_uri:port(Peer))
+      integer_to_list(ek_uri:get(port, Peer))
    ),
-   Node = ek_uri:to_binary({
-      ek_uri:schema(Peer),
-      ek:node(),
-      ek_uri:path(Peer)
-   }),
+   Node = ek_uri:to_binary(ek_uri:set(authority, ek:node(), Peer)),
    Req = <<
       "CONNECT ", Host/binary, ":", Port/binary, " HTTP/1.1\r\n",
       "Host: ", Host/binary, ":", Port/binary, "\r\n",

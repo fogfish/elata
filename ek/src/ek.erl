@@ -124,12 +124,12 @@ registered(Schema) ->
 node() ->
    List = ek_reg:q(
       fun(ek) -> true;  (_) -> false end,
-      fun(undefined)  -> false; (_) -> true end,
+      fun([])  -> false; (_) -> true end,
       fun(_) -> true end
    ),
    case List of
       []         -> throw(no_ek);
-      [Node | _] -> ek_uri:authority(Node)
+      [Node | _] -> ek_uri:get(authority, Node)
    end.
    
 %%
@@ -137,18 +137,19 @@ node() ->
 %% Retrive list of connected nodes
 nodes() ->
    ek_reg:q(
-      fun(ek)         -> false; (_) -> true  end,
-      fun(undefined)  -> false; (_) -> true  end,
-      fun(<<"/">>)    -> true;  (_) -> false end
+      fun(ek)  -> false; (_) -> true  end,
+      fun([])  -> false; (_) -> true  end,
+      fun("/") -> true;  (_) -> false end
    ).
    
 %%
 %% Initiates a connection with remote node
 %% connect(Node) -> {ok, Pid} | {error, ...}
 %%    Node - list(), remote node identity
-connect({node, Node, <<"/">>} = Uri) ->
+connect({node, _} = Uri) ->
    ek_prot_sup:create(Uri);
-connect({_, _, _} = Uri) ->
+connect({_,    _} = Uri) ->
+   %  only node schema is supported
    throw({badarg, Uri});
 connect(Uri) ->
    connect(ek_uri:new(Uri)).
@@ -183,20 +184,32 @@ demonitor(EvtHandler) ->
 %% Sends message to process identified by URI
 %% if process do not exists locally then Msg is routed to remote node
 %% Failure: {badarg, Uri} if process or node cannot be found
-send({_Scheme, undefined, _Path} = Uri, Msg) ->
-   case ek:whereis(Uri) of
-      undefined -> throw({badarg, Uri});
-      Pid       -> Pid ! Msg, ok
-   end;
-send({Scheme, Auth, Path} = Uri, Msg) ->
-   case ek:node() of
-      Auth -> 
-         % Auth = ek:node() message for this node
-         send({Scheme, undefined, Path}, Msg);
-      _    ->
-         case ek:whereis({node, Auth, <<"/">>}) of
+send({Scheme, _} = Uri, Msg) ->
+   case ek_uri:get(authority, Uri) of
+      []   ->
+         % authority is not defined, local process
+         case ek:whereis(Uri) of
             undefined -> throw({badarg, Uri});
-            Pid       -> ek_prot:send(Pid, Uri, Msg)
+            Pid       -> Pid ! Msg, ok
+         end;
+      Auth ->
+         case ek:node() of
+            Auth -> 
+               % Auth = ek:node() message for this node
+               case ek:whereis(ek_uri:set(authority, "", Uri)) of
+                  undefined -> throw({badarg, Uri});
+                  Pid       -> Pid ! Msg, ok
+               end;
+            _    ->
+               Nid = ek_uri:set(path, "/",
+                  ek_uri:set(authority, Auth,
+                     ek_uri:set(schema, node, ek_uri:new())
+                  )
+               ),
+               case ek:whereis(Nid) of
+                  undefined -> throw({badarg, Uri});
+                  Pid       -> ek_prot:send(Pid, Uri, Msg)
+               end
          end
    end;
 send(Uri, Msg) ->

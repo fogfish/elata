@@ -198,25 +198,4 @@ rnd_string(Length, AllowedChars) ->
       lists:seq(1, Length)
    ).
 
-   
-   % {ok, _} = ek:connect("http://localhost:8891"),
-   % {ok, _} = ek:connect("http://localhost:8892"),
-   % {ok, _} = ek:connect("http://localhost:8893"),
-   % timer:sleep(2000),
-   % ?assert( lists:member("http://localhost:8891", ek:nodes()) ),
-   % ?assert( lists:member("http://localhost:8892", ek:nodes()) ),
-   % ?assert( lists:member("http://localhost:8893", ek:nodes()) ).
-   
-   
-% node_rejoin() ->
-   % {ok, Pid} = ek:connect("http://localhost:8891"),
-   % erlang:exit(Pid, error),
-   % ?assert( not lists:member("http://localhost:8891", ek:nodes()) ),
-   % ?assert( lists:member("http://localhost:8892", ek:nodes()) ),
-   % ?assert( lists:member("http://localhost:8893", ek:nodes()) ),
-   % timer:sleep(2000),
-   % ?assert( lists:member("http://localhost:8891", ek:nodes()) ),
-   % ?assert( lists:member("http://localhost:8892", ek:nodes()) ),
-   % ?assert( lists:member("http://localhost:8893", ek:nodes()) ).
-   % 
-   
+

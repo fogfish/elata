@@ -72,48 +72,48 @@ q_scheme_test() ->
       fun(_) -> true end,
       fun(_) -> true end
    ),
-   ?assert(lists:member({http, undefined, <<"/path">>}, R)),
-   ?assert(lists:member({http, <<"localhost:8080">>, <<"/path">>}, R)).
+   ?assert(lists:member(ek_uri:new("http:/path"), R)),
+   ?assert(lists:member(ek_uri:new("http://localhost:8080/path"), R)).
    
 q_host_1_test() ->
    R = ek_reg:q(
       fun(_) -> true end,
-      fun(undefined) -> true; (_) -> false end,
+      fun([]) -> true; (_) -> false end,
       fun(_) -> true end
    ),
-   ?assert(lists:member({http, undefined, <<"/path">>}, R)),
-   ?assert(lists:member({urn,  undefined, <<"/path">>}, R)).
+   ?assert(lists:member(ek_uri:new("http:/path"), R)),
+   ?assert(lists:member(ek_uri:new("urn:/path"), R)).
    
 q_host_2_test() ->
    R = ek_reg:q(
       fun(_) -> true end,
-      fun(undefined) -> false; (_) -> true end,
+      fun([]) -> false; (_) -> true end,
       fun(_) -> true end
    ),
-   ?assert(lists:member({http, <<"localhost:8080">>, <<"/path">>}, R)).
+   ?assert(lists:member(ek_uri:new("http://localhost:8080/path"), R)).
    
 q_path_test() ->
    R = ek_reg:q(
       fun(_) -> true end,
       fun(_) -> true end,
-      fun(<<"/path">>) -> true; (_) -> false end
+      fun("/path") -> true; (_) -> false end
    ),
-   ?assert(lists:member({http, undefined, <<"/path">>}, R)),
-   ?assert(lists:member({urn,  undefined, <<"/path">>}, R)),
-   ?assert(lists:member({http, <<"localhost:8080">>, <<"/path">>}, R)).
+   ?assert(lists:member(ek_uri:new("http:/path"), R)),
+   ?assert(lists:member(ek_uri:new("urn:/path"), R)),
+   ?assert(lists:member(ek_uri:new("http://localhost:8080/path"), R)).
    
    
 registered_test() ->
    R = ek_reg:registered(),
-   ?assert(lists:member({http, undefined, <<"/path">>}, R)),
-   ?assert(lists:member({urn,  undefined, <<"/path">>}, R)).   
+   ?assert(lists:member(ek_uri:new("http:/path"), R)),
+   ?assert(lists:member(ek_uri:new("urn:/path"), R)).   
    
 registered_scheme_test() ->
    R = ek_reg:registered(http),
-   ?assert(lists:member({http, undefined, <<"/path">>}, R)).   
+   ?assert(lists:member(ek_uri:new("http:/path"), R)).   
    
 remote_test() ->
    R = ek_reg:remote(),
-   ?assert(lists:member({http, <<"localhost:8080">>, <<"/path">>}, R)).
+   ?assert(lists:member(ek_uri:new("http://localhost:8080/path"), R)).
       
    

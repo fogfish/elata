@@ -53,6 +53,7 @@
 %%   - IPv6 support
 
 -export([
+   new/0,
    new/1,
    get/2,
    set/3,
@@ -68,13 +69,12 @@
 %%
 %% internal representation
 -record(uri, {
-   userinfo,
-   ip,
-   host,
-   port,
-   path,
-   q,
-   fragment
+   userinfo = [],
+   host     = [],
+   port     = undefined,
+   path     = [],
+   q        = [],
+   fragment = []
 }).
 
 -define(NIL, {[], [], []}).
@@ -85,6 +85,8 @@
 %%
 %% parses URI into tuple, fails with badarg if invalid URI
 %%
+new() ->
+   {undefined, #uri{}}.
 new({_,U} = Uri) when is_record(U, uri) ->
    Uri;
 new(Uri) when is_binary(Uri) ->
