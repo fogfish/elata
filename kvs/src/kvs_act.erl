@@ -63,8 +63,7 @@ start_link(Spec) ->
 new(Spec) ->
    % create a keyspace category
    Uri = proplists:get_value(uri, Spec),
-   {kvs, undefined, Path} = ek_uri:new(Uri),
-   {ok, _} = kvs:new({kvs, undefined, <<Path/binary, "#key">>}, [{storage, kvs_ets}, direct]),
+   {ok, _} = kvs:new(ek_uri:append(path, "/key", Uri), [{storage, kvs_ets}, direct]),
    % register an element factory
    kvs_sup:start_factory(Spec).
    

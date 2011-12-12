@@ -120,9 +120,11 @@ new(Spec) ->
          undefined   
    end,
    % define in-memory bucket to keep a latest results of streams in memory
-   {kvs, undefined, Path} = proplists:get_value(uri, Spec),
-   Uri = {kvs, undefined, <<Path/binary, "#cache">>},
-   {ok, _} = kvs:new(Uri, [{storage, kvs_ets}, direct]),
+   Uri = ek_uri:set(fragment, "cache", proplists:get_value(uri, Spec)),
+   {ok, _} = kvs:new(
+       Uri, 
+      [{storage, kvs_ets}, direct]
+   ),
    ?DEBUG(Spec),
    {ok,
       #srv{
@@ -224,8 +226,9 @@ handle(_Msg, State) ->
 
 %%
 %% converts a key into file name
-key_to_stream({_,_,_}=Uri) ->
-   "/" ++ ek_uri:lhash(authority, Uri) ++ binary_to_list(ek_uri:path(Uri));
+key_to_stream({_,_}=Uri) ->
+   ek_uri:to_path(Uri);
+   %"/" ++ ek_uri:lhash(authority, Uri) ++ binary_to_list(ek_uri:path(Uri));
 key_to_stream(Uri) ->
    key_to_stream(ek_uri:new(Uri)).
   

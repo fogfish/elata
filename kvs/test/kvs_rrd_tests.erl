@@ -87,21 +87,21 @@ cleanup(Pid) ->
    os:cmd("killall rrdcached").
    
 put() ->
-   Key = {<<"localhost:80">>, "mycase", tcp},
+   Key = "http://localhost:80/mycase/tcp",
    ?assert(
       ok =:= kvs:put("kvs:test", Key, 1000)
    ),
    timer:sleep(500), %% RRD put is async, we have to wait before file is created
    ?assert(
-      kvs:has("kvs:test#cache", "/localhost:80/mycase/tcp")
+      kvs:has("kvs:test#cache", "/http/localhost/80/mycase/tcp")
    ),
    ?assert(
-      filelib:is_file("/private/tmp/kvs/localhost:80/mycase/tcp")
+      filelib:is_file("/private/tmp/kvs/http/localhost/80/mycase/tcp")
    ).
 
 has() ->
-   Key1 = {<<"localhost:80">>, "mycase", tcp},
-   Key2 = {<<"localhost:81">>, "mycase", tcp},  
+   Key1 = "http://localhost:80/mycase/tcp",
+   Key2 = "http://localhost:81/mycase/tcp",  
    ?assert(
       true =:= kvs:has("kvs:test", Key1)
    ),
@@ -110,8 +110,8 @@ has() ->
    ).
    
 get() ->
-   Key1 = {<<"localhost:80">>, "mycase", tcp},
-   Key2 = {<<"localhost:81">>, "mycase", tcp},  
+   Key1 = "http://localhost:80/mycase/tcp",
+   Key2 = "http://localhost:81/mycase/tcp",  
    ?assert(
       {ok, 1000} =:= kvs:get("kvs:test", Key1)
    ),

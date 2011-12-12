@@ -96,7 +96,7 @@
 
 
 
--define(SYNC_URI,     <<"/kvs/sync/ht">>).
+-define(SYNC_URI,     "sync:/kvs/sync/ht").
 %% timeout: wait for remote peer to estmate diff on key set
 -define(T_DIFF_WAIT,   60000). %% TODO: performance of ht needs to be validated
 %% timeout: wait
@@ -118,7 +118,7 @@ start_link(TX) ->
    gen_fsm:start_link(?MODULE, [TX], []).
    
 init([]) ->
-   ek:register({sync, undefined, ?SYNC_URI}),
+   ek:register(?SYNC_URI),
    {ok, 
       'LISTEN', 
       #fsm{}
@@ -126,9 +126,11 @@ init([]) ->
   
 %%
 %% start sync transaction
+%%   Type = atom()
+%%   Uri  = category URI
 init([Type, Uri]) ->
-   prot_sync_req(Type, ek_uri:new(Uri)),
-   ek:register({sync, undefined,  tx(Uri)}),
+   prot_sync_req(Type, Uri),
+   ek:register(cat_to_tx(Uri)),
    {ok, 
       'DIFF',
       #fsm{
@@ -143,7 +145,7 @@ init([Type, Uri]) ->
 %%
 %% Accept a sync request
 init([TX]) when is_record(TX, sync_tx) ->
-   ek:register({sync, undefined, tx(TX#sync_tx.uri)}),
+   ek:register(cat_to_tx(TX#sync_tx.uri)),
    gen_fsm:send_event_after(10, diff_init),
    ?DEBUG([{sync, sync_tx}, {tx, TX}]),
    {ok, 
@@ -230,8 +232,8 @@ init([TX]) when is_record(TX, sync_tx) ->
    % slave  - remove changed/missed keys at slave peer
    Keys = kvs_ht:keys(HT),
    ?DEBUG([{sync, remove}, {key, Keys}]),
-   {Scheme, _, Path} = TX#sync_tx.uri,
-   lists:foreach(fun(K) -> kvs:remove({Scheme, undefined, Path}, K) end, Keys),
+   Uri = ek_uri:set(authority, "", TX#sync_tx.uri),
+   lists:foreach(fun(K) -> kvs:remove(Uri, K) end, Keys),
    {stop, normal, S};
 'DATA'(_Msg, S) ->
    {stop, normal, S}.
@@ -262,9 +264,9 @@ handle_sync_event(_Req, _From, Name, State) ->
 
 %%
 %% generates hash tree for category
-ht({Schema, _, Path}) ->
+ht({_, _} = Uri) ->
    HT = kvs:fold(
-      {Schema, undefined, Path}, 
+      ek_uri:set(authority, "", Uri), 
       kvs_ht:new(), 
       fun(K, V, T) -> kvs_ht:insert(K, V, T) end
    ).
@@ -283,12 +285,12 @@ ht_diff(Phash, Pint, HT) ->
   
 %%
 %% exchanges key/vals
-xchange({Scheme, _, Path} = Uri, HT) ->   
+xchange({_, _} = Uri, HT) ->   
    Keys = kvs_ht:keys(HT),
    ?DEBUG([{sync, xchange}, {key, Keys}]),
    lists:foreach(
       fun(Key) ->
-         {ok, Val} = kvs:get({Scheme, undefined, Path}, Key),
+         {ok, Val} = kvs:get(ek_uri:set(authority, "", Uri), Key),
          ok = kvs:put(Uri, Key, Val)
       end, 
       Keys
@@ -306,9 +308,10 @@ xchange({Scheme, _, Path} = Uri, HT) ->
 prot_sync_req(Type, Uri) ->
    TX = #sync_tx{
       type = tx_inv_type(Type),
-      uri  = {ek_uri:schema(Uri), ek:node(), ek_uri:path(Uri)}
+      uri  = ek_uri:set(authority, ek:node(), Uri)
    },
-   ok = ek:send({sync, ek_uri:authority(Uri), ?SYNC_URI}, TX),  
+   Peer = ek_uri:set(authority, ek_uri:get(authority, Uri), ?SYNC_URI),
+   ok = ek:send(Peer, TX),  
    ?DEBUG([{sync, sync_tx}, {uri, Uri}, {tx, TX}]),
    ok.
    
@@ -319,40 +322,31 @@ prot_sync_diff(Uri, HT) ->
       hash      = kvs_ht:hash(kvs_ht:depth(HT), HT),
       intersect = {hash, kvs_ht:depth(HT), []}
    },
-   ek:send(
-      {
-         sync,
-         ek_uri:authority(Uri),
-         tx({ek_uri:schema(Uri), ek:node(), ek_uri:path(Uri)})
-      },
-      Msg
+   TX   = cat_to_tx(ek_uri:set(authority, ek:node(), Uri)),
+   Peer = ek_uri:set(path, ek_uri:get(path, TX),
+      ek_uri:set(authority, ek_uri:get(authority, Uri), ?SYNC_URI)
    ),
+   ek:send(Peer, Msg),
    ?DEBUG([{sync, diff}, {uri, Uri}, {msg, Msg}]).
    
 prot_sync_diff(Uri, Hash, Int) ->
    Msg = #sync_diff{
       hash      = Hash,
       intersect = Int
-   },     
-   ek:send(
-      {
-         sync,
-         ek_uri:authority(Uri),
-         tx({ek_uri:schema(Uri), ek:node(), ek_uri:path(Uri)})
-      },
-      Msg
+   },
+   TX   = cat_to_tx(ek_uri:set(authority, ek:node(), Uri)),
+   Peer = ek_uri:set(path, ek_uri:get(path, TX),
+      ek_uri:set(authority, ek_uri:get(authority, Uri), ?SYNC_URI)
    ),
+   ek:send(Peer, Msg),
    ?DEBUG([{sync, diff}, {uri, Uri}, {msg, Msg}]).
    
 prot_sync_stop(Uri) ->
-   ek:send(
-      {
-         sync,
-         ek_uri:authority(Uri),
-         tx({ek_uri:schema(Uri), ek:node(), ek_uri:path(Uri)})
-      },
-      sync_stop
-   ).
+   TX   = cat_to_tx(ek_uri:set(authority, ek:node(), Uri)),
+   Peer = ek_uri:set(path, ek_uri:get(path, TX),
+      ek_uri:set(authority, ek_uri:get(authority, Uri), ?SYNC_URI)
+   ),
+   ek:send(Peer, sync_stop).
    
 %%%------------------------------------------------------------------   
 %%% 
@@ -362,17 +356,9 @@ prot_sync_stop(Uri) ->
 
 %% 
 %% transaction id
-tx(Uri) ->
-   TX = list_to_binary(
-      bin_to_hex( 
-         crypto:sha(
-            term_to_binary(
-               ek_uri:new(Uri)
-            )
-         )
-      )
-   ),
-   <<?SYNC_URI/binary, "/", TX/binary>>.
+cat_to_tx(Uri) ->
+   TX = bin_to_hex(ek_uri:hash(Uri)),
+   ek_uri:set(path, TX, ?SYNC_URI).
 
 %% inverts a transaction type  
 tx_inv_type(p2p) ->

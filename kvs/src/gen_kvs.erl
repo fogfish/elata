@@ -239,7 +239,7 @@ put(active, _Pid, Cat, Key, Val) ->
    
 %%
 %% put value into remote category
-put(remote, _Pid, {_,_,_}=Cat, Key, Val) ->
+put(remote, _Pid, {_,_}=Cat, Key, Val) ->
    ek:send(Cat, {kvs_put, Key, Val}).
 
    
@@ -265,7 +265,7 @@ has(active, _Pid, Cat, Key) ->
    
 %%
 %% check key from remote category
-has(remote, _Pid, {_,_,_}=Cat, Key) ->
+has(remote, _Pid, {_,_}=Cat, Key) ->
    throw(not_supported).
    
 
@@ -291,7 +291,7 @@ get(active, _Pid, Cat, Key) ->
 
 %%
 %% get key from remote category
-get(remote, _Pid, {_,_,_}=Cat, Key) ->
+get(remote, _Pid, {_,_}=Cat, Key) ->
    throw(not_supported).
    
    
@@ -316,7 +316,7 @@ remove(active, _Pid, Cat, Key) ->
 
 %%
 %% remove key from remote category
-remove(remote, _Pid, {_,_,_}=Cat, Key) ->
+remove(remote, _Pid, {_,_}=Cat, Key) ->
    ek:send(Cat, {kvs_remove, Key}).   
    
    
@@ -334,9 +334,9 @@ map(passive, {Mod, Ref}, _Cat, Fun) ->
    
 %%
 %% map keys from local active category
-map(active, _Pid, {_,_,Path}=Cat, Fun) ->
+map(active, _Pid, {_,_}=Cat, Fun) ->
    kvs:map(
-      {kvs, undefined, <<Path/binary, "#key">>}, 
+      ek_uri:append(path, "/key", Cat),
       fun(Key, Pid) ->
          {ok, Val} = gen_server:call(Pid, {kvs_get, Key}),
          Fun(Key, Val)
@@ -345,7 +345,7 @@ map(active, _Pid, {_,_,Path}=Cat, Fun) ->
 
 %%
 %% map keys from remote category
-map(remote, _Pid, {_,_,_}=Cat, Fun) ->
+map(remote, _Pid, {_,_}=Cat, Fun) ->
    throw(not_supported).
 
 
@@ -362,9 +362,9 @@ fold(passive, {Mod, Ref}, _Cat, Acc, Fun) ->
    
 %%
 %% fold keys from local active category
-fold(active, _Pid, {_,_,Path}=Cat, Acc, Fun) ->
+fold(active, _Pid, {_,_}=Cat, Acc, Fun) ->
    kvs:fold(
-      {kvs, undefined, <<Path/binary, "#key">>},
+      ek_uri:append(path, "/key", Cat),
       Acc,
       fun(Key, Pid, Acc1) ->
          {ok, Val} = gen_server:call(Pid, {kvs_get, Key}),
@@ -374,7 +374,7 @@ fold(active, _Pid, {_,_,Path}=Cat, Acc, Fun) ->
 
 %%
 %% fold keys from remote category
-fold(remote, _Pid, {_,_,_} = Cat, Acc, Fun) ->
+fold(remote, _Pid, {_,_} = Cat, Acc, Fun) ->
    throw(not_supported).
    
    
@@ -387,13 +387,11 @@ fold(remote, _Pid, {_,_,_} = Cat, Acc, Fun) ->
 
 %%
 %% register value key
-val_init({kvs, undefined, Path}, Key) ->
-   Cat = {kvs, undefined, <<Path/binary, "#key">>},
-   ok = kvs:put(Cat, Key, self()).
+val_init({kvs, _} = Cat, Key) ->
+   ok = kvs:put(ek_uri:append(path, "/key", Cat), Key, self()).
    
-val_terminate({kvs, undefined, Path}, Key) ->
-   Cat = {kvs, undefined, <<Path/binary, "#key">>},
-   ok = kvs:remove(Cat, Key).
+val_terminate({kvs, _} = Cat, Key) ->
+   ok = kvs:remove(ek_uri:append(path, "/key", Cat), Key).
 
 %%
 %%
@@ -566,9 +564,8 @@ srv_fold(Acc, Fun, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
 %% key_to_pid(Cat, Key) -> {ok, Pid} | {error, ...} 
 %%
 %% lookup local process that holds a key
-key_to_pid({kvs, undefined, Path}, Key) ->
-   Cat = {kvs, undefined, <<Path/binary, "#key">>},
-   case kvs:get(Cat, Key) of
+key_to_pid({kvs, _} = Cat, Key) ->
+   case kvs:get(ek_uri:append(path, "/key", Cat), Key) of
       {ok, Pid} ->
          case is_process_alive(Pid) of
             true  -> 
