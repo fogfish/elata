@@ -34,7 +34,7 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 %%
-%% High order-function: latency measurment
+%% High order-function: Performance
 %%
 
 -export([
@@ -42,92 +42,44 @@
    filter/2
 ]).
 
+%%-------------------------------------------------------------------
 %%
-%% Measures latency for various network services
+%% Request network service
+%% 
+%% hof(Uri, Req) -> [Stat, {Schema, Status, Protocol, Payload}]
+%%   Schema = atom()
+%%   Status = 
+%%
+%%-------------------------------------------------------------------
+
+%%
+%% Request Network Service
 net() ->
    emc:seq([
       fun ek_uri:new/1,
       emc:alt([
-         %% dns pipeline
-         emc:seq([
-            fun
-               ({dns,_,_}=Uri) -> {ok, [Uri]};
-               (_)             -> {error, uri_scheme}
-            end,
-            fun hof_inet:dns/1,
-            fun (IP, Uri) ->
-               % TODO: fix pipeline dimensions
-               {ok, [Uri, []]}
-            end
-         ]),
-         %% tcp pipeline
-         emc:seq([
-            fun
-               ({tcp,_,_}=Uri) -> {ok, [Uri]};
-               (_)             -> {error, uri_scheme}
-            end,
-            fun hof_inet:dns/1,
-            fun hof_inet:tcp/3,
-            fun hof_inet:statistic/1,
-            fun hof_inet:close/1
-         ]),
-         %% ssl pipeline
-         emc:seq([
-            fun
-               ({ssl,_,_}=Uri) -> {ok, [Uri]};
-               (_)             -> {error, uri_scheme}
-            end,
-            fun hof_inet:dns/1,
-            fun hof_inet:tcp/3,
-            fun hof_inet:ssl/3,
-            fun hof_inet:statistic/1,
-            fun hof_inet:close/1
-         ]),
-         %% http pipeline
-         emc:seq([
-            fun
-               ({http,_,_}=Uri) -> {ok, [Uri]};
-               (_)              -> {error, uri_scheme}
-            end,
-            fun hof_inet:dns/1,
-            fun hof_inet:tcp/3,
-            fun hof_http:get/3,
-            fun hof_http:recv/2,
-            fun hof_http:recv/3,
-            fun hof_http:response/3,
-            fun hof_inet:statistic/1,
-            fun hof_inet:close/1
-         ]),
-         %% https pipeline
-         emc:seq([
-            fun
-               ({https,_,_}=Uri) -> {ok, [Uri]};
-               (_)               -> {error, uri_scheme}
-            end,
-            fun hof_inet:dns/1,
-            fun hof_inet:tcp/3,
-            fun hof_inet:ssl/3,
-            fun hof_http:get/3,
-            fun hof_http:recv/2,
-            fun hof_http:recv/3,
-            fun hof_http:response/3,
-            fun hof_inet:statistic/1,
-            fun hof_inet:close/1
-         ])
+         hof_inet:dns(),
+         hof_inet:tcp(),
+         hof_inet:ssl(),
+         hof_http:http(),
+         hof_http:https()
       ]),
       emc:'='(emc_pf),
-      fun(X) -> 
-         hof_perf:filter(X, [
-            {<<"hof_inet:dns/1">>, dns},
-            {<<"hof_inet:tcp/3">>, tcp},
+      fun(X, Stat) -> 
+         hof_perf:filter(X ++ Stat, [
+            {<<"hof_inet:dns/2">>, dns},
+            {<<"hof_inet:tcp/2">>, tcp},
             {<<"hof_inet:ssl/3">>, ssl},
-            {<<"hof_http:recv/2">>, ttfb},
-            {<<"hof_http:recv/3">>, ttmr}
+            {<<"hof_http:wait/2">>, ttfb},
+            {<<"hof_http:recv/3">>, ttmr},
+            {recv_oct, size},
+            {recv_avg, chnk},
+            {recv_cnt, pckt}
          ]) 
       end
    ]).
 
-   
+                                  
    
 %%
 %% Filters performance results 

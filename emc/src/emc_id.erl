@@ -53,7 +53,7 @@ bind({m, X, MX}, HOF) ->
    case erlang:apply(HOF, X) of
       {ok,    Y} -> {ok, {m, pack(Y), MX}};
       {error, E} -> {error,    E};
-      Y          -> {ok, {m, pack(Y), MX}}
+      Y          -> {ok, {m, pack(Y), MX}} % hof is legacy, result wrapped
    end.
    
 

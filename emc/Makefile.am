@@ -21,6 +21,7 @@ ESRC = \
    src/emc_id.erl   \
    src/emc_pf.erl   \
    src/emc_debug.erl \
+   src/hof.erl \
    src/hof_inet.erl  \
    src/hof_http.erl \
    src/hof_perf.erl

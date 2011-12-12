@@ -1,6 +1,6 @@
 %%
 %%   Copyright (c) 2011, Nokia Corporation
-%%   All rights reserved.
+%%   All Rights Reserved.
 %%
 %%    Redistribution and use in source and binary forms, with or without
 %%    modification, are permitted provided that the following conditions
@@ -29,21 +29,68 @@
 %%   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 %%   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 %%
--module(job_script_tests).
+-module(hof).
 -author(dmitry.kolesnikov@nokia.com).
--include_lib("eunit/include/eunit.hrl").
 
-tcp_job_test() ->
-   {ok, _, _} = job_script:execute(<<"tcp://localhost:80/">>).
+
+%%
+%% High-order functions: Common
+%%
+-export([
+   ok/0,
+   ok/1,
+   ok/2,
+   ok/3,
+   ok/4,
+   bin_to_hex/1,
+   hex_to_bin/1
+]).
+
+%%
+%%
+ok() ->
+   {ok, []}.
+ok(Y1) -> 
+   {ok, [Y1]}.
+ok(Y1, Y2) ->
+   {ok, [Y1, Y2]}.
+ok(Y1, Y2, Y3) ->
+   {ok, [Y1, Y2, Y3]}.
+ok(Y1, Y2, Y3, Y4) ->
+   {ok, [Y1, Y2, Y3, Y4]}.   
+
+
+%%   
+%% bin_to_hex(Bin) -> Hex
+%%    Bin = binary()
+%%    Hex = list() hexdec 
+bin_to_hex(Bin) ->
+   bin_to_hex(Bin, "").
    
-http_job_test() ->
-   {ok, _, _} = job_script:execute(<<"http://localhost:80/">>).
+bin_to_hex(<<>>, Acc) ->
+   Acc;
+bin_to_hex(<<X:8, T/binary>>, Acc) ->  
+   bin_to_hex(T, Acc ++ [to_hex(X div 16), to_hex(X rem 16)]).
+   
+to_hex(X) when X < 10 ->
+   $0 + X;
+to_hex(X) ->
+   $a + (X - 10).
 
-http_simple_script_test() ->
-   {ok, _, _} = job_script:execute([
-      {uri, <<"http://localhost:80/">>},
-      {proxy,  {<<"127.0.0.1">>, 80}},
-      {header, [
-         {<<"User-Agent">>, <<"eunit">>}
-      ]}
-   ]).
+%%
+%% hex_to_bin(Hex) -> Bin
+%%    Hex = list()
+%%    Bin = binary()
+hex_to_bin(Hex) ->
+   hex_to_bin(Hex, <<>>).
+
+hex_to_bin([], Acc) ->
+   Acc;
+hex_to_bin([H, L | T], Acc) ->
+   V = to_int(H) * 16 + to_int(L),
+   hex_to_bin(T, <<Acc/binary, V>>).
+
+to_int(C) when C >= $a, C =< $f ->
+   10 + (C - $a);
+to_int(C) when C >= $0, C =< $9 ->
+   C - $0.   

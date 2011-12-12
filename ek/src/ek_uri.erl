@@ -45,162 +45,215 @@
 %%         / \ /                        \
 %%         urn:example:animal:ferret:nose
 %%
-%% URI is enforsed as an identity and represented via tuple:
-%% {schema, <<"authority">>, <<"path">>}
+%% URI is enforsed as an identity and represented by tuple.
+%% nested tuples allows pattern matching against schema
+%% {Schema, {UserInfo, Host, Port, Path, Query, Fragment}}
 %%    
 %% TODO:
-%%   - query
-%%   - fragment
+%%   - IPv6 support
 
 -export([
    new/1,
-   schema/1,
-   host/1,
-   port/1,
-   authority/1,
-   q/1,
-   fragment/1,
-   path/1,
+   get/2,
+   set/3,
+   append/3,
+   insert/3,
+   path/2,
+   to_list/1,
    to_binary/1,
-   hash/1,
-   hash/2,
-   lhash/1,
-   lhash/2
+   to_path/1,
+   hash/1
 ]).
 
--define(NIL, {undefined, undefined, undefined}).
+%%
+%% internal representation
+-record(uri, {
+   userinfo,
+   ip,
+   host,
+   port,
+   path,
+   q,
+   fragment
+}).
+
+-define(NIL, {[], [], []}).
 
 %%
-%% new(URI) -> {Schema, Authority, Path}
-%%   URI       = list() | binary()
-%%   Schema    = atom()
-%%   Authority = binary()
-%%   Path      = binary()
+%% new(URI) -> {uri, ...}
+%%   URI       = list() | binary() | uri()
 %%
 %% parses URI into tuple, fails with badarg if invalid URI
 %%
-new({Schema, Authority, Path}) when is_atom(Schema), 
-                                    is_binary(Path) ->
-   {Schema, Authority, Path};                                 
+new({_,U} = Uri) when is_record(U, uri) ->
+   Uri;
+new(Uri) when is_binary(Uri) ->
+   new(binary_to_list(Uri));
 new(Uri) when is_list(Uri) ->
-   p_uri(list_to_binary(Uri), schema, <<>>, ?NIL);
-new(Uri) when is_binary(Uri)->
-   p_uri(Uri, schema, <<>>, ?NIL).
+   {Schema, Auth, Part} = p_uri(Uri, schema, "", ?NIL),
+   {User,   Host, Port}  = p_auth(Auth, host, "", ?NIL),
+   {Path,   Q,    Frag} = p_path(Part, path, "", ?NIL),
+   {Schema,
+      #uri{
+      userinfo = User,
+      host     = Host,
+      port     = schema_to_port(Schema, Port),
+      path     = Path,
+      q        = Q,
+      fragment = Frag
+      }
+   }.
    
 %%
-%% schema(URI) -> atom()
-%%   URI  = list() | binary() | tuple()
-schema({undefined, _, _}) ->
-   undefined;
-schema({Schema, _, _}) ->
-   Schema;
-schema(Uri) ->
-   schema(new(Uri)).
+%% get(Item, Uri) -> list()
+%%
+get(schema, {S, _}) ->
+   S;
+get(authority, {_, Uri}) when is_record(Uri, uri) ->
+   to_list(authority, Uri);
+get(userinfo, {_, #uri{userinfo = U}}) ->
+   U;
+get(host, {_, #uri{host = H}}) ->
+   H;
+get(port, {_, #uri{port = P}}) ->
+   P;
+get(path, {_, #uri{path = P}}) ->
+   P;
+get(q, {_, #uri{q = Q}}) ->
+   Q;
+get(fragment, {_, #uri{fragment = F}}) ->
+   F;
+get(Item, Uri) when is_list(Uri) ->   
+   get(Item, new(Uri));
+get(Item, Uri) when is_binary(Uri) ->   
+   get(Item, new(Uri)).
+   
+%%
+%% set(Item, Val, Uri) -> Uri
+%%
+set(schema, Value, {_, Uri}) when is_record(Uri, uri) ->
+   {Value, Uri};
+set(authority, Value, {Schema, Uri}) when is_record(Uri, uri) ->
+   {User,   Host, Port}  = p_auth(Value, host, "", ?NIL),
+   {Schema, Uri#uri{
+      userinfo = User,
+      host     = Host,
+      port     = schema_to_port(Schema, Port)
+   }};
+set(userinfo, Value, {Schema, Uri}) when is_record(Uri, uri) ->
+   {Schema, Uri#uri{userinfo = Value}};
+set(host, Value, {Schema, Uri}) when is_record(Uri, uri) ->
+   {Schema, Uri#uri{host = Value}};
+set(port, Value, {Schema, Uri}) when is_record(Uri, uri), is_integer(Value) ->   
+   {Schema, Uri#uri{port = Value}};
+set(path, Value, {Schema, Uri}) when is_record(Uri, uri) ->
+   {Schema, Uri#uri{path = Value}};
+set(q, Value, {Schema, Uri}) when is_record(Uri, uri) ->
+   {Schema, Uri#uri{q = Value}};
+set(fragment, Value, {Schema, Uri}) when is_record(Uri, uri) ->
+   {Schema, Uri#uri{fragment = Value}};
+set(Item, Value, Uri) when is_list(Uri) ->   
+   set(Item, Value, new(Uri));
+set(Item, Value, Uri) when is_binary(Uri) ->   
+   set(Item, Value, new(Uri)).   
 
+
+%%
+%% append(Item, Val, Uri) -> Uri
+%% TODO: other components
+append(path, Value, {Schema, #uri{path = Path} = Uri}) ->
+   {Schema, Uri#uri{path = Path ++ Value}};
+append(Item, Value, Uri) ->
+   append(Item, Value, new(Uri)).   
+  
+%%
+%% insert(Item, Val, Uri) -> Uri
+%% TODO: other components
+insert(path, Value, {Schema, #uri{path = Path} = Uri}) ->
+   {Schema, Uri#uri{path = Value ++ Path}};
+insert(Item, Value, Uri) ->
+   insert(Item, Value, new(Uri)).   
+   
+   
    
    
 %%
-%% host(URI) -> binary()
-%%   URI  = list() | binary() | tuple()
-host({_, undefined, _}) ->
-   undefined;
-host({_, Auth, _}) ->
-   {_, Host, _} = p_auth(Auth, host, <<>>, ?NIL),
-   Host;
-host(Uri) ->
-   host(new(Uri)).
-   
+%% path(Nth, URI) -> list()
 %%
-%% port(URI) -> integer()
-%%   URI  = list() | binary() | tuple()
-port({_, undefined, _}) ->
-   undefined;
-port({Schema, Auth, _}) ->
-   case p_auth(Auth, host, <<>>, ?NIL) of
-      {_, _, undefined} -> schema_to_port(Schema);
-      {_, _, Port}      -> Port
-   end;
-port(Uri) ->
-   port(new(Uri)).
+path(Nth, {_, #uri{path = Path}}) when Nth >= 0 ->
+   Tkns = string:tokens(Path, "/"),
+   {_, List} = lists:split(Nth, Tkns),
+   lists:foldl(
+      fun
+         ("", Acc) -> Acc;
+         (X,  Acc) -> Acc ++ "/" ++ X
+      end, 
+      "",
+      List
+   );
+path(Nth, {_, #uri{path = Path}}) when Nth < 0 ->
+   Tkns = string:tokens(Path, "/"),
+   {List, _} = lists:split(length(Tkns) + Nth, Tkns),
+   lists:foldl(
+      fun
+         ("", Acc) -> Acc;
+         (X,  Acc) -> Acc ++ "/" ++ X 
+      end, 
+      "",
+      List
+   );
+path(Nth, Uri) ->
+   path(Nth, new(Uri)).
+   
  
-   
 %%
-%% authority(URI) -> binary()
-%%   URI  = list() | binary() | tuple()
-authority({_, undefined, _}) ->
-   undefined;
-authority({_, Auth, _}) ->
-   Auth;
-authority(Uri) ->
-   authority(new(Uri)).
-
 %%
-%% path(URI) -> binary()
-%%   URI  = list() | binary() | tuple()
-path({_, _, In}) ->
-   {Path, _, _} = p_path(In, path, <<>>, ?NIL),
-   Path;
-path(Uri) ->
-   path(new(Uri)).      
-
-   
-%%
-%% query(URI) -> binary()
-%%   URI   = list() | binary() | tuple()
-q({_,_, Path}) ->
-   {_, Query, _} = p_path(Path, path, <<>>, ?NIL),
-   Query;
-q(Uri) ->
-   q(new(Uri)).
-
-%%
-%% fragment(URI) -> binary()
-%%   URI   = list() | binary() | tuple()
-fragment({_,_, Path}) ->
-   {_, _, Frag} = p_path(Path, path, <<>>, ?NIL),
-   Frag;
-fragment(Uri) ->
-   fragment(new(Uri)).   
-   
-   
-%%
-%% hash(Uri)            -> binary()
-%% lhash(Uri)           -> list()
-%% hash(component, Uri) -> binary()
-%% lhash(component, Uri)-> list()
-%%
-hash(Uri) ->
-   crypto:sha(to_binary(Uri)).   
-   
-hash(authority, {_,Auth,_}) ->
-   Sfx = string:to_lower(
-         integer_to_list(erlang:phash2(Auth), 16)
-   ),
-   Len = 8 - string:len(Sfx),
-   hex_to_bin(string:chars($0, Len) ++ Sfx);
-hash(path, {_,_,Path}) ->
-   crypto:sha(to_binary(Path));
-hash(Part, Uri) ->
-   hash(Part, new(Uri)).
-
-lhash(Uri) ->
-   bin_to_hex(hash(Uri)).
-lhash(Part, Uri) ->
-   bin_to_hex(hash(Part, Uri)).
+to_list({Schema, #uri{userinfo = [], host = [], port = undefined} = Uri})  ->
+   atom_to_list(Schema) ++ ":" ++ to_list(resource, Uri);
+to_list({Schema, Uri})  ->
+   atom_to_list(Schema) ++ "://" ++ to_list(authority, Uri) ++ to_list(resource, Uri);
+to_list(Uri) ->
+   to_list(new(Uri)).
    
 %%
 %% to_binary(URI) -> binary()
 %%    URI  = list() | binary() | tuple()
-to_binary({Schema, undefined, Path}) ->
-   S = atom_to_binary(Schema, utf8),
-   <<S/binary, ":", Path/binary>>;
-to_binary({Schema, Authority, Path}) ->
-   S = atom_to_binary(Schema, utf8),
-   <<S/binary, "://", Authority/binary, Path/binary>>;
 to_binary(Uri) ->
-   to_binary(new(Uri)).
+   list_to_binary(to_list(Uri)).
+
+%%
+%% to_path(URI) -> binary()
+%%
+to_path({_,_} = Uri) ->
+   List = [
+      atom_to_list(get(schema, Uri)),
+      get(userinfo, Uri),
+      get(host, Uri),
+      integer_to_list(get(port, Uri)),
+      get(path, Uri),
+      get(fragment, Uri)
+   ],
+   lists:foldl(
+      fun
+         ([], Acc) -> Acc;
+         ("/" ++ X, Acc) -> Acc ++ "/" ++ X;
+         (X, Acc) -> Acc ++ "/" ++ X
+      end, 
+      [],
+      List
+   );      
+to_path(Uri) ->
+   to_path(new(Uri)).
+
    
+%%
+%% hash(Uri) -> binary()
+%%
+hash(Uri) ->
+   crypto:sha(to_binary(Uri)).   
    
+
+
 %%%------------------------------------------------------------------
 %%%
 %%% Private
@@ -216,32 +269,32 @@ to_binary(Uri) ->
 %%
 
 %% end of schema
-p_uri(<<":", Str/binary>>, schema, Acc, {S,A,P}) ->
+p_uri(":" ++ Str, schema, Acc, {S,A,P}) ->
    % TODO: binary_to_atom security OOM issue
    % Note: end-of-schema implies path
-   p_uri(Str, path, <<>>, {binary_to_atom(Acc, utf8), A, P});
+   p_uri(Str, path, "", {list_to_atom(Acc), A, P});
 
 %% start of authority
-p_uri(<<"//", Str/binary>>, path, _, U) ->
-   p_uri(Str, auth, <<>>, U);   
+p_uri("//" ++ Str, path, _, U) ->
+   p_uri(Str, auth, "", U);   
    
 %% start of path
-p_uri(<<"/", Str/binary>>, auth, Acc, {S,A,P}) ->
-   p_uri(Str, path, <<"/">>, {S, Acc, P});   
+p_uri("/" ++ Str, auth, Acc, {S,A,P}) ->
+   p_uri(Str, path, "/", {S, Acc, P});   
    
 %% accumulates token
-p_uri(<<H:8, T/binary>>, Tag, Acc, U) ->
-   p_uri(T, Tag, <<Acc/binary, H>>, U);   
+p_uri([H | T], Tag, Acc, U) ->
+   p_uri(T, Tag, Acc ++ [H], U);   
    
 %% eof   
-p_uri(<<>>, schema, <<>>, {S,A,_}) ->
-   {S,A,<<"/">>};
-p_uri(<<>>, schema, Acc, {S,A,P})  ->
+p_uri([], schema, "", {S,A,_}) ->
+   {S,A,"/"};
+p_uri([], schema, Acc, {S,A,P})  ->
    {S,A,Acc};
-p_uri(<<>>, auth, Acc, {S,_,_}) ->
+p_uri([], auth, Acc, {S,_,_}) ->
    % no path, set default
-   {S, Acc, <<"/">>};
-p_uri(<<>>, path, Acc, {S,A,P}) ->
+   {S, Acc, "/"};
+p_uri([], path, Acc, {S,A,P}) ->
    {S, A, Acc}.
    
 
@@ -250,84 +303,83 @@ p_uri(<<>>, path, Acc, {S,A,P}) ->
 %%
 
 %% end of userinfo
-p_auth(<<"@", Str/binary>>, host, Acc, {_, H, P}) ->
-   p_auth(Str, host, <<>>, {Acc, H, P});
+p_auth("@" ++ Str, host, Acc, {_, H, P}) ->
+   p_auth(Str, host, "", {Acc, H, P});
    
 %% end of host
-p_auth(<<":", Str/binary>>, host, Acc, {U, _, P}) ->
-   p_auth(Str, port, <<>>, {U, Acc, P});
+p_auth(":" ++ Str, host, Acc, {U, _, P}) ->
+   p_auth(Str, port, "", {U, Acc, P});
    
 %% accumulates token
-p_auth(<<H:8, T/binary>>, Tag, Acc, A) ->
-   p_auth(T, Tag, <<Acc/binary, H>>, A);
+p_auth([H | T], Tag, Acc, A) ->
+   p_auth(T, Tag, Acc ++ [H], A);
 
 %% eof
-p_auth(<<>>, host, Acc, {U, _, P}) ->
+p_auth([], host, Acc, {U, _, P}) ->
    {U, Acc, P};
-p_auth(<<>>, port, Acc, {U, H, _}) ->
-   {U, H, list_to_integer(binary_to_list(Acc))}.
+p_auth([], port, Acc, {U, H, _}) ->
+   {U, H, list_to_integer(Acc)}.
    
 %%
 %%   path: /over/there?name=ferret#nose
 %%
-p_path(<<"?", Str/binary>>, path, Acc, {_, Q, F}) ->
-   p_path(Str, 'query', <<>>, {Acc, Q, F});
+p_path("?" ++ Str, path, Acc, {_, Q, F}) ->
+   p_path(Str, 'query', "", {Acc, Q, F});
    
-p_path(<<"#", Str/binary>>, path, Acc, {_, Q, F}) ->
-   p_path(Str, fragment, <<>>, {Acc, Q, F});
+p_path("#" ++ Str, path, Acc, {_, Q, F}) ->
+   p_path(Str, fragment, "", {Acc, Q, F});
    
-p_path(<<"#", Str/binary>>, 'query', Acc, {P, _, F}) ->
-   p_path(Str, fragment, <<>>, {P, Acc, F});
+p_path("#" ++ Str, 'query', Acc, {P, _, F}) ->
+   p_path(Str, fragment, "", {P, Acc, F});
    
 %% accumulates token
-p_path(<<H:8, T/binary>>, Tag, Acc, P) ->
-   p_path(T, Tag, <<Acc/binary, H>>, P);   
+p_path([H | T], Tag, Acc, P) ->
+   p_path(T, Tag, Acc ++ [H], P);   
    
 %% eof
-p_path(<<>>, path, Acc, {_, Q, F}) ->
+p_path([], path, Acc, {_, Q, F}) ->
    {Acc, Q, F};
-p_path(<<>>, 'query', Acc, {P, _, F}) ->
+p_path([], 'query', Acc, {P, _, F}) ->
    {P, Acc, F};
-p_path(<<>>, fragment, Acc, {P, Q, _}) ->
+p_path([], fragment, Acc, {P, Q, _}) ->
    {P, Q, Acc}.
    
    
 
 %%
 %% Maps schema to default ports
-schema_to_port(http)  -> 80;
-schema_to_port(https) -> 443;
-schema_to_port(_)     -> undefined.
-   
 
-%%   
-%% binary to hex
-bin_to_hex(Bin) ->
-   bin_to_hex(Bin, "").
+schema_to_port(http,  []) -> 80;
+schema_to_port(https, []) -> 443;
+schema_to_port(_,     []) -> undefined;
+schema_to_port(_,   Port) -> Port.
    
-bin_to_hex(<<>>, Acc) ->
-   Acc;
-bin_to_hex(<<X:8, T/binary>>, Acc) ->  
-   bin_to_hex(T, Acc ++ [to_hex(X div 16), to_hex(X rem 16)]).
-   
-to_hex(X) when X < 10 ->
-   $0 + X;
-to_hex(X) ->
-   $a + (X - 10).
 
 %%
-%% hex to binary
-hex_to_bin(Hex) ->
-   hex_to_bin(Hex, <<>>).
+%%
+to_list(host, #uri{host = {N1, N2, N3, N4}}) ->
+   integer_to_list(N1) ++ "." ++
+   integer_to_list(N2) ++ "." ++
+   integer_to_list(N3) ++ "." ++
+   integer_to_list(N4);
+to_list(host, #uri{host = H}) ->
+   H;
+to_list(authority, #uri{userinfo = [], host = []}) ->
+   "";
+to_list(authority, #uri{userinfo = [], port = undefined} = Uri) ->
+   to_list(host, Uri);
+to_list(authority, #uri{userinfo = U,  port = undefined} = Uri) ->
+   U ++ "@" ++ to_list(host, Uri);   
+to_list(authority, #uri{userinfo = [], port = P} = Uri) ->
+   to_list(host, Uri) ++ ":" ++ integer_to_list(P);
+to_list(authority, #uri{userinfo = U,  port = P} = Uri) ->   
+   U ++ "@" ++ to_list(host, Uri) ++ ":" ++ integer_to_list(P);
+to_list(resource, #uri{path = P, q = [], fragment = []}) ->
+   P;
+to_list(resource, #uri{path = P, q = [], fragment = F}) ->  
+   P ++ "#" ++ F;
+to_list(resource, #uri{path = P, q = Q, fragment = []}) ->
+   P ++ "?" ++ Q;
+to_list(resource, #uri{path = P, q = Q, fragment = F}) ->
+   P ++ "?" ++ Q ++ "#" ++ F.
 
-hex_to_bin([], Acc) ->
-   Acc;
-hex_to_bin([H, L | T], Acc) ->
-   V = to_int(H) * 16 + to_int(L),
-   hex_to_bin(T, <<Acc/binary, V>>).
-
-to_int(C) when C >= $a, C =< $f ->
-   10 + (C - $a);
-to_int(C) when C >= $0, C =< $9 ->
-   C - $0.  
-   

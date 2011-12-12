@@ -1,5 +1,5 @@
 TESTS  = emc_tests
-#TESTS += emc_net_tests
+TESTS += hof_perf_tests
 
 .SECONDARY:
 

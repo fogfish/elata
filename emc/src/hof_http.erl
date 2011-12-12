@@ -38,76 +38,156 @@
 %%
 
 -export([
-   get/3,
-   recv/2,
+   % pipeline
+   http/0,
+   https/0,
+   % hofs
+   req/3,
+   wait/2,
    recv/3,
-   response/3
+   rsp/3
 ]).
 
+%%
+%% debug macro
+-ifdef(DEBUG).
+-define(DEBUG(M), error_logger:info_report([{?MODULE, self()}] ++ M)).
+-else.
+-define(DEBUG(M), true).
+-endif.
+
+%%-------------------------------------------------------------------
+%%
+%% Pipeline
+%%
+%%-------------------------------------------------------------------
+http() ->
+   emc:seq([
+      fun
+         ({http,_} = Uri) -> hof:ok(Uri);
+         (_)             -> {error, uri_scheme}
+      end,
+      fun hof_inet:dns/2,
+      fun hof_inet:tcp/2,
+      fun hof_http:req/3,
+      fun hof_http:wait/2,
+      fun hof_http:recv/3,
+      fun hof_http:rsp/3,
+      fun hof_inet:statistic/1,
+      fun hof_inet:close/1
+   ]).
+
+https() ->
+   emc:seq([
+      fun
+         ({https,_} = Uri) -> hof:ok(Uri);
+         (_)             -> {error, uri_scheme}
+      end,
+      fun hof_inet:dns/2,
+      fun hof_inet:tcp/2,
+      fun hof_inet:ssl/3,
+      fun hof_http:req/3,
+      fun hof_http:wait/2,
+      fun hof_http:recv/3,
+      fun hof_http:rsp/3,
+      fun hof_inet:statistic/1,
+      fun hof_inet:close/1
+   ]).   
+
+%%-------------------------------------------------------------------
+%%
+%% HOFs
+%%
+%%-------------------------------------------------------------------
+
 
 %%
-%% get(Uri, Sock, Opts) -> [Uri, Sock]
-%%
-%% sends GET request
-%%
-get({Mod, Sock}, {Schema, Auth, Path} = Uri, Opts) ->
-   % authority & path depends on proxy option
-   {Rauth, Rpath} = case proplists:get_value(proxy, Opts) of
-      undefined ->
-         {Auth, Path};
-      Proxy     -> 
-         {ek_uri:authority(Proxy), ek_uri:to_binary(Uri)}      
+%% request HTTP service
+%% 
+req({Mod, Sock, _} = Sckt, {_,_} = Uri, Req) ->
+   % method
+   Method = case proplists:get_value(method, Req, get) of
+      get  -> <<"GET">>;
+      post -> <<"POST">>;
+      head -> <<"HEAD">>
    end,
-   % request headers
-   Head = case proplists:get_value(header, Opts) of
+   % payload
+   Payload = proplists:get_value(payload, Req, <<>>),
+   % authority & path
+   {Host, Path} = case proplists:get_value(proxy, Req) of
+      undefined ->
+         {
+            list_to_binary(ek_uri:get(authority, Uri)),   
+            list_to_binary(ek_uri:get(path, Uri))
+         };
+      Proxy     ->
+         {
+            list_to_binary(ek_uri:get(authority, Proxy)), 
+            list_to_binary(ek_uri:to_list(Uri))
+         }
+   end,
+   % headers
+   Head = case proplists:get_value(header, Req) of
       undefined -> <<>>;
       List      -> list_to_binary([<<H/binary, "\r\n">> || H <- List])
    end,
-   Req = <<
-      "GET ", Rpath/binary, " HTTP/1.1\r\n",
+   Mod:send(Sock, <<
+      Method/binary, " ", Path/binary, " HTTP/1.1\r\n",
       "Connection: close\r\n",
       "Accept: */*\r\n",
-      "Host: ", Rauth/binary, "\r\n",
+      "Host: ", Host/binary, "\r\n",
       Head/binary,
-      "\r\n"
-   >>,
-   Mod:send(Sock, Req),
-   {ok, [{Mod, Sock}, Uri]}.
+      "\r\n",
+      Payload/binary
+   >>),
+   hof:ok(Sckt, Uri).
    
 
 %%
-%% Receive 1st byte
-recv({Mod, Sock}, Uri) ->
+%% wait service response 
+%%
+wait({Mod, Sock, _} = Sckt, Uri) ->
    case Mod:recv(Sock, 0) of
-      {ok, Pckt}  -> {ok, [{Mod, Sock}, Uri, Pckt]};
-      {error, _}  -> {ok, [{Mod, Sock}, Uri]}
+      {ok, Pckt}  -> 
+         hof:ok(Sckt, Uri, Pckt);
+      {error, _}  -> 
+         hof:ok(Sckt, Uri, undefined)
    end.   
 
 %%
-%% Receive reminder
-recv({Mod, Sock}, Uri, Data) -> 
+%% receive service response 
+%%
+recv(Sock, Uri, undefined) ->
+   hof:ok(Sock, Uri, undefined);
+recv({Mod, Sock, _} = Sckt, Uri, Data) -> 
    case Mod:recv(Sock, 0) of
-      {ok,      Pckt}  ->
-         recv({Mod, Sock}, Uri, <<Data/binary, Pckt/binary>>);
+      {ok,   <<"0\r\n\r\n">>} ->
+         % fix for chunked encoding
+         hof:ok(Sckt, Uri, <<Data/binary, "0\r\n\r\n">>); 
+      {ok,   Pckt}  ->
+         recv(Sckt, Uri, <<Data/binary, Pckt/binary>>);
       {error, closed}  ->
-         {ok, [{Mod, Sock}, Uri, Data]}
+         hof:ok(Sckt, Uri, Data)
    end.
       
    
 %%
 %% parse response as tuple
-response(Sock, Uri, Data) ->
-   {ok, [Sock, Uri, rsp(Data, <<>>, undefined)]}.
+rsp(Sock, Uri, Data) ->
+   hof:ok(
+      Sock,
+      ht_parse(Data, <<>>, undefined)
+   ).
 
-rsp(<<"\r\n", T/binary>>, Acc, undefined) ->
+ht_parse(<<"\r\n", T/binary>>, Acc, undefined) ->
    {[_, Status, _], _} = lists:split(3, string:tokens(binary_to_list(Acc), " ")),
    Code = list_to_integer(Status),
-   rsp(T, <<Acc/binary, "\r\n">>, Code);
+   ht_parse(T, <<Acc/binary, "\r\n">>, Code);
    
-rsp(<<"\r\n\r\n", T/binary>>, Acc, Code) ->
-   {Code, <<Acc/binary, "\r\n\r\n">>, T};
+ht_parse(<<"\r\n\r\n", T/binary>>, Acc, Code) ->
+   {http, Code, <<Acc/binary, "\r\n\r\n">>, T};
 
-rsp(<<H:8, T/binary>>, Acc, Code) ->
-   rsp(T, <<Acc/binary, H:8>>, Code).
+ht_parse(<<H:8, T/binary>>, Acc, Code) ->
+   ht_parse(T, <<Acc/binary, H:8>>, Code).
 
    

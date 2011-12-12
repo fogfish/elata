@@ -130,7 +130,9 @@ alt(Seq) ->
 %%
 %% '?'(...) -> Fun
 %%
-'?'(Seq) ->
+'?'(Seq) when is_list(Seq) ->
+   fun(X) when is_record(X, emc) -> '_?'(seq(Seq), X) end;
+'?'(Seq) when is_function(Seq) ->
    fun(X) when is_record(X, emc) -> '_?'(Seq, X) end.
 
 %%
