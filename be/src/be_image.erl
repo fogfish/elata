@@ -74,12 +74,14 @@
 
 %%
 %%
-start_link(Spec, Key, Val) ->
-  gen_server:start_link(?MODULE, [Spec, Key, Val], []).
+start_link(Spec, Pid, Proc) ->
+  gen_server:start_link(?MODULE, [Spec, Pid, Proc], []).
   
-init([Spec, Key, Val]) ->
+init([Spec, Id, Proc]) ->
+   % register value (Spec is Category specification)
    Cat = proplists:get_value(uri, Spec),
-   gen_kvs:val_init(Cat, Key),
+   gen_kvs:val_init(Cat, Id),
+   % start rendering timer(s)
    lists:foreach(
       fun({Scale, Timeout}) ->
          timer:send_after(
@@ -90,15 +92,14 @@ init([Spec, Key, Val]) ->
       end,
       proplists:get_value(scale, Spec)
    ),
-   Tname = proplists:get_value(template, Spec) ++ "/" ++ binary_to_list(ek_uri:fragment(Key)),
+   % template id is fragment
+   error_logger:info_report([{id, Id}]),
+   Tname = proplists:get_value(template, Spec) ++ "/" ++ ek_uri:path(1, Id),
    {ok, 
       #srv{
          cat  = Spec, 
-         key  = Key,
-         val  = Val,
-         name = binary_to_list(ek_uri:fragment(Key)),
-         host = ek_uri:lhash(authority, Key),
-         proc = string:sub_string(binary_to_list(ek_uri:path(Key)), 2),
+         key  = Id,
+         val  = Proc,
          tpl  = be_rrd:compile(Tname)
       } 
    }. 
@@ -118,14 +119,19 @@ handle_cast(_Req, State) ->
 handle_info({render, Scale, Timeout}, S) ->   
    ?DEBUG([{render, Scale}, {id, ek_uri:to_binary(S#srv.key)}]),
    % image rendering 
+   Title = binary_to_list(proplists:get_value(script, S#srv.val)),
+   Node  = ek_uri:get(authority, S#srv.key),
+   Path  = ek_uri:to_path(
+         ek_uri:set(path, ek_uri:path(-1, S#srv.key), S#srv.key)
+   ),
    Ctx = [
-      {title, binary_to_list(ek_uri:authority(S#srv.key)) ++ " " ++ S#srv.val},
+      {title, Node ++ " " ++ Title},
       {from,  "-" ++ Scale},
-      {host,  S#srv.host},
-      {uid,   S#srv.proc}
+      {trend, integer_to_list(erlang:round(scale_to_sec(Scale) / 3))},
+      {path,  Path}
    ],
-   Filename = S#srv.host ++ "/" ++ S#srv.proc ++ "/" ++ S#srv.name ++ "/" ++ Scale ++ ".png",
-   be_rrd:render(S#srv.cat, Ctx, S#srv.tpl, Filename),
+   ImgUri = ek_uri:append(path, "/" ++ Scale ++ ".png", S#srv.key), 
+   be_rrd:render(S#srv.cat, Ctx, S#srv.tpl, ek_uri:to_path(ImgUri)),
    timer:send_after(Timeout, {render, Scale, Timeout}),
    {noreply, S};
 handle_info(_Msg, S) ->
@@ -144,4 +150,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Private functions
 %%%
 %%%------------------------------------------------------------------
+
+scale_to_sec("1hours")  ->  1 * 3600;
+scale_to_sec("12hours") -> 12 * 3600;
+scale_to_sec("1day")    -> 24 * 3600;
+scale_to_sec("3days")   ->  3 * 24 * 3600;
+scale_to_sec("1week")   ->  7 * 24 * 3600;
+scale_to_sec("1month")  -> 30 * 24 * 3600;
+scale_to_sec("6months") ->  6 * 30 * 24 * 3600;
+scale_to_sec("1year")   -> 12 * 30 * 24 * 3600.
+
+
 

@@ -189,7 +189,7 @@ send({Scheme, _} = Uri, Msg) ->
       []   ->
          % authority is not defined, local process
          case ek:whereis(Uri) of
-            undefined -> throw({badarg, Uri});
+            undefined -> {error, {no_process, Uri}};
             Pid       -> Pid ! Msg, ok
          end;
       Auth ->
@@ -197,7 +197,7 @@ send({Scheme, _} = Uri, Msg) ->
             Auth -> 
                % Auth = ek:node() message for this node
                case ek:whereis(ek_uri:set(authority, "", Uri)) of
-                  undefined -> throw({badarg, Uri});
+                  undefined ->{error, {no_process, Uri}};
                   Pid       -> Pid ! Msg, ok
                end;
             _    ->
@@ -207,7 +207,7 @@ send({Scheme, _} = Uri, Msg) ->
                   )
                ),
                case ek:whereis(Nid) of
-                  undefined -> throw({badarg, Uri});
+                  undefined -> {error, {no_node, Uri}};
                   Pid       -> ek_prot:send(Pid, Uri, Msg)
                end
          end

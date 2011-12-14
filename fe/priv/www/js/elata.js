@@ -173,9 +173,10 @@ function ui_user_profile(obj)
 	
 	for(id in user.usecase)
 	{
+		var pid = uri(id);
       ui_usecase_summary(id, user.usecase[id]).inject(ui_dsh);
 	   new Request.JSON({
-	      url: '/' + user.username + '/proc/' + id,
+	      url: '/' + user.username + '/' + pid.schema + pid.path,
 	      onSuccess: ui_usecase_details
 	   }).get();		
 	};
@@ -217,7 +218,7 @@ function ui_usecase_summary(id, uc)
 	var a  = (new Element('a')).inject(li);
 	(new Element('small', {html: 'PENDING'})).inject(a);
 	var icn = (new Element('img')).inject(a);
-   icn.src = '/view/' + locId + '/' + id + '/icon.image/1hours';
+   icn.src = '/style/pending.png';
 	
    var d  = (new Element('div')).inject(a);
 	(new Element('span', {html: title[0]})).inject(d);	
@@ -251,13 +252,10 @@ function ui_usecases_update()
 	{
       var ui = $(id);
       var u  = user.usecase[id];
-      ui.getElement('img').src = '/view/' + locId + '/' + id + '/icon.image/1hours';
       ui.getElements('span')[1].innerHTML = u.script;
+      ui.getElement('img').src = u.telemetry[locId].icon;
 	   if (u.telemetry && u.telemetry[locId])
-	   	if (u.telemetry[locId].latency)
-	   	   ui.getElement('small').innerHTML = (u.telemetry[locId].latency / 1000).toFixed(3) + ' ms';
-	   	else
-		      ui.getElement('small').innerHTML = (u.telemetry[locId] / 1000).toFixed(3) + ' ms';
+	      ui.getElement('small').innerHTML = (u.telemetry[locId].latency / 1000).toFixed(3) + ' ms';
       else
 	      ui.getElement('small').innerHTML = 'PENDING';
 	};
@@ -387,7 +385,7 @@ function new_usecase()
 	if (valid && username)
 	{
 		new Request.JSON({
-			url: '/' + username + '/proc',
+			url: '/' + username + '/process',
 			onSuccess: get_user_profile
 		}).send({
 		   method: 'post',
@@ -503,6 +501,10 @@ function ui_statistic()
    var i1 = (new Element('img')).inject(ui);
    i1.src = '/view/' + locId + '/' + key + '/latency.image/' + scale;
    
+   var i5 = (new Element('img')).inject(ui);
+   i5.src = '/view/' + locId + '/' + key + '/dns.image/' + scale;
+   
+   
    var i2 = (new Element('img')).inject(ui);
    i2.src = '/view/' + locId + '/' + key + '/tcp.image/' + scale;
    
@@ -534,6 +536,39 @@ function view_back()
    });
 	$(id).setProperty('focused', 'true');
 }
+
+
+//-------------------------------------------------------------------
+//
+// URI parser
+//
+//-------------------------------------------------------------------
+function uri(Str)
+{
+	var obj   = {};
+	var acc   = "";
+	var state = 0;
+   for (i = 0; i < Str.length; i++)
+   {
+      if ((state == 0) && (Str.charAt(i) == ':'))
+      {	
+         obj.schema = acc;
+         acc = "";
+      } else if (acc == "//") {
+      	acc   = "";
+      	state = 1;
+      } else if ((state == 1) && (Str.charAt(i) == '/')) {
+      	obj.authority = acc;
+      	acc   = "/";
+      	state = 2;
+      } else {
+      	acc = acc + Str.charAt(i);
+      }
+   };
+   obj.path = acc;
+   return obj;	
+}
+
 
 
 

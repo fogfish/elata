@@ -70,11 +70,11 @@ start(_Type, _Args) ->
          % users TODO: dets
          {ok, _} = kvs:new("kvs:/elata/user",    [
             {storage, kvs_dets},
-            {file, DataDir ++ "/user.dets"}
+            {file, DataDir ++ "/user-v2.dets"}
          ]),
          {ok, _} = kvs:new("kvs:/elata/usecase", [
             {storage, kvs_dets},
-            {file, DataDir ++ "/ucase.dets"}
+            {file, DataDir ++ "/ucase-v2.dets"}
          ]),
          {ok, Pid};
       Err ->

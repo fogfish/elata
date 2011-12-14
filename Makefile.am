@@ -18,6 +18,7 @@ SUBDIRS = ek emc kvs agt be fe
 
 SRC  = \
    agt-$(VERSION).tgz \
+   be-$(VERSION).tgz \
    fe-$(VERSION).tgz
 
 rel: $(SRC)

@@ -1,0 +1,44 @@
+--interlace
+--imgformat PNG
+--slope-mode
+--full-size-mode
+--lower-limit 0
+--vertical-label sec
+--rigid
+--border 0
+--width 720
+--height 240
+--title "packets <?title?>"
+--start <?from?>
+--end now
+DEF:a=<?data?>/<?path?>/pckt:val:AVERAGE
+CDEF:t=a,<?trend?>,TRENDNAN
+
+AREA:a#ccff66:"packets"
+VDEF:amin=a,MINIMUM
+VDEF:aavg=a,AVERAGE
+VDEF:astd=a,STDEV
+VDEF:ap95=a,95,PERCENTNAN
+VDEF:ap98=a,98,PERCENTNAN
+VDEF:amax=a,MAXIMUM
+GPRINT:amin:"min %1.3lf"
+GPRINT:aavg:"avg %1.3lf"
+GPRINT:astd:"std %1.3lf"
+GPRINT:ap95:"95%% %1.3lf"
+GPRINT:ap98:"98%% %1.3lf"
+GPRINT:amax:"max %1.3lf\j"
+
+LINE1:t#333300:"trend  "
+VDEF:tmin=t,MINIMUM
+VDEF:tavg=t,AVERAGE
+VDEF:tstd=t,STDEV
+VDEF:tp95=t,95,PERCENTNAN
+VDEF:tp98=t,98,PERCENTNAN
+VDEF:tmax=t,MAXIMUM
+GPRINT:tmin:"min %1.3lf"
+GPRINT:tavg:"avg %1.3lf"
+GPRINT:tstd:"std %1.3lf"
+GPRINT:tp95:"95%% %1.3lf"
+GPRINT:tp98:"98%% %1.3lf"
+GPRINT:tmax:"max %1.3lf\j"
+

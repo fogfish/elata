@@ -59,7 +59,8 @@
 ]).
 
 -record(fsm, {
-   node,    % node name
+   node,    % node identity (uri)
+   name,    % node name (human readable name)
    sock,    % node transport
    attempt, % number of connection attempts
    p,       % inbound fragmented packet
@@ -102,7 +103,8 @@ send(Pid, Uri, Msg) ->
 start_link(Config, Uri) ->
    gen_fsm:start_link(?MODULE, [Config, Uri], []).
    
-init([_Config, Uri]) ->
+init([_Config, Nid]) ->
+   Uri = ek_uri:set(q, [], Nid),
    case ek:whereis(Uri) of
       undefined ->
          ?DEBUG([{node, Uri}, {pid, self()}]),
@@ -112,6 +114,7 @@ init([_Config, Uri]) ->
             'IDLE',
             #fsm{
                node    = Uri,
+               name    = ek_uri:get(q, Nid),
                sock    = undefined,
                attempt = 0,
                q       = queue:new()
@@ -249,11 +252,13 @@ code_change(_OldVsn, Name, State, _Extra) ->
 %%
 %% Sync API Impl
 %%
-handle_sync_event(get_node_info, _From, Name, State) ->   
+handle_sync_event(get_node_info, _From, Name, S) ->   
    R = [
+      {node,  S#fsm.node},
+      {name,  S#fsm.name},
       {state, Name}
    ],
-   {reply, {ok, R}, Name, State};
+   {reply, {ok, R}, Name, S};
    
 handle_sync_event(_Req, _From, Name, State) ->
    {reply, {error, not_supported}, Name, State}.   
@@ -272,6 +277,7 @@ handle_sync_event(_Req, _From, Name, State) ->
 %%
 %% register node
 join_node(Node)  ->
+   %%ek:register(Node),
    gen_fsm:send_event_after(?T_NODE_HEARTBEAT, heartbeat),
    ek_evt:join(Node),
    ?DEBUG([{join, Node}]). 
@@ -279,6 +285,7 @@ join_node(Node)  ->
 %%
 %% remove node
 leave_node(Node) ->  
+   %%ek:unregister(Node),
    gen_fsm:send_event_after(?T_NODE_HEARTBEAT, node_connect),
    ek_evt:leave(Node),
    ?DEBUG([{leave, Node}]).

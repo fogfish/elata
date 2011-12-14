@@ -36,43 +36,44 @@
 %% High-order functions: Elata agent
 %%
 -export([
-   pipeline/2
+   pipeline/1
 ]).
 
 %%
 %% agent measurment pipeline
-pipeline(Owner, Key) ->
+pipeline(Pid) ->
    emc:seq([
-      hof_perf:net(),                 % latency measurment pipeline
-      fun telemetry/2,                % telemetry aggregation
-      fun(Tele, Uri, Doc) ->          % telemetry persistency
-         store(Owner, Key, Tele, Uri, Doc) 
+      hof_perf:net(),            % latency measurment pipeline
+      fun(Tele, Doc) ->          % telemetry persistency
+         store(Pid, Tele, Doc) 
       end  
    ]).
 
-
-%%
-%% accumulates telemetry
-telemetry(PfStat, SockStat) ->
-   Uri  = lists:foldl(fun({_, V}, A) -> A + V end, 0, PfStat),
-   Stat = [{uri, Uri} | PfStat ++ SockStat], 
-   {ok, [Stat]}.
    
 %%
 %%
-store(Owner, Key, Tele, Uri, {Code, HTTP, Doc}) ->
+store(Pid, Tele, {_, Code, HTTP, Doc}) ->
+   Cat = ek_uri:set(path, "/elata/ds", ek_uri:set(schema, kvs, Pid)), 
    lists:foreach(
       fun({Tag, Value}) ->
-         Sfx = atom_to_binary(Tag, utf8),
-         Tid = {http, ek:node(), <<"/", Key/binary, "/", Sfx/binary>>},
-         ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/ds">>}, Tid, {timestamp(), Value})
+         Sfx = atom_to_list(Tag),
+         Tid = ek_uri:append(path, "/" ++ Sfx,
+            ek_uri:set(authority, ek:node(), Pid)
+         ),
+         ok  = kvs:put(Cat, Tid, {timestamp(), Value})
       end,
-      Tele
+      [{code, Code} | Tele]
    ),
-   Tid = {http, ek:node(), <<"/", Key/binary, "/code">>},
-   ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/ds">>}, Tid, {timestamp(), Code}),
-   ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/rsp">>}, {http, ek:node(), <<"/", Key/binary>>}, HTTP),
-   ok  = kvs:put({kvs, ek_uri:authority(Owner), <<"/elata/doc">>}, {http, ek:node(), <<"/", Key/binary>>}, Doc),
+   ok  = kvs:put(
+      ek_uri:set(path, "/elata/rsp", Cat),
+      ek_uri:set(authority, ek:node(), Pid),
+      HTTP
+   ),
+   ok  = kvs:put(
+      ek_uri:set(path, "/elata/doc", Cat),
+      ek_uri:set(authority, ek:node(), Pid),
+      Doc
+   ),
    {ok, []}.
 
 

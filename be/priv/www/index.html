@@ -1,0 +1,207 @@
+<!DOCTYPE html5>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="COPYRIGHT" content="
+     Copyright (c) 2011, Nokia Corporation
+     All Rights Reserved.
+
+     The contents of this file are subject to the 3-clause BSD License,
+     (the "License"); you may not use this file except in compliance 
+     with the License. You should have received a copy of the 3-clause
+     BSD Licensee along with this software. If not, it can be
+     retrieved online at http://www.opensource.org/licenses/BSD-3-Clause.
+ 
+     Software distributed under the License is distributed on an "AS IS"
+     basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+     the License for the specific language governing rights and limitations
+     under the License.
+    ">
+    <title>Latency In-Focus</title>
+    <link rel="stylesheet" type="text/css" href="style/ui.css">
+    <link rel="stylesheet" type="text/css" href="style/be.css">
+    <script type="text/javascript" src="js/mootools-core-1.4.1.js"></script>
+    <script type="text/javascript" src="js/be.js"></script>
+    <script type="text/javascript">
+        window.addEvent('domready', function() {
+           main()	
+        });
+    </script>
+</head>
+<body>    
+
+
+<div class="view">
+   
+   <div class="toolbar header">
+     <ul class="list menu">
+        <li><span>Latency Console</span></li>
+        <li class="button"><a class="warn" id="action-del">&#8855;</a></li>
+        <li class="button right"><a id="back">Back</a></li>
+        <li class="button right"><a id="action-stat">Graphs</a></li>
+        <li class="button right"><a id="action-add">&#8853;</a></li>
+     </ul>
+   </div>                          
+   
+   <div class="main">
+      <div class="viewport">
+         <div class="col col1">
+         <ul id="cluster" class="list">
+            <!-- node template --
+            <li>
+               <a href="#">
+                  <small>on</small>
+                  node://localhost:8080
+               </a>
+            </li>
+            -- -->
+         </ul>
+         </div>
+         <div class="col col2">
+         
+         <!-- View Dashboard -->
+         <ul id="dashboard" class="list panel" focused="true">
+            <!-- element template
+            <li>
+               <a href="#">
+                  <small>FREE</small> 
+                  <img src="style/any/dev-image.jpg">      
+                  <div>
+                     <span class="type">Video</span>
+                     <big  class="label">Video 1</big>
+                     <span class="desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla vitae enim sapien.</span>
+                 </div>             
+               </a>
+            </li>
+            -->
+         </ul>
+         
+         <!-- View Viewer -->
+         <ul id="viewer" class="list proplist panel" focused="false">
+            <li>Details</li>
+            <li id="li-script">
+               <h3>script</h3>
+               <span></span>
+            </li>
+            <li id="li-http">
+               <h3>http</h3>
+               <p></p>
+            </li>
+            <li id="li-thinktime">
+               <h3>thinktime</h3>
+               <span></span>
+            </li>
+            <li id="li-uri">
+               <h3>latency</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-dns">
+               <h3>dns</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-tcp">
+               <h3>tcp</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-ssl">
+               <h3>ssl</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-ttfb">
+               <h3>ttfb</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-ttmr">
+               <h3>ttmr</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-size">
+               <h3>size</h3>
+               <span unit="KB" scale="1024">0</span>
+            </li>
+            <li id="li-pckt-size">
+               <h3>IP pckt size</h3>
+               <span unit="B">0</span>
+            </li>
+            <li id="li-pckt">
+               <h3>IP packets</h3>
+               <span>0</span>
+            </li>
+            <li id="li-response">
+               <h3>response</h3>
+               <pre> </pre>
+            </li>
+            <li id="li-payload">
+               <h3>payload</h3>
+               <pre> </pre>
+            </li>
+         </ul>
+         
+         <!-- Graphs -->
+         <ul id="graph" class="list proplist panel" focused="false">
+            <li>Graphs</li>
+            <li>
+               <h3>timescale</h3>
+               <span>
+               <select id="tscale">
+                  <option value="1hours">1  hour</option>
+                  <option value="12hours">12 hours</option>
+                  <option value="1day">1 day</option>
+                  <option value="3days">3 days</option>
+                  <option value="1week">1 week</option>
+                  <option value="1month">1 month</option>
+                  <option value="6months">6 monthes</option>
+                  <option value="1year">1 year</option>
+               </select>
+               </span>
+           </li>
+           <li class="images"></li>
+         </ul>
+         
+         <!-- editor -->
+         <ul id="editor" class="list propeditor panel">
+             <li>Editor</li>
+             <!-- uri -->
+             <li>
+                <h3>Uri</h3>
+                <span>
+                <input id="furi" name="uri" type="text" value="" placeholder="uri of your usecase (e.g. http://localhost:80/path_to_resource)">
+                </span>
+             </li>
+             <!-- UA -->
+             <li>
+                <h3>User-Agent</h3>
+                <span>
+                <input id="fua" name="ua" type="text" value="Mozilla/5.0 (Symbian/3; U; NokiaN8-00; Profile/MIDP-2.1 Configuration/CLDC-1.1 ) AppleWebKit/532.4 (KHTML, like Gecko) QtWRT/1.0 Mobile Safari/532.4" placeholder="value of User-Agent HTTP header">
+                </span>
+             </li>
+             <!-- Thinktime -->
+             <li>
+                <h3>Thinktime</h3>
+                <span>
+                <input id="fthinktime" name="thinktime" type="number" value="60" placeholder="think time in seconds">
+                </span>
+             </li>
+             <!-- Note -->
+             <li>
+                <h3>Note</h3>
+                <p>
+                The defined use-case will be executed agains live systems in 24/7 manner. 
+                <br/><br/>
+                <strong>Note all fields are mandatory. Uri MUST contains schema, host, port and path, e.g. http://localhost:80/path</strong>
+                </p>
+             </li>   
+          </ul>
+          
+         </div>
+      </div>
+   </div>
+   
+   <div class="toolbar footer">
+      <div class="label">powered by Erlang</div>
+   </div>
+</div>
+
+</div>
+</body>
+</html>

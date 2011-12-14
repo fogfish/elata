@@ -351,7 +351,9 @@ p_path([], fragment, Acc, {P, Q, _}) ->
 %%
 %% Maps schema to default ports
 
+schema_to_port(tcp,  [])  -> 80;   % custom schema for tcp sensors
 schema_to_port(http,  []) -> 80;
+schema_to_port(ssl,   []) -> 443;  % custom schema for ssl sensors 
 schema_to_port(https, []) -> 443;
 schema_to_port(_,     []) -> undefined;
 schema_to_port(_,   Port) -> Port.

@@ -120,7 +120,7 @@ new(Spec) ->
          undefined   
    end,
    % define in-memory bucket to keep a latest results of streams in memory
-   Uri = ek_uri:set(fragment, "cache", proplists:get_value(uri, Spec)),
+   Uri = ek_uri:append(path, "/cache", proplists:get_value(uri, Spec)),
    {ok, _} = kvs:new(
        Uri, 
       [{storage, kvs_ets}, direct]

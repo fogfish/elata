@@ -158,59 +158,61 @@ h('GET', [User],   Req) ->
 %%%
 %%%------------------------------------------------------------------
 
-%% /user/proc -> process id
-h('POST', [User, "proc"], Req) ->
+%% /user/process -> process id
+h('POST', [User, "process"], Req) ->
+   %% pre-process input
    Val  = json_to_elata(Req:recv_body(), [
       <<"usecase">>, <<"script">>, <<"http">>, <<"proxy">>, <<"thinktime">>,
       <<"ttl">>
    ]),
-   % usecase this is a user specific component
-   Proc = proplists:delete(usecase, Val),
-   Pid  = crypto:sha(term_to_binary(Proc)),  % process identity
-   Uid  = uid(User),
-   % mark user as an owner for new process
-   case kvs:has("kvs:/elata/proc", Pid) of
-      false ->
-        % process do not exists (store it) & mark ownership
-        ok = kvs:put(
-           "kvs:/elata/proc", Pid, 
-           [{owner, ek_uri:to_binary(Uid)} | Proc]
-        ),
-        % spawn rendering
-        be:spawn(Pid, Proc);
-      true  -> 
-        % process exists 
-        ok
+   Right = case be_process:put(proplists:delete(usecase, Val)) of
+      %% new process user is owner
+      {ok, Pid}                      -> 7; %xrw
+      %% existed process user is observer
+      {error, {already_exists, Pid}} -> 6  %xr-
    end,
-   % update user record
+   Uid  = uid(User),
+   Case =  {ek_uri:to_binary(Pid),  
+      {struct, [
+         {<<"title">>, proplists:get_value(usecase, Val)},
+         {<<"right">>, Right}
+      ]}
+   },
    {ok, Cases} = kvs:get("kvs:/elata/usecase", Uid, []),
-   ok = kvs:put("kvs:/elata/usecase", Uid, [
-      {
-         list_to_binary(bin_to_hex(Pid)), 
-         elata_to_mochi([{title, proplists:get_value(usecase, Val)}])
-      } | Cases
-   ]),
-   Req:respond({200, [{"Conten-Type", "application/json"}], "\"" ++ bin_to_hex(Pid) ++ "\""});
+   ok = kvs:put("kvs:/elata/usecase", Uid, [Case | Cases]),
+   Req:respond({200, [{"Conten-Type", "application/json"}], "\"" ++ ek_uri:to_list(Pid) ++ "\""});
    
-h('GET', [User, "proc", Key], Req) ->
-   {ok, Val} = kvs:get("kvs:/elata/proc", hex_to_bin(Key)),
+h('GET', [User, Schema, Key], Req) ->
+   K   =  list_to_binary(Key),
+   Pid = {list_to_atom(Schema), ek:node(), <<"/", K/binary>>},  
+   {ok, Val} = kvs:get("kvs:/elata/proc", Pid),
    List = lists:map(
       fun(Node) ->
-         BK   = list_to_binary(Key),
-         DsId = {http, ek_uri:authority(Node), <<"/", BK/binary, "/uri">>},
-         {ok, T} = kvs:get("kvs:/elata/ds", DsId, 0),
-         {ek_uri:authority(Node), T}
+         Tid  = {http, ek_uri:authority(Node), <<"/", K/binary, "/uri">>},   
+         {ok, T} = kvs:get("kvs:/elata/ds", Tid, 0),
+         Bauth   = ek_uri:authority(Node),
+         Icon    = <<"/view/", Bauth/binary, "/", K/binary, "/icon.image/1hours.png">>, 
+         {Bauth, 
+            {struct, [
+               {<<"latency">>, T}, 
+               {<<"icon">>,    Icon}
+            ]}
+         }
       end,
       ek:nodes()
    ),
-   MVal = [{id, list_to_binary(Key)}, {telemetry, elata_to_mochi(List)} | Val],
+   MVal = [{id, ek_uri:to_binary(Pid)}, {telemetry, elata_to_mochi(List)} | Val],
    Req:respond({
       200, 
       [{"Conten-Type", "application/json"}], 
       elata_to_json(MVal)
    });
    
-h('DELETE', [User, "proc", Key], Req) ->
+h('DELETE', [User, Schema, Key], Req) ->
+   K   =  list_to_binary(Key),
+   Pid = {list_to_atom(Schema), ek:node(), <<"/", K/binary>>},
+   Uid  = uid(User),
+
    Pid        = hex_to_bin(Key),
    {ok, Proc} = kvs:get("kvs:/elata/proc", Pid),
    Uid        = ek_uri:to_binary(uid(User)),
@@ -295,9 +297,9 @@ h('GET', [User, "telemetry", Key], Req) ->
 %%% statistic
 %%%
 %%%------------------------------------------------------------------
-h('GET', ["view", Node, Key, Klass, Scale], Req) ->
+h('GET', ["view", Node, Key, View, Scale], Req) ->
    Uri  = ek_uri:new("http://" ++ Node ++ "/" ++ Key),
-   File = ek_uri:lhash(authority, Uri) ++ "/" ++ Key ++ "/" ++ Klass ++ "/" ++ Scale ++ ".png",
+   File = ek_uri:lhash(authority, Uri) ++ "/" ++ Key ++ "/" ++ View ++ "/" ++ Scale ++ ".png",
    {ok, Val} = kvs:get("kvs:/elata/img", File),
    Req:respond({
       200,

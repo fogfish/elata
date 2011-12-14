@@ -258,8 +258,12 @@ format(tcp, Sock) ->
    <<>>;
 
 format(ssl, Sock) ->
+   {ok, Cert} = ssl:peercert(Sock),
+   CA = public_key:pkix_decode_cert(Cert, otp),
    % TODO: ssl report
-   <<>>.
+   list_to_binary(
+      lists:flatten(io_lib:print(CA))
+   ).
    
 ip_to_list({N1,N2,N3,N4}) ->
    integer_to_list(N1) ++ "." ++

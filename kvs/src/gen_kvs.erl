@@ -523,6 +523,7 @@ srv_put(Key, Val, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
             false -> ok
          end;
       Err ->
+         error_logger:error_report([{kvs, put}, {error, Err}]),
          Err
    end.
 
@@ -546,6 +547,7 @@ srv_remove(Key, #srv{spec = Spec, mod = Mod, cat = Cat}) ->
             false -> ok
          end;
       Err ->
+         error_logger:error_report([{kvs, remove}, {error, Err}]),
          Err
    end.
 

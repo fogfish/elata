@@ -1,0 +1,11 @@
+14-12-2011: Version 0.4.1 <dmitry.kolesnikov@nokia.com>
+
+* dns latency sampling via OS syscalls
+* sampling of number of received bytes (size), IP packets (pckt) and average packet length (chnk)
+* enchanced visualization of sampled data
+* content of service(s) response available via web ui, supported schemas dns,ssl, http, https
+* refactored web ui 
+* back-end management console and front-end less installation
+* bug fixes on latency measurement at tcp & ssl schemas
+
+

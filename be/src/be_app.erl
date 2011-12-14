@@ -68,9 +68,9 @@ start(_Type, _Args) ->
    Config = config(?APPNAME, [
       {codepath, "/usr"},
       {datapath, "/var/lib/elata"},
-      {sync,     120}
+      {sync,     60},
+      console
    ]),
-   %boot_storage(Config),
    case be_sup:start_link(Config) of
       {ok, Pid} ->
          {file, Module} = code:is_loaded(?MODULE),
@@ -78,7 +78,7 @@ start(_Type, _Args) ->
          % process category TODO: dets category
          kvs:new("kvs:/elata/proc", [
             {storage, kvs_dets},
-            {file, proplists:get_value(datapath, Config) ++ "/proc.dets"}
+            {file, proplists:get_value(datapath, Config) ++ "/proc-v2.dets"}
          ]), 
          kvs:new("kvs:/elata/rsp",  [{storage, kvs_ets}]), 
          kvs:new("kvs:/elata/doc",  [{storage, kvs_ets}]), 
@@ -100,17 +100,29 @@ start(_Type, _Args) ->
             {datapath, proplists:get_value(datapath, Config)},
             {scale,    ?VIEW_SCALE}
          ]),
-         kvs:map("kvs:/elata/proc", fun(Pid, Spec) -> be:spawn(Pid, Spec) end),
-         
-         % bucket to keep a persisten definition of job(s)
-         % defined by users
-         % kvs_bucket:define(bckt_proc, [{storage, kvs_sys}, event, evtlog]),
-         % bucket to keep raw telemetry (sync from agents)
-         % kvs_bucket:define(bckt_ds,   [{storage, kvs_sys}]),
-         % bucket to keep documents (sync from agents)
-         % kvs_bucket:define(bckt_doc,  [{storage, kvs_sys}]),
-         %start_agent_iface(),
-         %start_static_view(),
+         kvs:map(
+            "kvs:/elata/proc", 
+            fun(Id, Spec) -> 
+               be_process:spawn_views(ek:nodes(), Id, Spec) 
+            end
+         ),
+         % web console
+         case proplists:get_value(console, Config) of
+            undefined -> ok;
+            _         ->
+               % web app content
+               {ok, _} = kvs:new("kvs:/elata/console", [
+                  {storage, kvs_fs},
+                  {root,    Root ++ "/www"},
+                  {type,    file}
+               ]),
+               % view content
+               {ok, _} = kvs:new("kvs:/elata/g", [
+                  {storage, kvs_fs},
+                  {root, proplists:get_value(datapath, Config) ++ "/view"},
+                  {type, file}
+               ])
+         end,
          {ok, Pid};
       Err ->
          Err

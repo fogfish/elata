@@ -39,6 +39,7 @@
 
 -export([
    net/0,
+   accumulate/1,
    filter/2
 ]).
 
@@ -65,6 +66,7 @@ net() ->
          hof_http:https()
       ]),
       emc:'='(emc_pf),
+      fun hof_perf:accumulate/1,
       fun(X, Stat) -> 
          hof_perf:filter(X ++ Stat, [
             {<<"hof_inet:dns/2">>, dns},
@@ -72,6 +74,7 @@ net() ->
             {<<"hof_inet:ssl/3">>, ssl},
             {<<"hof_http:wait/2">>, ttfb},
             {<<"hof_http:recv/3">>, ttmr},
+            {wclock,    uri},
             {recv_oct, size},
             {recv_avg, chnk},
             {recv_cnt, pckt}
@@ -96,4 +99,10 @@ filter(Pf, Sample) ->
          Sample
       )]
    }.
+   
+%%
+%%
+accumulate(Pf) ->
+   WClock = lists:foldl(fun({_, V}, A) -> A + V end, 0, Pf),
+   {ok, [[{wclock, WClock} | Pf]]}.
    

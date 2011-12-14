@@ -45,7 +45,7 @@ init([Config]) ->
    {ok,
       {
          {one_for_one, 4, 3600},
-         sync(Config)
+         sync(Config) ++ httpd(Config)
       }
    }.
    
@@ -65,3 +65,23 @@ sync(Config) ->
       permanent, brutal_kill, supervisor, dynamic
    }].
 
+httpd(Config) ->
+   case proplists:get_value(console, Config) of
+      undefined -> [];
+      Port      ->
+         WebCfg = [
+            {name, be_web},
+            {loop, {be_web, h}},
+            {port, Port}
+         ],
+         [{
+            httpd,       % child id
+            {
+               mochiweb_http,  % Mod
+               start,          % Fun
+               [WebCfg]        % Args
+            },
+            transient, brutal_kill, worker, dynamic 
+        }]
+   end.
+   

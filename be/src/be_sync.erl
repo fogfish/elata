@@ -76,8 +76,17 @@ handle_cast(_Req, S) ->
    
 handle_info(timeout, #srv{thinktime = T} = S) ->
    lists:foreach(
-      fun({_,Node,_}) ->
-         catch(kvs_sync_ht_tx:start_link(master, {kvs, Node, <<"/elata/proc">>}))
+      fun(Uri) ->
+         catch(
+            kvs_sync_ht_tx:start_link(
+               master, 
+               ek_uri:set(
+                  authority,
+                  ek_uri:get(authority, Uri), 
+                  "kvs:/elata/proc"
+               )
+            )
+        )
       end,
       ek:nodes()
    ),

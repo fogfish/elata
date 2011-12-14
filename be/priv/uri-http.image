@@ -1,0 +1,96 @@
+--interlace
+--imgformat PNG
+--slope-mode
+--full-size-mode
+--lower-limit 0
+--vertical-label sec
+--rigid
+--border 0
+--width 720
+--height 240
+--title "http @ <?title?>"
+--start <?from?>
+--end now
+DEF:_a=<?data?>/<?path?>/tcp:val:AVERAGE
+DEF:_c=<?data?>/<?path?>/ttfb:val:AVERAGE
+DEF:_d=<?data?>/<?path?>/ttmr:val:AVERAGE
+DEF:_e=<?data?>/<?path?>/uri:val:AVERAGE
+DEF:_f=<?data?>/<?path?>/dns:val:AVERAGE
+CDEF:a=_a,1000000,/
+CDEF:c=_c,1000000,/
+CDEF:d=_d,1000000,/
+CDEF:e=_e,1000000,/
+CDEF:f=_f,1000000,/
+
+
+AREA:f#00FF99:"dns    "
+VDEF:fmin=f,MINIMUM
+VDEF:favg=f,AVERAGE
+VDEF:fstd=f,STDEV
+VDEF:fp95=f,95,PERCENTNAN
+VDEF:fp98=f,98,PERCENTNAN
+VDEF:fmax=f,MAXIMUM
+GPRINT:fmin:"min %1.3lf"
+GPRINT:favg:"avg %1.3lf"
+GPRINT:fstd:"std %1.3lf"
+GPRINT:fp95:"95%% %1.3lf"
+GPRINT:fp98:"98%% %1.3lf"
+GPRINT:fmax:"max %1.3lf\j"
+
+
+AREA:a#3399FF:"tcp    ":STACK
+VDEF:amin=a,MINIMUM
+VDEF:aavg=a,AVERAGE
+VDEF:astd=a,STDEV
+VDEF:ap95=a,95,PERCENTNAN
+VDEF:ap98=a,98,PERCENTNAN
+VDEF:amax=a,MAXIMUM
+GPRINT:amin:"min %1.3lf"
+GPRINT:aavg:"avg %1.3lf"
+GPRINT:astd:"std %1.3lf"
+GPRINT:ap95:"95%% %1.3lf"
+GPRINT:ap98:"98%% %1.3lf"
+GPRINT:amax:"max %1.3lf\j"
+
+AREA:c#FF3399:"ttfb   ":STACK
+VDEF:cmin=c,MINIMUM
+VDEF:cavg=c,AVERAGE
+VDEF:cstd=c,STDEV
+VDEF:cp95=c,95,PERCENTNAN
+VDEF:cp98=c,98,PERCENTNAN
+VDEF:cmax=c,MAXIMUM
+GPRINT:cmin:"min %1.3lf"
+GPRINT:cavg:"avg %1.3lf"
+GPRINT:cstd:"std %1.3lf"
+GPRINT:cp95:"95%% %1.3lf"
+GPRINT:cp98:"98%% %1.3lf"
+GPRINT:cmax:"max %1.3lf\j"
+
+AREA:d#99FF33:"ttmr   ":STACK
+VDEF:dmin=d,MINIMUM
+VDEF:davg=d,AVERAGE
+VDEF:dstd=d,STDEV
+VDEF:dp95=d,95,PERCENTNAN
+VDEF:dp98=d,98,PERCENTNAN
+VDEF:dmax=d,MAXIMUM
+GPRINT:dmin:"min %1.3lf"
+GPRINT:davg:"avg %1.3lf"
+GPRINT:dstd:"std %1.3lf"
+GPRINT:dp95:"95%% %1.3lf"
+GPRINT:dp98:"98%% %1.3lf"
+GPRINT:dmax:"max %1.3lf\j"
+
+LINE1:e#333300:"latency"
+VDEF:emin=e,MINIMUM
+VDEF:eavg=e,AVERAGE
+VDEF:estd=e,STDEV
+VDEF:ep95=e,95,PERCENTNAN
+VDEF:ep98=e,98,PERCENTNAN
+VDEF:emax=e,MAXIMUM
+GPRINT:emin:"min %1.3lf"
+GPRINT:eavg:"avg %1.3lf"
+GPRINT:estd:"std %1.3lf"
+GPRINT:ep95:"95%% %1.3lf"
+GPRINT:ep98:"98%% %1.3lf"
+GPRINT:emax:"max %1.3lf\j"
+

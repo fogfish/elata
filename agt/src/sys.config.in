@@ -24,7 +24,7 @@
 
    %% cluster
    {ek, [
-      {node, "node://localhost:8001"}
+      {node, "node://127.0.0.1:8001"}
       %% {proxy, {host, port}}
    ]},
 

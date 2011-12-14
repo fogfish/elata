@@ -11,7 +11,7 @@
 --height 32
 --start <?from?>
 --end now
-DEF:_e=<?data?>/<?host?>/<?uid?>/uri:val:AVERAGE
+DEF:_e=<?data?>/<?path?>/uri:val:AVERAGE
 CDEF:e=_e,1000000,/
 
 AREA:e#ccff66

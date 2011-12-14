@@ -33,8 +33,7 @@
 -author(dmitry.kolesnikov@nokia.com).
 
 -export([
-   start/0,
-   spawn/2
+   start/0
 ]).
 
 %%
@@ -69,46 +68,5 @@ start() ->
       Apps
    ),
    application:start(?MODULE).
+
    
-%%
-%% spawn(Spec) -> ok
-%%
-%% spawn worker(s) processes assotaited with activity
-spawn(Pid, Spec) ->
-   lists:foreach(
-      fun(Node) ->
-         lists:foreach(
-            fun(Template) ->
-               ok = kvs:put(
-                  "kvs:/elata/view", 
-                  vid(Node, Pid, Template), 
-                  binary_to_list(proplists:get_value(script, Spec))
-               )
-            end,
-            [<<"uri.image">>, <<"latency.image">>, <<"icon.image">>, <<"tcp.image">>, <<"http.image">>, <<"availability.image">>]
-         )
-      end,
-      ek:nodes()
-   ).
-   
-%%
-%% create view identity
-vid(Node, Key, Template) ->
-   K = list_to_binary(bin_to_hex(Key)),
-   {http, ek_uri:authority(Node), <<"/", K/binary, "#", Template/binary>>}.
-   
-   
-%%   
-%% binary to hex
-bin_to_hex(Bin) ->
-   bin_to_hex(Bin, "").
-   
-bin_to_hex(<<>>, Acc) ->
-   Acc;
-bin_to_hex(<<X:8, T/binary>>, Acc) ->  
-   bin_to_hex(T, Acc ++ [to_hex(X div 16), to_hex(X rem 16)]).
-   
-to_hex(X) when X < 10 ->
-   $0 + X;
-to_hex(X) ->
-   $a + (X - 10).   

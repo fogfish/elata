@@ -28,7 +28,7 @@
       {node,  "node://localhost:8000"},
       % nodes to be connected
       {nodes, [
-         "node://localhost:8001"
+         "node://127.0.0.1:8001/?localhost"
       ]}
       %% {proxy, {host, port}}
    ]},
@@ -40,6 +40,7 @@
    
    %% back-end
    {be, [
+      {console, 8080},
       {codepath, "/usr/local/macports"},
       {datapath, "/private/tmp/elata"}
    ]}

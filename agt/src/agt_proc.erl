@@ -86,9 +86,6 @@ init([Spec, Key, Proc]) ->
    Cat = proplists:get_value(uri, Spec),
    gen_kvs:val_init(Cat, Key),
    t_thinktime(Proc),
-   % pipelien params
-   Owner = proplists:get_value(owner, Proc),
-   BKey  = list_to_binary(bin_to_hex(Key)),
    % return a state
    {ok,
       #srv{
@@ -96,7 +93,7 @@ init([Spec, Key, Proc]) ->
          key = Key,
          proc= Proc,
          timestamp = timestamp(),
-         pipeline  = emc:c(runnable, emc_pf:new(emc_id, 120), agt_hof:pipeline(Owner, BKey))
+         pipeline  = emc:c(runnable, emc_pf:new(emc_id, 120), agt_hof:pipeline(Key))
        }
     }.
          

@@ -93,7 +93,7 @@ put() ->
    ),
    timer:sleep(500), %% RRD put is async, we have to wait before file is created
    ?assert(
-      kvs:has("kvs:test#cache", "/http/localhost/80/mycase/tcp")
+      kvs:has("kvs:test/cache", "/http/localhost/80/mycase/tcp")
    ),
    ?assert(
       filelib:is_file("/private/tmp/kvs/http/localhost/80/mycase/tcp")

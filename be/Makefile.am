@@ -17,6 +17,8 @@ ESRC = \
    src/be.erl \
    src/be_app.erl \
    src/be_sup.erl \
+   src/be_web.erl \
+   src/be_process.erl \
    src/be_sync.erl \
    src/be_image.erl \
    src/be_rrd.erl
@@ -26,13 +28,13 @@ EBIN += \
    ebin/sys.config \
    ebin/be.app
 
-EDAT = \
-   priv/availability.image \
-   priv/http.image \
-   priv/icon.image \
-   priv/latency.image \
-   priv/tcp.image \
-   priv/uri.image
+#EDAT = \
+#   priv/availability.image \
+#   priv/http.image \
+#   priv/icon.image \
+#   priv/latency.image \
+#   priv/tcp.image \
+#   priv/uri.image
 
 nobase_pkgliberl_SCRIPTS = $(EBIN) $(EDAT)
 CLEANFILES = $(EBIN) 
