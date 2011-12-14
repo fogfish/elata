@@ -131,7 +131,11 @@ pid(Spec) ->
    ),
    Key   = hof:bin_to_hex(Hash),
    ek_uri:set(path, "/" ++ Key, 
-      ek_uri:set(authority, ek:node(), Uri)
+      ek_uri:set(authority, ek:node(), 
+         ek_uri:set(schema, ek_uri:get(schema, Uri), 
+            ek_uri:new()
+         )
+      )
    ).
 
 

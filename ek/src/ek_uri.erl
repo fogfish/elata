@@ -119,6 +119,8 @@ get(host, {_, #uri{host = H}}) ->
    H;
 get(port, {_, #uri{port = P}}) ->
    P;
+get(resource, {_, Uri}) when is_record(Uri, uri) ->
+   to_list(resource, Uri);
 get(path, {_, #uri{path = P}}) ->
    P;
 get(q, {_, #uri{q = Q}}) ->
@@ -227,13 +229,22 @@ to_binary(Uri) ->
 %% to_path(URI) -> binary()
 %%
 to_path({_,_} = Uri) ->
+   Q = case get(q, Uri) of
+          [] -> [];
+          Rq -> integer_to_list(erlang:phash(Rq, 16#FFFFFFFF), 16)
+   end,
+   F = case get(fragment, Uri) of
+          [] -> [];
+          Rf -> integer_to_list(erlang:phash(Rf, 16#FFFFFFFF), 16)
+   end,
    List = [
       atom_to_list(get(schema, Uri)),
       get(userinfo, Uri),
       get(host, Uri),
       integer_to_list(get(port, Uri)),
       get(path, Uri),
-      get(fragment, Uri)
+      Q,
+      F
    ],
    lists:foldl(
       fun

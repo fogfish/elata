@@ -93,7 +93,6 @@ init([Spec, Id, Proc]) ->
       proplists:get_value(scale, Spec)
    ),
    % template id is fragment
-   error_logger:info_report([{id, Id}]),
    Tname = proplists:get_value(template, Spec) ++ "/" ++ ek_uri:path(1, Id),
    {ok, 
       #srv{
@@ -119,7 +118,11 @@ handle_cast(_Req, State) ->
 handle_info({render, Scale, Timeout}, S) ->   
    ?DEBUG([{render, Scale}, {id, ek_uri:to_binary(S#srv.key)}]),
    % image rendering 
-   Title = binary_to_list(proplists:get_value(script, S#srv.val)),
+   Uri = proplists:get_value(script, S#srv.val),
+   Title = case ek_uri:get(q, Uri) of
+      [] -> binary_to_list(Uri);
+      Q  -> ek_uri:to_list(ek_uri:set(q, "...", Uri))
+   end,
    Node  = ek_uri:get(authority, S#srv.key),
    Path  = ek_uri:to_path(
          ek_uri:set(path, ek_uri:path(-1, S#srv.key), S#srv.key)

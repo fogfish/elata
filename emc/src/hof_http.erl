@@ -118,7 +118,7 @@ req({Mod, Sock, _} = Sckt, {_,_} = Uri, Req) ->
       undefined ->
          {
             list_to_binary(ek_uri:get(authority, Uri)),   
-            list_to_binary(ek_uri:get(path, Uri))
+            list_to_binary(ek_uri:get(resource, Uri))
          };
       Proxy     ->
          {

@@ -15,8 +15,9 @@ tfoot, thead, tr, th, td, input
    font-size: 100%;
    font-family: inherit;
    vertical-align: baseline;
-   text-overflow: ellipsis;
    white-space: nowrap;
+   overflow: hidden;    
+   text-overflow: ellipsis;
    text-decoration: none;
 }
 
@@ -393,6 +394,18 @@ a
    width: 80%;
    font-size: 16px;
 }
+
+.col1 .list li a
+{
+   padding-right: 8px;
+}
+
+.col1 .list li a > div
+{
+   width: 100%;
+}
+
+
 
 .main .list li a > div span
 {
