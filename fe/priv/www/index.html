@@ -18,10 +18,9 @@
      under the License.
     ">
     <title>Latency In-Focus</title>
-    <link rel="stylesheet" type="text/css" href="style/ui.css">
+    <link rel="stylesheet" type="text/css" href="style/ui.css"/>
     <script type="text/javascript" src="js/mootools-core-1.4.1.js"></script>
-    <script type="text/javascript" src="js/navigator.js"></script>
-    <script type="text/javascript" src="js/elata.js"></script>
+    <script type="text/javascript" src="js/fe.js"></script>
     <script type="text/javascript">
         window.addEvent('domready', function() {
            main()	
@@ -35,30 +34,32 @@
  User sign-in/registration
 
 -->
-<div id="signin" class="view" focused="true">
+<div id="signin" class="view">
+
    <div class="toolbar header">
      <ul class="list menu">
         <li><span>Latency In-Focus</span></li>
-        <li class="button right"><a id="action-signin">Sign-in</a></li>
+        <li class="button right"><a id="action-signin" href="#">Sign-in</a></li>
      </ul>  
    </div>
    
    <div class="main">
       <div class="viewport">
-         <form>
-             <!-- service title -->
-             <div>
-                <label>Username</label>
+         <ul class="list propeditor">
+             <li>
+                <h3>Username</h3>
+                <span>
                 <input id="username" name="username" type="text" value="" placeholder="(e.g. fogfish)">
-             </div>
-             <!-- usecase title -->
-             <div>
-                <label>Email</label>
+                </span>
+             </li>
+             <li>
+                <h3>Email</h3>
+                <span>
                 <input id="usermail" name="usermail" type="text" value="" placeholder="(e.g. fogfish@ovi.com)">
-             </div>
-             <!-- disclaimer -->
-             <div>
-                <label>Note</label>
+                </span>
+             </li>
+             <li>
+                <h3>Note</h3>
                 <p>
                 The application intent is the behavior analysis of cloud-base software components using
                 live telemetry gathered as the cloud sustain production load. The objectives are control of grade of 
@@ -72,11 +73,10 @@
                 latency tracking use-cases that are executed agains live systems in 24/7 manner. Please consider carefully each
                 use-case defined by you. Please pay speciall attention when use-case covers 3rd party services.
                 <br/><br/>
-                User credential and e-mail is required for audit purposes only. User profiles are public but access to the service
-                is restricted within company.
+                User credential and e-mail is required for audit purposes only. User profiles are public.
                 </p>
-             </div>
-          </form>
+             </li>
+          </ul>
       </div>
    </div>
    
@@ -84,6 +84,220 @@
       <div class="label">powered by Erlang</div>
    </div>
 </div>
+
+
+
+
+
+<div id="main" class="view">
+   
+   <div class="toolbar header">
+     <ul class="list menu">
+        <li><span>Latency In-Focus</span></li>
+        <li class="button"><a class="warn" id="action-del" href="#">&#8855; remove</a></li>
+        <li class="button right"><a id="back" href="#">&#8656;  back</a></li>
+        <li class="button right"><a id="action-edit" href="#">&empty; edit</a></li>
+        <li class="button right"><a id="action-stat" href="#">&image; graphs</a></li>
+        <li class="button right"><a id="action-add" href="#">&#8853; add</a></li>
+        <li class="button right"><a id="action-update" href="#">&#8853; update</a></li>
+     </ul>
+     <div class="signout">logged as <span id="username1"></span> <a href="#" id="action-out">( sign out )</a></div>
+   </div>                          
+   
+   <div class="main">
+      <div class="viewport">
+         <div class="col col1">
+         <ul id="cluster" class="list container">
+            <!-- node template --
+            <li>
+               <a href="#">
+                  <small>on</small>
+                  node://localhost:8080
+               </a>
+            </li>
+            -- -->
+         </ul>
+         </div>
+         <div class="col col2">
+         
+         <!-- View Dashboard -->
+         <ul id="dashboard" class="list panel" focused="true">
+            <!-- element template
+            <li>
+               <a href="#">
+                  <small>FREE</small> 
+                  <img src="style/any/dev-image.jpg">      
+                  <div>
+                     <span class="type">Video</span>
+                     <big  class="label">Video 1</big>
+                     <span class="desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla vitae enim sapien.</span>
+                 </div>             
+               </a>
+            </li>
+            -->
+         </ul>
+         
+         <!-- View Viewer -->
+         <ul id="viewer" class="list proplist panel" focused="false">
+            <li>Details</li>
+            <li id="li-script">
+               <h3>script</h3>
+               <span></span>
+            </li>
+            <li id="li-http">
+               <h3>http</h3>
+               <p></p>
+            </li>
+            <li id="li-thinktime">
+               <h3>thinktime</h3>
+               <span></span>
+            </li>
+            <li id="li-uri">
+               <h3>latency</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-dns">
+               <h3>dns</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-tcp">
+               <h3>tcp</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-ssl">
+               <h3>ssl</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-ttfb">
+               <h3>ttfb</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-ttmr">
+               <h3>ttmr</h3>
+               <span unit="ms" scale="1000">0</span>
+            </li>
+            <li id="li-size">
+               <h3>size</h3>
+               <span unit="KB" scale="1024">0</span>
+            </li>
+            <li id="li-pckt-size">
+               <h3>IP pckt size</h3>
+               <span unit="B">0</span>
+            </li>
+            <li id="li-pckt">
+               <h3>IP packets</h3>
+               <span>0</span>
+            </li>
+            <li id="li-response">
+               <h3>response</h3>
+               <pre> </pre>
+            </li>
+            <li id="li-payload">
+               <h3>payload</h3>
+               <pre> </pre>
+            </li>
+         </ul>
+         
+         <!-- Graphs -->
+         <ul id="graph" class="list proplist panel" focused="false">
+            <li>Graphs</li>
+            <li>
+               <h3>timescale</h3>
+               <span>
+               <select id="tscale">
+                  <option value="1hours">1  hour</option>
+                  <option value="12hours">12 hours</option>
+                  <option value="1day">1 day</option>
+                  <option value="3days">3 days</option>
+                  <option value="1week">1 week</option>
+                  <option value="1month">1 month</option>
+                  <option value="6months">6 monthes</option>
+                  <option value="1year">1 year</option>
+               </select>
+               </span>
+           </li>
+           <li class="images"></li>
+         </ul>
+         
+         <!-- editor -->
+         <ul id="editor" class="list propeditor panel">
+             <li>Editor</li>
+             <!-- service title -->
+             <li>
+                <h3>Service</h3>
+                <span>
+                <input id="fservice" name="service" type="text" value="" placeholder="title of your service (e.g. My Service)">
+                </span>
+             </li>
+             <!-- usecase title -->
+             <li>
+                <h3>Usecase</h3>
+                <span>
+                <input id="fusecase" name="usecase" type="text" value="" placeholder="title of your usecase (e.g. My Use-Case)">
+                </span>
+             </li>
+             <!-- uri -->
+             <li>
+                <h3>Uri</h3>
+                <span>
+                <input id="furi" name="uri" type="text" value="" placeholder="uri of your usecase (e.g. http://localhost:80/path_to_resource)">
+                </span>
+             </li>
+             <!-- UA -->
+             <li>
+                <h3>User-Agent</h3>
+                <span>
+                <input id="fua" name="ua" type="text" value="Mozilla/5.0 (Symbian/3; U; NokiaN8-00; Profile/MIDP-2.1 Configuration/CLDC-1.1 ) AppleWebKit/532.4 (KHTML, like Gecko) QtWRT/1.0 Mobile Safari/532.4" placeholder="value of User-Agent HTTP header">
+                </span>
+             </li>
+             <!-- Thinktime -->
+             <li>
+                <h3>Thinktime</h3>
+                <span>
+                <input id="fthinktime" name="thinktime" type="number" value="60" placeholder="think time in seconds">
+                </span>
+             </li>
+             <!-- Note -->
+             <li>
+                <h3>Note</h3>
+                <p>
+                You are about to create a observer process against live system that might cause 24/7 load to live system. Please consider carefully necessity of the use-case defined by you. 
+<br/><br/>
+Uri defines behavior of observer process and specified system end-point. The following schemas are supported:
+<br/><br/>
+dns://myhost.com - measures a time required to resolve IP address of myhost.com
+<br/><br/>
+tcp://myhost.com - measures a time required to establish TCP/IP connection (default port is 80).
+<br/><br/>
+ssl://myhost.com - measures a time required to establish SSL connection (default port is 443).
+<br/><br/>
+http://myhost.com/mydoc.html - measures a time required to fetch mydoc.html from myhost.com over HTTP (defat port is 80). 
+<br/><br/>
+https://myhost.com/mydoc.html - measures a time required to fetch mydoc.html from myhost.com over HTTPS (defat port is 443). 
+<br/><br/>
+Foreach use-case the tool aggregates, reports and visualize various KPIs such as dns resolution time; time to establish tcp/ip connection, time to establish ssl connection, time to first byte, time to meaningful response (time to receive body), size of response, average size of ip packet, number of ip packets.
+
+</p>
+             </li>   
+          </ul>
+          
+         </div>
+      </div>
+   </div>
+   
+   <div class="toolbar footer">
+      <div class="label">powered by Erlang</div>
+   </div>
+</div>
+
+
+
+
+
+
+
+
+
 
 
 <div id="dashboard" class="view" focused="false">
@@ -94,7 +308,7 @@
         <li id="nav-agent"></li>
         <li class="button right"><a id="action-add">Add</a></li>
      </ul>
-   <div class="signout"><a href="#" id="action-out">sign out</a></div>  
+     
    </div>                          
    
    <div class="main">

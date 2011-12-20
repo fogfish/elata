@@ -87,6 +87,8 @@
 %%
 new() ->
    {undefined, #uri{}}.
+new(Schema) when is_atom(Schema) ->
+   {Schema, #uri{}};
 new({_,U} = Uri) when is_record(U, uri) ->
    Uri;
 new(Uri) when is_binary(Uri) ->

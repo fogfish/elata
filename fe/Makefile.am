@@ -26,7 +26,7 @@ EBIN += \
 
 EDAT = \
    priv/www/index.html \
-   priv/www/js/elata.js \
+   priv/www/js/fe.js \
    priv/www/js/navigator.js \
    priv/www/style/bg.png \
    priv/www/style/ui.css

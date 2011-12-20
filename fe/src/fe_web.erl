@@ -32,34 +32,24 @@
 -module(fe_web).
 -author(dmitry.kolesnikov@nokia.com).
 
-%%
-%% API:
-%%
-%% http://{host}:{port}/config/agent 
-%%   GET
-%%   List of agents configured within the system
-%%   {
-%%      id: 
-%%      title:
-%%   }
-%%
-%% http://{be}/{user}   <- GET
-%% http://{be}/profile  <- POST
-%%
-%%   User profile & list of use-cases
-%%   {
-%%      username:
-%%      usermail:
-%%      usecase: [{
-%%                  id:
-%%                  title:
-%%                }]
-%%   }
-%%
-
 
 -export([
    h/1
+]).
+
+%%
+%% available telemetry
+-define(TM, [
+   <<"uri">>,
+   <<"dns">>,
+   <<"tcp">>,
+   <<"ssl">>,
+   <<"ttfb">>,
+   <<"ttmr">>,
+   <<"code">>,
+   <<"pckt">>,
+   <<"size">>,
+   <<"chnk">>
 ]).
 
 %%
@@ -84,7 +74,7 @@ h('GET', [], Req) ->
 h('GET', ["js", File], Req) ->
    {ok, Val} = kvs:get("kvs:/elata/web", "js/" ++ File),
    Req:respond({200, [{"Conten-Type", "application/javascript"}], Val});
-
+ 
 h('GET', ["style", File], Req) ->
    {ok, Val} = kvs:get("kvs:/elata/web", "style/" ++ File),
    case filename:extension(File) of
@@ -93,28 +83,22 @@ h('GET', ["style", File], Req) ->
       _      ->   
          Req:respond({200, [{"Conten-Type", "text/css"}], Val})
    end;
-   
-%%%------------------------------------------------------------------
-%%%
-%%% User category
-%%%
-%%%------------------------------------------------------------------
-h('GET', ["config", "agent"], Req) ->
-   Nodes = lists:map(
-      fun(N) ->
-         elata_to_mochi([
-            {id,    ek_uri:authority(N)},
-            {title, ek_uri:authority(N)}
-         ])
-      end,
-      ek:nodes()
+
+h('GET', ["image" | T], Req) ->
+   File = lists:foldl(
+      fun(X, Acc) -> Acc ++ "/" ++ X end,
+      "",
+      T
    ),
+   {ok, Val} = kvs:get("kvs:/elata/img", File),
    Req:respond({
-      200, 
-      [{"Conten-Type", "application/json"}], 
-      list_to_json(Nodes)
-   });
+      200,
+      [{"Conten-Type", "image/png"}],
+      Val
+   });   
    
+h('GET', ["cluster"], Req) ->
+   be_web:h(Req);
    
 %%%------------------------------------------------------------------
 %%%
@@ -122,34 +106,36 @@ h('GET', ["config", "agent"], Req) ->
 %%%
 %%%------------------------------------------------------------------
 h('POST', ["user"], Req) ->
-   User  = json_to_elata(Req:recv_body(), [<<"username">>, <<"usermail">>]),
-   % user identity is uri http://{be}/user
-   Uid  = uid(proplists:get_value(username,  User)), 
-   case kvs:get("kvs:/elata/user", Uid) of
+   {struct, Json} = mochijson2:decode(Req:recv_body()),
+   Uid = uid(proplists:get_value(<<"username">>, Json)),
+   {ok, User} = case kvs:get("kvs:/elata/user", Uid) of
+      {ok, {struct, U}}  -> 
+         case lists:member({usermail, proplists:get_value(<<"usermail">>, Json)}, U) of
+            true  -> {ok, {struct, U}};
+            false -> {error, noaccess}
+         end;
       {error, not_found} ->
-         ok    = kvs:put("kvs:/elata/user", Uid, User),
-         Req:respond({
-            200, 
-            [{"Conten-Type", "application/json"}], 
-            elata_to_json([{usecase, elata_to_mochi([])} | User])
-         });
-      {ok, User} ->
-         {ok, Cases} = kvs:get("kvs:/elata/usecase", Uid, []),
-         Req:respond({
-            200, 
-            [{"Conten-Type", "application/json"}], 
-            elata_to_json([{usecase, elata_to_mochi(Cases)} | User])
-         })
-   end;
-
-h('GET', [User],   Req) ->
-   Uid         = uid(User),
-   {ok, UObj}  = kvs:get("kvs:/elata/user",    Uid),
-   {ok, Cases} = kvs:get("kvs:/elata/usecase", Uid, []),
+         U = {struct, [
+            {username, proplists:get_value(<<"username">>, Json)},
+            {usermail, proplists:get_value(<<"usermail">>, Json)},
+            {usecases, []}
+         ]},
+         ok = kvs:put("kvs:/elata/user", Uid, U),
+         {ok, U}
+   end,
    Req:respond({
       200, 
       [{"Conten-Type", "application/json"}], 
-      elata_to_json([{usecase, elata_to_mochi(Cases)} | UObj])
+      mochijson2:encode(User)
+   });
+
+h('GET', [Username],   Req) ->
+   Uid         = uid(Username),
+   {ok, User}  = kvs:get("kvs:/elata/user",    Uid),
+   Req:respond({
+      200, 
+      [{"Conten-Type", "application/json"}], 
+      mochijson2:encode(User)
    });
    
 %%%------------------------------------------------------------------
@@ -159,155 +145,149 @@ h('GET', [User],   Req) ->
 %%%------------------------------------------------------------------
 
 %% /user/process -> process id
-h('POST', [User, "process"], Req) ->
-   %% pre-process input
-   Val  = json_to_elata(Req:recv_body(), [
-      <<"usecase">>, <<"script">>, <<"http">>, <<"proxy">>, <<"thinktime">>,
-      <<"ttl">>
-   ]),
-   Right = case be_process:put(proplists:delete(usecase, Val)) of
+h('POST', [Username, "process"], Req) ->
+   {struct, Json} = mochijson2:decode(Req:recv_body()),
+   Uid  = uid(Username),
+   {ok, {struct, User}} = kvs:get("kvs:/elata/user", Uid),
+   Proc = [
+      {script,    proplists:get_value(<<"script">>,    Json)},
+      {http,      proplists:get_value(<<"http">>,      Json)},
+      {thinktime, proplists:get_value(<<"thinktime">>, Json)}
+   ],
+   {Pid, Right} = case be_process:put(Proc) of
       %% new process user is owner
-      {ok, Pid}                      -> 7; %xrw
+      {ok, Pid}                      -> {Pid, 7}; %xrw
       %% existed process user is observer
-      {error, {already_exists, Pid}} -> 6  %xr-
+      {error, {already_exists, Pid}} -> {Pid, 6}  %xr-
    end,
-   Uid  = uid(User),
-   Case =  {ek_uri:to_binary(Pid),  
-      {struct, [
-         {<<"title">>, proplists:get_value(usecase, Val)},
-         {<<"right">>, Right}
-      ]}
-   },
-   {ok, Cases} = kvs:get("kvs:/elata/usecase", Uid, []),
-   ok = kvs:put("kvs:/elata/usecase", Uid, [Case | Cases]),
+   Case = {struct, [
+      {service,  proplists:get_value(<<"service">>,    Json)},
+      {usecase,  proplists:get_value(<<"usecase">>,    Json)},
+      {pid,      ek_uri:to_binary(Pid)},
+      {right,    Right}
+   ]},
+   UCases = [Case | proplists:get_value(usecases, User)],
+   NUser  = [{usecases, UCases} | proplists:delete(usecases, User)],
+   ok = kvs:put("kvs:/elata/user", Uid, {struct, NUser}),
    Req:respond({200, [{"Conten-Type", "application/json"}], "\"" ++ ek_uri:to_list(Pid) ++ "\""});
    
-h('GET', [User, Schema, Key], Req) ->
-   K   =  list_to_binary(Key),
-   Pid = {list_to_atom(Schema), ek:node(), <<"/", K/binary>>},  
-   {ok, Val} = kvs:get("kvs:/elata/proc", Pid),
-   List = lists:map(
+h('GET', [Username, "process" | _], Req) ->
+   {_,  Pid}  = lists:split(length(Username) + 7 + 3, Req:get(path)),
+   {ok, Proc} = kvs:get("kvs:/elata/proc", ek_uri:new(Pid)),
+   TM = lists:map(
       fun(Node) ->
-         Tid  = {http, ek_uri:authority(Node), <<"/", K/binary, "/uri">>},   
-         {ok, T} = kvs:get("kvs:/elata/ds", Tid, 0),
-         Bauth   = ek_uri:authority(Node),
-         Icon    = <<"/view/", Bauth/binary, "/", K/binary, "/icon.image/1hours.png">>, 
-         {Bauth, 
+         Tid = ek_uri:append(path, "/uri", 
+            ek_uri:set(authority, ek_uri:get(authority, Node), Pid)
+         ),
+         Icon = list_to_binary(
+            ek_uri:to_path(
+               ek_uri:append(path, "/icon.image/1hours.png", 
+                  ek_uri:set(authority, ek_uri:get(authority, Node), Pid)
+               )
+            )
+         ),
+         {ok, Ltnc} = kvs:get("kvs:/elata/ds", Tid, 0),
+         {ek_uri:get(authority, Node), 
             {struct, [
-               {<<"latency">>, T}, 
-               {<<"icon">>,    Icon}
+               {<<"uri">>, Ltnc},
+               {<<"icon.image">>,  <<"/image", Icon/binary>>}
             ]}
          }
       end,
       ek:nodes()
    ),
-   MVal = [{id, ek_uri:to_binary(Pid)}, {telemetry, elata_to_mochi(List)} | Val],
+   R = lists_to_mjson([
+      {id, ek_uri:to_binary(Pid)},
+      {tm, {struct, TM}} 
+      | Proc   
+   ]),
    Req:respond({
       200, 
-      [{"Conten-Type", "application/json"}], 
-      elata_to_json(MVal)
+      [{"Content-Type", "application/json"}], 
+      mochijson2:encode(R)
    });
    
-h('DELETE', [User, Schema, Key], Req) ->
-   K   =  list_to_binary(Key),
-   Pid = {list_to_atom(Schema), ek:node(), <<"/", K/binary>>},
-   Uid  = uid(User),
-
-   Pid        = hex_to_bin(Key),
-   {ok, Proc} = kvs:get("kvs:/elata/proc", Pid),
-   Uid        = ek_uri:to_binary(uid(User)),
-   Owner      = proplists:get_value(owner, Proc),
-   % delete process 
-   if
-      Uid =:= Owner ->
-         ok = kvs:remove("kvs:/elata/proc", Pid),
-         % drop rendering
-         lists:foreach(
-           fun(Node) ->
-              lists:foreach(
-                 fun(Template) ->
-                    ok = kvs:remove("kvs:/elata/view", vid(Node, Pid, Template))
-                 end,
-                 [<<"uri.image">>, <<"latency.image">>, <<"icon.image">>, <<"tcp.image">>, <<"http.image">>, <<"availability.image">>]
-              )
-           end,
-           ek:nodes()
-         );
-      true ->
-         ok
-   end,
-   % update user record
-   {ok, Cases} = kvs:get("kvs:/elata/usecase", uid(User)),
-   ok = kvs:put("kvs:/elata/usecase", uid(User), 
-      lists:foldl(
-         fun({Id,_}=Obj, Acc) ->
-            Bid = hex_to_bin(binary_to_list(Id)),
-            if
-               Pid =/=  Bid -> Acc ++ [Obj];
-               true         -> Acc
-            end
-         end,
-         [],
-         Cases
-      )
-   ),
-   Req:respond({200, [], "\"" ++ Key ++ "\""});
-   
-%%%------------------------------------------------------------------
-%%%
-%%% Telemetry category
-%%%
-%%%------------------------------------------------------------------
-
-% /user/telemetry/{key}
-h('GET', [User, "telemetry", Key], Req) ->   
-   BKey = list_to_binary(Key),
-   List = lists:map(
-      fun(Node) ->                                                                                        
-         {ok, Rsp}  = kvs:get("kvs:/elata/rsp", {http, ek_uri:authority(Node), <<"/", BKey/binary>>}, <<"">>),
-         {ok, Doc}  = kvs:get("kvs:/elata/doc", {http, ek_uri:authority(Node), <<"/", BKey/binary>>}, <<"">>), 
-         {ok, Dns}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/dns">>},  0),
-         {ok, Tcp}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/tcp">>},  0),
-         {ok, Ssl}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ssl">>},  0),
-         {ok, Ttfb} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ttfb">>}, 0),
-         {ok, Ttmr} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/ttmr">>}, 0),
-         {ok, RecvAvg} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/recv_avg">>}, 0),
-         {ok, RecvCnt} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/recv_cnt">>}, 0),
-         {ok, RecvOct} = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/recv_oct">>}, 0),
-         {ok, Lat}  = kvs:get("kvs:/elata/ds",  {http, ek_uri:authority(Node), <<"/", BKey/binary, "/uri">>},  0),
-         try
+h('GET', [Username, "telemetry" | _], Req) ->   
+   {_,  Pid}  = lists:split(length(Username) + 9 + 3, Req:get(path)),  
+   {ok, Proc} = kvs:get("kvs:/elata/proc", ek_uri:new(Pid)),
+   TM = lists:map(
+      fun(Node) ->
+         L1 = lists:map(
+            fun(Sfx) ->
+               Tid = ek_uri:append(path, "/" ++ binary_to_list(Sfx), 
+                  ek_uri:set(authority, ek_uri:get(authority, Node), Pid)
+               ),
+               {ok, Val} = kvs:get("kvs:/elata/ds", Tid, 0),
+               {Sfx, Val}
+            end,
+            ?TM
+         ),
+         L2 = lists:map(
+            fun(View) ->
+               Icon = list_to_binary(ek_uri:to_path(
+                  ek_uri:append(path, "/" ++ binary_to_list(View), 
+                     ek_uri:set(authority, ek_uri:get(authority, Node), Pid)
+                  )
+               )),
+               {View, <<"/image", Icon/binary>>}
+            end,
+            proplists:get_value(view, Proc)
+         ),
+         {ok, Rsp} = kvs:get("kvs:/elata/rsp", ek_uri:set(authority, ek_uri:get(authority, Node), Pid), <<"">>),
+         {ok, Doc} = kvs:get("kvs:/elata/doc", ek_uri:set(authority, ek_uri:get(authority, Node), Pid), <<"">>),
+         L3 = try 
             mochijson2:encode(Doc),
-            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, Doc/binary>>}, {dns, Dns}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {recv_avg, RecvAvg}, {recv_cnt, RecvCnt}, {recv_oct, RecvOct}, {latency, Lat}])}
+            [{<<"response">>, Rsp}, {<<"payload">>, Doc}]
          catch
-            _:_ ->
-            SafeDoc = base64:encode(Doc),
-            {ek_uri:authority(Node), elata_to_mochi([{doc, <<Rsp/binary, SafeDoc/binary>>}, {dns, Dns}, {tcp, Tcp}, {ssl, Ssl}, {ttfb, Ttfb}, {ttmr, Ttmr}, {recv_avg, RecvAvg}, {recv_cnt, RecvCnt}, {recv_oct, RecvOct}, {latency, Lat}])}
-         end
+         _:_ ->
+            SDoc = base64:encode(Doc),
+            [{<<"response">>, Rsp}, {<<"payload">>, SDoc}]
+         end,
+         {ek_uri:get(authority, Node), 
+            {struct, L1 ++ L2 ++ L3}
+         }
       end,
       ek:nodes()
    ),
+   R = lists_to_mjson([
+      {id, ek_uri:to_binary(Pid)},
+      {tm, {struct, TM}} 
+      | Proc
+   ]),
    Req:respond({
       200, 
-      [{"Conten-Type", "application/json"}], 
-      elata_to_json(List)
+      [{"Content-Type", "application/json"}], 
+      mochijson2:encode(R)
    });
-
-%%%------------------------------------------------------------------
-%%%
-%%% statistic
-%%%
-%%%------------------------------------------------------------------
-h('GET', ["view", Node, Key, View, Scale], Req) ->
-   Uri  = ek_uri:new("http://" ++ Node ++ "/" ++ Key),
-   File = ek_uri:lhash(authority, Uri) ++ "/" ++ Key ++ "/" ++ View ++ "/" ++ Scale ++ ".png",
-   {ok, Val} = kvs:get("kvs:/elata/img", File),
-   Req:respond({
-      200,
-      [{"Conten-Type", "image/png"}],
-      Val
-   }).
-
-
+   
+   
+   
+h('DELETE', [Username, "process" | _], Req) ->
+   {_,  Pid}  = lists:split(length(Username) + 7 + 3, Req:get(path)),
+   {ok, Proc} = kvs:get("kvs:/elata/proc", ek_uri:new(Pid)),
+   Uid = uid(Username),
+   {ok, {struct, User}} = kvs:get("kvs:/elata/user", Uid),
+   %% update user record
+   {Case, UCases} = lists:foldl(
+      fun({struct, U}, {C, UC}) ->
+         case lists:member({pid, ek_uri:to_binary(Pid)}, U) of 
+            true  -> {U, UC};
+            false -> {C, [{struct, U} | UC]}
+         end
+      end,
+      {undefined, []},
+      proplists:get_value(usecases, User)
+   ),
+   % delete process if user is owner
+   case lists:member({right, 7}, Case) of
+      true  -> be_process:remove(Pid);
+      false -> ok
+   end,
+   % update user
+   NUser  = [{usecases, UCases} | proplists:delete(usecases, User)],
+   ok = kvs:put("kvs:/elata/user", Uid, {struct, NUser}),
+   Req:respond({200, [], "\"" ++ ek_uri:to_list(Pid) ++ "\""}).
+   
 
 %%%------------------------------------------------------------------
 %%%
@@ -318,9 +298,11 @@ h('GET', ["view", Node, Key, View, Scale], Req) ->
 %%
 %% create user identity
 uid(User) when is_binary(User) ->
-   {http, ek:node(), <<"/", User/binary>>};
-uid(User) when is_list(User)->
-   {http, ek:node(), list_to_binary("/" ++ User)}.
+   uid(binary_to_list(User));
+uid(User) ->
+   ek_uri:set(path, "/" ++ User,
+      ek_uri:set(authority, ek:node(), ek_uri:new(http))
+   ).
 
 %%
 %% create view identity
@@ -361,36 +343,15 @@ to_int(C) when C >= $0, C =< $9 ->
    C - $0.
    
    
-%%
-%% translates basic ELATA obj into mochiweb Json suitabe format
-elata_to_mochi(Val) when is_list(Val) ->
-   MVal = lists:map(
-      fun
-         ({K,V}) when is_binary(K) -> {K,     V};
-         ({K,V}) -> {atom_to_binary(K, utf8), V}
-      end,
-      Val
-   ),
-   {struct, MVal}.
-
    
-%%
-%% Translates JSON into Elata format
-json_to_elata(Json, Attrs) ->
-   {struct, Mochi} = mochijson2:decode(Json),
-   lists:map(
-      fun({K, V}) ->
-         true = lists:member(K, Attrs),
-         {binary_to_atom(K, utf8), V}
-      end,
-      Mochi
-   ).
-
-elata_to_json(Val) ->
-   Json = mochijson2:encode(elata_to_mochi(Val)),
-   iolist_to_binary(Json).
-   
-list_to_json(Val) ->
-   Json = mochijson2:encode(Val),
-   iolist_to_binary(Json).
+lists_to_mjson(List) -> 
+   {struct,
+      lists:map(
+         fun
+            ({K,V}) when is_binary(K) -> {K,     V};
+            ({K,V}) -> {atom_to_binary(K, utf8), V}
+         end,
+         List
+      )
+   }.   
    
