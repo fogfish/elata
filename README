@@ -1,2 +1,201 @@
+Erlang Latency Agent (elata)
+****************************
 
-See doc/ for project details
+Copyright (C) 2011 Nokia Corporation. 
+
+   This file is free documentation; the Nokia Corporation gives unlimited 
+permission to copy, distribute and modify it.
+
+Introduction
+============
+
+   The application intent is the behavior analysis of cloud-base software 
+components using live telemetry gathered as the cloud sustain production 
+load. End-to-end latency is seen by us as a major metric for quality 
+assessment of software architecture and underlying infrastructure. It 
+yields both user-oriented SLA and the objectives for each Cloud component. 
+The ultimate goal is the ability to quantitatively evaluate and trade-off 
+software quality attributes to ensure competitive end-to-end latency of 
+Internet Services:
+
+  1. Control of grade of service is fulfilling the requirements; 
+  
+  2. Quality assessment of distributed software architecture; 
+  
+  3. Resolution short term capacity decisions include for example 
+     the determination of optimal configuration, the number of live servers; 
+  
+  4. Resolution of long term capacity decisions such as decisions 
+     concerning the development and extension of data- and service 
+     architecture, choice of technology, etc;
+     
+  5. Provide granular latency control for diverse data and computational 
+     load in hybrid Cloud architectures.
+
+   If performance metrics of the service do not meet defined requirements 
+(inadequate) then business is impacted. It has been reported in multiple 
+sources that latency affects on sales, user activity and various business 
+metrics. The role of software behavioral analysis therefore is crucial in 
+order to achieve proper level of accountability of the whole system.     
+     
+   Users of the application are empowered with ability to define latency 
+tracking use-cases that are executed agains live systems in 24/7 manner. 
+Thus each use-case should consider carefully especially when use-case 
+covers 3rd party online services.
+
+   The application consists of 
+   
+   * latency measurement agent (agt) is geo distributable component, 
+     performs measurements against SUTs and reports result to back-end;
+     
+   * back-end (be) is manages use-cases, persists telemetry information,
+     visualizes statistical information;
+
+   * front-end (fe) handles user management and personalized views
+   
+
+Development environment: compile & build  
+========================================
+
+   The application source code is available at git repository
+
+   git clone https://github.com/fogfish/elata.git
+   
+   Briefly, the shell command `./configure; make; make rel' should 
+configure, build, and assembly distribution package. The following
+instructions are specific to this package; see the `INSTALL' file for
+instructions specific to GNU build tools. 
+
+   The `configure' shell script attempts to guess dependencies and system 
+configuration required to compile & build system. The application has 
+following build time dependencies:
+
+   1. Erlang/OTP (recommended release is R14B02) see http://www.erlang.org
+      for instructions specific to Erlang/OTP. If you have multiple Erlang
+      environments available at build machine then command line argument
+      --with-erlang={prefix_to_otp} supplied to `./configure' binds elata
+      application with chosen environment. 
+      
+
+   2. MochiWeb is Erlang-based lightweight http server (recommended version
+      2.3.1). It is publicly available at GitHub. The following shell command
+      build the mochiweb, they should be executed at root elata source tree
+      thus mochiweb becomes a sub-project. You can manage mochiweb as
+      independent project but then it has to be manually installed into OTP 
+      environment. 
+
+      git clone https://github.com/mochi/mochiweb.git;
+      cd mochiweb;
+      make       
+
+      Note that MochiWeb is required to develop and prepare release packages 
+      for back-end and front-end. 
+
+
+The simplest way to compile this application is:
+
+  1. `cd' to the directory containing the package's source code and type
+     `./configure' to configure the package for your system.
+
+     Running `configure' might take a while.  While running, it prints
+     some messages telling which features it is checking for.
+
+  2. Type `make' to compile the package.   
+
+  3. Type `make rel' to prepare release packages. Each release package
+     contains Erlang VM, compiled application objects and its dependencies. It
+     is ready for distribution and installation on "clean" network nodes.
+     The release package contains architecture dependence objects such as
+     Erlang VM. It is important that architectures of build and target nodes
+     are similar. 
+
+     The package assembling process should fail if the version of dependent 
+     component(s) do not match with declared one. The typical error message
+
+     mochiweb: No valid version ("2.3.0") of .app file found. Found file "./
+     mochiweb/ebin/mochiweb.app" with version "2.3.1"
+
+     The issue is fixed either by using recommended releases or modification 
+     of appropriate versions at release configuration(s): 
+        src/agt.rel.in 
+        src/be.rel.in
+        src/fe.rel.in
+
+     The shell command `make rel-clean' removes packages
+
+  4. The results are release files:
+
+        agt-x.y.z.tgz - latency measurement agent
+        be-x.y.z.tgz - back-end including Web UI management console
+        fe-x.y.z.tgz - front-end      
+
+
+Installation: Agent
+===================
+    
+   Copy agt-x.y.z.tgz to target host and extract the package content using
+   the shell command `tar -xvf agt-x.y.z.tgz'
+
+   The component is configured via releases/x.y.z/sys.config
+   (see http://www.erlang.org/doc/man/config.html for file format).
+   It is required to define:
+
+   1. The `node' address and port at `ek' section that would be used to 
+      communicate with back-end component. Use only IP address, no FQDN.
+
+   Use `./bin/elata {start|stop}' shell command to launch and kill the agent.   
+
+
+Installation: Back-end & Front-end
+==================================
+
+   Copy either be-x.y.z.tgz or fe-x.y.z.tgz (depending on your needs) to 
+   target host and extract the package using `tar -xvf {fe|be}-x.y.z.tgz'
+
+   The application utilizes rrdtools to persist a collected data and 
+   visualize statistic. Please refer to http://oss.oetiker.ch/rrdtool/
+   for installation details. It is mandatory to configure rrdtools with
+   rrdcached support. This daemon is used by elata application to scale
+   disk I/O operation.    
+
+   The component is configured via releases/x.y.z/sys.config
+   (see http://www.erlang.org/doc/man/config.html for file format).
+   It is required to define:
+
+   1. The `node' address and port at `ek' section that would be used to 
+      communicate with back-end component. Use only IP address, no FQDN.
+
+   2. The list of `nodes' at `ek' section. It specifies the list agents 
+      that should be connected. Use only IP address, no FQDN. Each node
+      is configured via URI: "node://{ip-address}:{port}/?{title}", 
+      title defines a human readable name that is visible on Web UI.
+
+   3. If back-end/front-end is connected to Internet via proxy then
+      `proxy' variable at `ek' section should define a proxy address & port
+
+   4. The path prefix to rrdtools binaries at `codepath' of `be' section. 
+      E.g. if rrdtools available at /usr/bin/rrdtool the value of `codepath'
+      id "/usr".
+
+   5. The path to persistent data that contains rrd-files, rendered 
+      images, etc. It is configured at `datapath' of `be' section. Please note
+      the folder must exists prior to application start.
+
+   6. Optionally web ui management console is enabled via `console' attribute.
+
+   7. The port for web ui is configured via `port' at `fe' section.
+         
+   Use `./bin/elata {start|stop}' shell command to launch and kill the agent.
+   You have to ensure that rrdcached is not started by OS in background,
+   otherwise telemetry would not be persisted. Alternatively, you can configure  
+   your OS to run rrdcached with following options:
+
+   rrdcached -g -w 120 -z 60 -l 127.0.0.1:42217 -B -b $datapath
+
+   where data path equals to `datapath' at `be' section of release 
+   configuration.
+
+
+
+
+

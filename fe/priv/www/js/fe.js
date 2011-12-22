@@ -524,7 +524,7 @@ function ui_list_cluster(list)
 	   		$(lid).toggleClass('selected');	
    	      lid = node.id;	
    	      $(lid).toggleClass('selected');	
-   	      ui_list_processes(plist);
+   	      get_user_profile();
          });
 	   }
 	);

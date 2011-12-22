@@ -26,7 +26,7 @@
       {compiler, "4.7.3"},
       {syntax_tools, "1.6.7"},
       {xmerl,    "1.2.8"},
-      {mochiweb, "1.5.1"},
+      {mochiweb, "2.3.1"},
       {ek,  "0.1.1"},
       {kvs, "0.2.1"},
       {emc, "0.1.1"},

@@ -30,7 +30,7 @@
       {nodes, [
           "node://127.0.0.1:8001/?localhost"
       ]}
-      %% {proxy, {host, port}}
+      %%, {proxy, "http://myproxy:8080"}
    ]},
 
    %% key-value interface

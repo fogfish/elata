@@ -14,3 +14,4 @@ Makefile
 autom4te.cache/
 *.config
 *.rrd
+mochiweb/
